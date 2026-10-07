@@ -5,9 +5,11 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from .media.images import IMAGE_EXTENSIONS, ImageRejected, load_image
+from .uploads import temp_upload
 from .model.backend import CapabilityUnavailable, ResourceError
 from .model.host import ModelBusy
 from .search import MatrixCache, rank
@@ -83,9 +85,78 @@ def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: floa
 
 
 def register(app: FastAPI) -> None:
+    register_reference(app)
+
     @app.post("/api/search/text")
     def search_text(req: TextSearchRequest) -> dict:
         vec, ms = embed_query(app, lambda b: b.embed_query_texts([req.text.strip()])[0])
         return run_search(app, mode="text", query_info={"text": req.text}, vec=vec, embed_ms=ms,
                           library_ids=req.library_ids, media_types=req.media_types, limit=req.limit)
 
+
+def _parse_libs(library_ids: str | None) -> list[str] | None:
+    if not library_ids:
+        return None
+    return [x for x in (s.strip() for s in library_ids.split(",")) if x]
+
+
+def _reference(app: FastAPI, file: UploadFile | None, asset_id: str | None):
+    """Context-managed reference resolution. Yields (image_or_None, content_hash, asset_or_None, info)."""
+    from contextlib import contextmanager
+
+    @contextmanager
+    def cm():
+        if (file is None) == (asset_id is None):
+            raise HTTPException(422, "provide exactly one of: an uploaded reference file, or asset_id")
+        if file is not None:
+            with temp_upload(file, app.state.settings.uploads_dir, IMAGE_EXTENSIONS) as (path, sha):
+                try:
+                    im = load_image(path)
+                except ImageRejected as e:
+                    raise HTTPException(422, f"invalid reference image: {e}")
+                yield im, sha, None, {"reference": "upload", "filename": file.filename}
+            return
+        a = app.state.store.get_asset(asset_id)
+        if a is None:
+            raise HTTPException(404, "reference asset not found")
+        if a["media_type"] != "image":
+            raise HTTPException(422, "reference asset is not an image")
+        _, path = app.state.asset_path(asset_id)  # ID-based, root-restricted
+        try:
+            im = load_image(path)
+        except ImageRejected as e:
+            raise HTTPException(422, f"invalid reference image: {e}")
+        yield im, a["content_hash"], a, {"reference": "asset", "asset_id": asset_id, "rel_path": a["rel_path"]}
+
+    return cm()
+
+
+def _exclusions(app: FastAPI, ref_asset: dict | None, content_hash: str | None, include_identical: bool) -> set[str]:
+    if include_identical:
+        return set()
+    ex = {ref_asset["id"]} if ref_asset else set()
+    if content_hash:
+        ex |= {a["id"] for a in app.state.store.find_by_hash(content_hash)}
+    return ex
+
+
+def register_reference(app: FastAPI) -> None:
+    @app.post("/api/search/image")
+    def search_image(file: UploadFile | None = File(None), asset_id: str | None = Form(None),
+                     library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
+                     include_identical: bool = Form(False)) -> dict:
+        with _reference(app, file, asset_id) as (im, sha, ref_asset, info):
+            stored = None
+            if ref_asset is not None:
+                stored = app.state.store.get_asset_vectors(ref_asset["id"], app.state.profile.key, "image")
+            if stored is not None:
+                vec, ms = stored[0], 0.0
+                info["embedding"] = "stored library vector"
+            else:
+                vec, ms = embed_query(app, lambda b: b.embed_images([im])[0])
+                info["embedding"] = "computed"
+        excl = _exclusions(app, ref_asset, sha, include_identical)
+        info["excluded_identical"] = len(excl)
+        return run_search(app, mode="image", query_info=info, vec=vec, embed_ms=ms,
+                          library_ids=_parse_libs(library_ids), media_types=["image"], limit=limit,
+                          exclude_assets=excl)
