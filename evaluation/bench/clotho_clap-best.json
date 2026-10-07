@@ -1,0 +1,48 @@
+{
+ "config": "clap-best",
+ "model": {
+  "id": "laion/clap-htsat-fused",
+  "revision": "365dea6ef167def6676140ed93bbc43f84dabb28"
+ },
+ "clips": 1045,
+ "captions": 5225,
+ "subset": false,
+ "device": "mps",
+ "precision": "float32",
+ "audio_input": "whole clip, 48 kHz mono, fusion truncation",
+ "audio_vectors": 1045,
+ "embed_seconds_total": 247.0,
+ "peak_rss_mb": 392.9,
+ "mps_driver_mb": 1087.2,
+ "metrics": {
+  "R@1": {
+   "mean": 0.1424,
+   "ci95": [
+    0.1286,
+    0.1568
+   ]
+  },
+  "R@5": {
+   "mean": 0.3734,
+   "ci95": [
+    0.3525,
+    0.3927
+   ]
+  },
+  "R@10": {
+   "mean": 0.498,
+   "ci95": [
+    0.4779,
+    0.5202
+   ]
+  },
+  "mAP@10": {
+   "mean": 0.2413,
+   "ci95": [
+    0.2264,
+    0.2575
+   ]
+  },
+  "median_rank": 11.0
+ }
+}

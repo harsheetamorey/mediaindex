@@ -25,6 +25,9 @@ dependencies = [
 demo = [
     "pyarrow>=25.0.1",
 ]
+bench = [
+    "py7zr",
+]
 
 [dependency-groups]
 dev = ["pytest", "httpx"]
