@@ -16,7 +16,8 @@ from .model.host import ModelBusy
 from .search import MatrixCache, rank
 from .store import index_state
 
-MEDIA_MODALITIES = {"image": ["image"], "audio": ["audio"]}
+MEDIA_MODALITIES = {"image": ["image"], "audio": ["audio"], "video": ["video-visual"]}
+VIDEO_SIGNALS = {"visual": "video-visual", "audio": "video-audio", "joint": "video-joint"}
 SIMILARITY_NOTE = ("similarity is raw cosine similarity between embeddings; it is not a probability or confidence, "
                    "and nearest-neighbour search always returns candidates even when nothing truly matches")
 
@@ -25,7 +26,8 @@ class TextSearchRequest(BaseModel):
     mode: Literal["text"] = "text"
     text: str = Field(min_length=1, max_length=2000)
     library_ids: list[str] | None = None
-    media_types: list[Literal["image", "audio"]] = ["image"]
+    media_types: list[Literal["image", "audio", "video"]] = ["image"]
+    video_signal: Literal["visual", "audio", "joint"] = "visual"
     limit: int = Field(24, ge=1, le=200)
     group_segments: bool = True
     global_rank: bool = False  # experimental: one list across media types by raw cosine
@@ -50,8 +52,18 @@ def embed_query(app: FastAPI, fn):
         raise
 
 
-def group_hits(hits, limit: int, max_extra: int = 5):
-    """Keep the best window per asset; attach up to `max_extra` other matching windows of that asset."""
+def _overlap_frac(a, b) -> float:
+    if a.start_s is None or b.start_s is None:
+        return 0.0
+    inter = max(0.0, min(a.end_s, b.end_s) - max(a.start_s, b.start_s))
+    shorter = max(1e-9, min(a.end_s - a.start_s, b.end_s - b.start_s))
+    return inter / shorter
+
+
+def group_hits(hits, limit: int, max_extra: int = 5, max_overlap: float = 0.5):
+    """Group windows by source file: the best window per asset plus up to `max_extra` other windows that
+    overlap every already-kept window of that asset by less than `max_overlap` (overlap de-duplication;
+    with 50% window overlap, adjacent windows are merged into the better one)."""
     best: dict[str, dict] = {}
     order: list[str] = []
     for h in hits:
@@ -59,10 +71,14 @@ def group_hits(hits, limit: int, max_extra: int = 5):
         if g is None:
             if len(order) >= limit:
                 continue
-            best[h.asset_id] = {"hit": h, "others": []}
+            best[h.asset_id] = {"hit": h, "others": [], "suppressed": 0}
             order.append(h.asset_id)
         elif len(g["others"]) < max_extra:
-            g["others"].append(h)
+            kept = [g["hit"], *g["others"]]
+            if all(_overlap_frac(h, k) < max_overlap for k in kept):
+                g["others"].append(h)
+            else:
+                g["suppressed"] += 1
     return [best[a] for a in order]
 
 
@@ -72,12 +88,12 @@ GLOBAL_RANK_NOTE = ("EXPERIMENTAL global ranking: images and sound windows are m
 
 def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: float, library_ids, media_types,
                limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True,
-               global_rank: bool = False) -> dict:
+               global_rank: bool = False, video_modality: str | None = None) -> dict:
     media_types = list(dict.fromkeys(media_types))
     if len(media_types) > 1:
         parts = [_search_one(app, mode=mode, query_info=query_info, vec=vec, embed_ms=embed_ms,
                              library_ids=library_ids, media_types=[t], limit=limit, exclude_assets=exclude_assets,
-                             group_segments=group_segments) for t in media_types]
+                             group_segments=group_segments, video_modality=video_modality) for t in media_types]
         out = dict(parts[0])
         out["candidates_searched"] = sum(p["candidates_searched"] for p in parts)
         out["timing_ms"] = {"query_embedding": parts[0]["timing_ms"]["query_embedding"],
@@ -98,11 +114,12 @@ def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: floa
         return out
     return _search_one(app, mode=mode, query_info=query_info, vec=vec, embed_ms=embed_ms, library_ids=library_ids,
                        media_types=media_types, limit=limit, exclude_assets=exclude_assets,
-                       group_segments=group_segments)
+                       group_segments=group_segments, video_modality=video_modality)
 
 
 def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: float, library_ids, media_types,
-                limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True) -> dict:
+                limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True,
+                video_modality: str | None = None) -> dict:
     store = app.state.store
     profile_key = app.state.profile.key
     if library_ids:
@@ -114,6 +131,8 @@ def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: flo
         raise HTTPException(409, "the selected libraries were indexed with a different model profile; re-import to "
                                  "reindex them with the current profile")
     modalities = [m for t in media_types for m in MEDIA_MODALITIES[t]]
+    if video_modality and "video" in media_types:
+        modalities = [video_modality if m == "video-visual" else m for m in modalities]
     cache: MatrixCache = app.state.matrix_cache
     t0 = time.perf_counter()
     vm = cache.get(profile_key, library_ids, modalities)
@@ -129,10 +148,16 @@ def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: flo
         a = store.get_asset(h.asset_id)
         if a is None:  # removed between ranking and lookup
             continue
-        results.append({"rank": len(results) + 1, "similarity": round(h.similarity, 5), "modality": h.modality,
-                        "start_s": h.start_s, "end_s": h.end_s, "asset": app.state.public_asset(a),
-                        "other_segments": [{"start_s": o.start_s, "end_s": o.end_s,
-                                            "similarity": round(o.similarity, 5)} for o in g["others"]]})
+        item = {"rank": len(results) + 1, "similarity": round(h.similarity, 5), "modality": h.modality,
+                "start_s": h.start_s, "end_s": h.end_s, "asset": app.state.public_asset(a),
+                "other_segments": [{"start_s": o.start_s, "end_s": o.end_s,
+                                    "similarity": round(o.similarity, 5)} for o in g["others"]],
+                "overlapping_windows_merged": g.get("suppressed", 0)}
+        if a["media_type"] == "video" and h.start_s is not None:
+            item["window_thumbnail_url"] = f"/api/assets/{a['id']}/window-thumbnail?start={h.start_s:.3f}"
+            for o in item["other_segments"]:
+                o["window_thumbnail_url"] = f"/api/assets/{a['id']}/window-thumbnail?start={o['start_s']:.3f}"
+        results.append(item)
     return {
         "mode": mode,
         "media_types": list(media_types),
@@ -152,13 +177,18 @@ def register(app: FastAPI) -> None:
     register_mixed(app)
     register_audio(app)
     register_modes(app)
+    register_video(app)
 
     @app.post("/api/search/text")
     def search_text(req: TextSearchRequest) -> dict:
         vec, ms = embed_query(app, lambda b: b.embed_query_texts([req.text.strip()])[0])
-        return run_search(app, mode="text", query_info={"text": req.text}, vec=vec, embed_ms=ms,
+        info = {"text": req.text}
+        if "video" in req.media_types:
+            info["video_signal"] = req.video_signal
+        return run_search(app, mode="text", query_info=info, vec=vec, embed_ms=ms,
                           library_ids=req.library_ids, media_types=req.media_types, limit=req.limit,
-                          group_segments=req.group_segments, global_rank=req.global_rank)
+                          group_segments=req.group_segments, global_rank=req.global_rank,
+                          video_modality=VIDEO_SIGNALS[req.video_signal])
 
 
 def _parse_libs(library_ids: str | None) -> list[str] | None:
@@ -213,7 +243,7 @@ def register_reference(app: FastAPI) -> None:
     def search_image(file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                      library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
                      include_identical: bool = Form(False),
-                     target: Literal["image", "audio"] = Form("image")) -> dict:
+                     target: Literal["image", "audio", "video"] = Form("image")) -> dict:
         with _reference(app, file, asset_id) as (im, sha, ref_asset, info):
             stored = None
             if ref_asset is not None:
@@ -227,7 +257,7 @@ def register_reference(app: FastAPI) -> None:
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
         _mark_cross(info, "image", target)
-        return run_search(app, mode="image" if target == "image" else "image→audio", query_info=info, vec=vec,
+        return run_search(app, mode="image" if target == "image" else f"image→{target}", query_info=info, vec=vec,
                           embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target], limit=limit,
                           exclude_assets=excl)
 
@@ -242,7 +272,7 @@ def register_mixed(app: FastAPI) -> None:
                           file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                           library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
                           include_identical: bool = Form(False),
-                          target: Literal["image", "audio"] = Form("image")) -> dict:
+                          target: Literal["image", "audio", "video"] = Form("image")) -> dict:
         text = text.strip()
         if not text:
             raise HTTPException(422, "refinement text is empty; use /api/search/image for reference-only search")
@@ -265,7 +295,7 @@ def register_mixed(app: FastAPI) -> None:
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
         _mark_cross(info, "image+text", target)
-        return run_search(app, mode="image+text" if target == "image" else "image+text→audio", query_info=info,
+        return run_search(app, mode="image+text" if target == "image" else f"image+text→{target}", query_info=info,
                           vec=vec, embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target],
                           limit=limit, exclude_assets=excl)
 
@@ -383,6 +413,14 @@ QUERY_MODES = [
     {"query": "audio+text", "target": "audio", "status": "experimental", "endpoint": "/api/search/audio", "needs": ["audio"]},
     {"query": "audio+text", "target": "image", "status": "experimental", "endpoint": "/api/search/audio",
      "needs": ["image", "audio"]},
+    {"query": "text", "target": "video", "status": "verified", "endpoint": "/api/search/text", "needs": ["image"]},
+    {"query": "image", "target": "video", "status": "experimental", "endpoint": "/api/search/image", "needs": ["image"]},
+    {"query": "image+text", "target": "video", "status": "verified (quality caveats)", "endpoint": "/api/search/image-text",
+     "needs": ["image"]},
+    {"query": "video-window", "target": "audio", "status": "experimental", "endpoint": "/api/search/video-window",
+     "needs": ["image", "audio"]},
+    {"query": "video-window", "target": "video", "status": "verified", "endpoint": "/api/search/video-window",
+     "needs": ["image"]},
 ]
 
 
@@ -403,3 +441,42 @@ def register_modes(app: FastAPI) -> None:
                           "calibrated across images and sounds.", GLOBAL_RANK_NOTE,
                           "A sound suggested for an image is a similarity candidate, not synchronization or a "
                           "judgement of artistic quality."]}
+
+
+class VideoWindowQuery(BaseModel):
+    asset_id: str
+    start_s: float = Field(ge=0)
+    target: Literal["audio", "video", "image"] = "audio"
+    signal: Literal["visual", "audio", "joint"] = "visual"
+    library_ids: list[str] | None = None
+    limit: int = Field(24, ge=1, le=200)
+    include_same_video: bool = False
+
+
+def register_video(app: FastAPI) -> None:
+    from .store import blob_to_vec
+
+    @app.post("/api/search/video-window")
+    def search_from_video_window(q: VideoWindowQuery) -> dict:
+        """Use a stored video window's embedding as the query (e.g. suggest sounds for a moment)."""
+        a = app.state.store.get_asset(q.asset_id)
+        if a is None or a["media_type"] != "video":
+            raise HTTPException(404, "video asset not found")
+        modality = VIDEO_SIGNALS[q.signal]
+        rows = app.state.store.db.query(
+            """SELECT start_s, end_s, dim, vector FROM embeddings WHERE asset_id=? AND profile_key=? AND modality=?
+               ORDER BY segment_index""", (q.asset_id, app.state.profile.key, modality))
+        if not rows:
+            raise HTTPException(409, f"no {modality} vectors for this video under the current profile")
+        pick = min(rows, key=lambda r: (not (r["start_s"] <= q.start_s < r["end_s"]), abs(r["start_s"] - q.start_s)))
+        vec = blob_to_vec(pick["vector"], pick["dim"])
+        info = {"reference": "video-window", "asset_id": q.asset_id, "rel_path": a["rel_path"],
+                "reference_span": [pick["start_s"], pick["end_s"]], "signal": q.signal,
+                "embedding": f"stored {modality} window vector"}
+        _mark_cross(info, "video-window", q.target)
+        if q.target == "audio":
+            info["caveat"] = ("EXPERIMENTAL: suggested sounds are similarity candidates for this moment; they are not "
+                              "generated, timed or synchronized to the video")
+        excl = set() if q.include_same_video else {q.asset_id}
+        return run_search(app, mode=f"video-window→{q.target}", query_info=info, vec=vec, embed_ms=0.0,
+                          library_ids=q.library_ids, media_types=[q.target], limit=q.limit, exclude_assets=excl)

@@ -164,3 +164,51 @@ def register(app: FastAPI) -> None:
         except (OSError, subprocess.TimeoutExpired) as e:
             raise HTTPException(500, f"could not open file manager: {e}")
         return {"revealed": True}
+
+
+class ClipPreview(BaseModel):
+    start_s: float = Field(ge=0)
+    end_s: float = Field(gt=0)
+    mode: str = "accurate"
+    destination: str = Field(min_length=1, max_length=4096)
+    query_context: dict | None = None
+
+
+def register_clips(app: FastAPI) -> None:
+    from . import clips
+
+    store = app.state.store
+    plans: dict[str, clips.ClipPlan] = {}
+    lock = threading.Lock()
+
+    @app.post("/api/assets/{asset_id}/clip/preview")
+    def clip_preview(asset_id: str, body: ClipPreview) -> dict:
+        a, path = app.state.asset_path(asset_id)
+        try:
+            plan = clips.plan_clip(store, a, path, body.start_s, body.end_s, body.mode, body.destination,
+                                   body.query_context)
+        except sel.SelectionError as e:
+            raise HTTPException(400, str(e))
+        with lock:
+            for k in [k for k, p in plans.items() if time.time() - p.created > clips.PLAN_TTL_SECONDS]:
+                plans.pop(k)
+            plans[plan.id] = plan
+        return clips.plan_dict(plan)
+
+    @app.post("/api/assets/{asset_id}/clip")
+    def clip_export(asset_id: str, body: ExportConfirm) -> dict:
+        if not body.confirm:
+            raise HTTPException(400, "clip export requires explicit confirmation")
+        with lock:
+            plan = plans.pop(body.plan_id, None)
+        if plan is None or plan.asset["id"] != asset_id or time.time() - plan.created > clips.PLAN_TTL_SECONDS:
+            raise HTTPException(409, "clip plan not found or expired; preview again")
+        try:
+            sel.validate_destination(store, str(plan.destination))
+        except sel.SelectionError as e:
+            raise HTTPException(400, str(e))
+        try:
+            job = app.state.runner.submit("clip", lambda ctx: clips.run_clip_export(ctx, plan))
+        except QueueFull as e:
+            raise HTTPException(503, str(e))
+        return job.to_dict()

@@ -238,9 +238,17 @@ def plan_export(store: Store, sid: str, destination: str, include_manifest: bool
         if status != "ok" or src is None:
             skipped.append({"item_id": it["id"], "rel_path": it["snapshot"]["rel_path"], "reason": status})
             continue
-        if it["start_s"] is not None:
+        if it["start_s"] is not None and it["snapshot"]["media_type"] != "video":
             skipped.append({"item_id": it["id"], "rel_path": it["snapshot"]["rel_path"],
-                            "reason": "time segments are exported with the clip exporter"})
+                            "reason": "audio segments are exported as whole files; add the file instead"})
+            continue
+        if it["start_s"] is not None:  # video moment -> frame-accurate clip
+            from .clips import fmt_ts
+
+            base = f"{Path(it['snapshot']['rel_path']).stem}_{fmt_ts(it['start_s'])}-{fmt_ts(it['end_s'])}.mp4"
+            name = _free_name(base, taken, dest)
+            entries.append({"item_id": it["id"], "source": str(src), "dest_name": name, "sha256": None,
+                            "renamed": name != base, "bytes": None, "clip": [it["start_s"], it["end_s"]]})
             continue
         base = Path(it["snapshot"]["rel_path"]).name
         name = _free_name(base, taken, dest)
@@ -256,8 +264,8 @@ def plan_to_dict(plan: ExportPlan) -> dict:
         "plan_id": plan.id,
         "destination": str(plan.destination),
         "destination_exists": plan.destination.exists(),
-        "files": [{k: e[k] for k in ("item_id", "dest_name", "renamed", "bytes")} | {"source": e["source"]}
-                  for e in plan.entries],
+        "files": [{k: e[k] for k in ("item_id", "dest_name", "renamed", "bytes")} | {"source": e["source"],
+                  "clip": e.get("clip")} for e in plan.entries],
         "skipped": plan.skipped,
         "manifest_name": plan.manifest_name,
         "total_bytes": sum(e["bytes"] or 0 for e in plan.entries),
@@ -300,8 +308,13 @@ def run_export(ctx: JobContext, store: Store, plan: ExportPlan) -> dict:
             src = Path(e["source"])
             tmp = plan.destination / f"{PARTIAL_PREFIX}{uuid.uuid4().hex}"
             try:
-                shutil.copyfile(src, tmp)  # content only; source opened read-only
-                shutil.copystat(src, tmp, follow_symlinks=True)
+                if e.get("clip"):
+                    from .clips import render_clip
+
+                    render_clip(ctx, src, e["clip"][0], e["clip"][1], "accurate", tmp, e["clip"][0])
+                else:
+                    shutil.copyfile(src, tmp)  # content only; source opened read-only
+                    shutil.copystat(src, tmp, follow_symlinks=True)
                 if e["sha256"] and _sha256(tmp) != e["sha256"]:
                     raise OSError("copied file does not match the indexed content hash (source changed?)")
                 final = _place_exclusive(tmp, plan.destination, e["dest_name"], taken)

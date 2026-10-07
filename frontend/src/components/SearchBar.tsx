@@ -50,14 +50,14 @@ export default function SearchBar(p: Props) {
     }
     setFileError(null)
     p.onReference({ kind: 'file', media, file: f, previewUrl: media === 'image' ? URL.createObjectURL(f) : '' })
-    if (p.target === 'both') p.onTarget(media)
+    if (p.target === 'all') p.onTarget(media)
   }
 
   const refMedia = p.reference?.media
   const refText = refMedia === 'audio' ? 'sound' : 'image'
-    const targetText = p.target === 'image' ? 'images' : p.target === 'audio' ? 'sounds' : 'images & sounds'
+    const targetText = { image: 'images', audio: 'sounds', video: 'video moments', all: 'everything' }[p.target]
   const queryKind = p.reference ? `${refMedia}${p.text.trim() ? '+text' : ''}` : 'text'
-  const modeInfo = p.modes.find((m) => m.query === queryKind && m.target === (p.target === 'both' ? 'image+audio' : p.target))
+  const modeInfo = p.modes.find((m) => m.query === queryKind && m.target === (p.target === 'all' ? 'image+audio' : p.target))
   const experimental = modeInfo?.status === 'experimental'
   const mode = p.reference
     ? p.text.trim()
@@ -133,18 +133,18 @@ export default function SearchBar(p: Props) {
             )}
           </label>
           <div className="seg" role="radiogroup" aria-label="Search in">
-            {(['image', 'audio', 'both'] as Target[]).map((t) => (
+            {(['image', 'audio', 'video', 'all'] as Target[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 role="radio"
                 aria-checked={p.target === t}
                 className={p.target === t ? 'on' : ''}
-                disabled={!!refMedia && t === 'both'}
-                title={refMedia && t === 'both' ? 'Reference searches target one media type at a time' : undefined}
+                disabled={!!refMedia && t === 'all'}
+                title={refMedia && t === 'all' ? 'Reference searches target one media type at a time' : undefined}
                 onClick={() => p.onTarget(t)}
               >
-                {t === 'image' ? 'Images' : t === 'audio' ? 'Sounds' : 'Both'}
+                {{ image: 'Images', audio: 'Sounds', video: 'Videos', all: 'All' }[t]}
               </button>
             ))}
           </div>
@@ -162,7 +162,9 @@ export default function SearchBar(p: Props) {
                   ? 'Optional: refine, e.g. "at night" or "in a forest"'
                   : p.target === 'audio'
                     ? 'Describe a sound, e.g. "glass breaking"…'
-                    : 'Describe what you’re looking for…'
+                    : p.target === 'video'
+                      ? 'Describe a moment, e.g. "a dog in a field"…'
+                      : 'Describe what you’re looking for…'
             }
             maxLength={2000}
             autoComplete="off"

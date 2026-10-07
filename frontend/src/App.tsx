@@ -170,7 +170,7 @@ export default function App() {
     setSearchError(null)
     try {
       player.stop()
-      const single: MediaType = target === 'both' ? (reference?.media ?? 'image') : target
+      const single: MediaType = target === 'all' ? (reference?.media ?? 'image') : target
       const r = reference
         ? reference.media === 'audio'
           ? await api.searchAudioReference(
@@ -187,7 +187,7 @@ export default function App() {
               includeIdentical,
               single,
             )
-        : await api.searchText(text.trim(), libraryIds, target === 'both' ? ['image', 'audio'] : [target], 48, globalRank)
+        : await api.searchText(text.trim(), libraryIds, target === 'all' ? ['image', 'audio', 'video'] : [target], 48, globalRank)
       if (seq !== searchSeq.current) return
       setResponse(r)
       setFocused(0)
@@ -203,7 +203,7 @@ export default function App() {
   const results = useMemo(() => {
     const rs = response?.results ?? []
     if (response?.grouping !== 'by_modality') return rs
-    return [...rs.filter((r) => r.asset.media_type === 'image'), ...rs.filter((r) => r.asset.media_type !== 'image')]
+    return (['image', 'audio', 'video'] as const).flatMap((m) => rs.filter((r) => r.asset.media_type === m))
   }, [response])
   const openResult = open != null ? results[open] : null
   const rawState = response?.index_state
@@ -216,11 +216,12 @@ export default function App() {
         : undefined
   const grouped = response?.grouping === 'by_modality'
   const sections: { label: string; offset: number; items: Result[] }[] = grouped
-    ? (['image', 'audio'] as MediaType[])
-        .map((m) => ({ m, items: results.filter((r) => (r.asset.media_type === 'image' ? 'image' : 'audio') === m) }))
+    ? (['image', 'audio', 'video'] as MediaType[])
+        .filter((m) => response?.media_types?.includes(m) ?? true)
+        .map((m) => ({ m, items: results.filter((r) => r.asset.media_type === m) }))
         .reduce<{ label: string; offset: number; items: Result[] }[]>((acc, g) => {
           const offset = acc.reduce((n, x) => n + x.items.length, 0)
-          acc.push({ label: g.m === 'image' ? 'Images' : 'Sounds', offset, items: g.items })
+          acc.push({ label: { image: 'Images', audio: 'Sounds', video: 'Videos' }[g.m], offset, items: g.items })
           return acc
         }, [])
     : [{ label: 'Search results', offset: 0, items: results }]
@@ -470,6 +471,31 @@ export default function App() {
           onAdd={() => addToSelection(openResult)}
           added={addedKeys.has(resultKey(openResult))}
           playing={player.playing === resultKey(openResult)}
+          queryContext={response ? { mode: response.mode, ...(response.query as Record<string, unknown>), rank: openResult.rank } : null}
+          onFindSounds={async (start) => {
+            setOpen(null)
+            setSearching(true)
+            try {
+              setResponse(await api.videoWindow(openResult.asset.id, start, 'audio', libraryIds))
+              setFocused(0)
+            } catch (e) {
+              setSearchError(e instanceof ApiError ? e.message : String(e))
+            } finally {
+              setSearching(false)
+            }
+          }}
+          onFindSimilarMoments={async (start) => {
+            setOpen(null)
+            setSearching(true)
+            try {
+              setResponse(await api.videoWindow(openResult.asset.id, start, 'video', libraryIds))
+              setFocused(0)
+            } catch (e) {
+              setSearchError(e instanceof ApiError ? e.message : String(e))
+            } finally {
+              setSearching(false)
+            }
+          }}
           onPlaySegment={(start, end) =>
             player.play(
               start === openResult.start_s ? resultKey(openResult) : `${openResult.asset.id}|${start}|${end}`,
@@ -485,7 +511,7 @@ export default function App() {
             const a = openResult.asset
             const media: MediaType = a.media_type === 'image' ? 'image' : 'audio'
             setReference({ kind: 'asset', media, assetId: a.id, previewUrl: a.thumbnail_url, label: a.rel_path, startS: openResult.start_s, endS: openResult.end_s })
-            if (target === 'both') setTarget(media)
+            if (target === 'all') setTarget(media)
             player.stop()
             setOpen(null)
             window.scrollTo({ top: 0, behavior: 'smooth' })

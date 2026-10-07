@@ -19,6 +19,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 12 Audio search and playback | PASSED |
 | 13 Cross-modal workspace | PASSED (experimental modes labelled) |
 | 14 Video ingestion and indexing | PASSED |
+| 15 Video-moment search and clip export | PASSED |
 
 ---
 
@@ -471,3 +472,35 @@ Only H.264 MP4 was exercised. An interrupted video restarts from its first windo
 **Gate:** PASSED. Real indexed windows refer to correct source intervals, and interrupted ingestion recovers.
 
 **Next:** Phase 15, video-moment search and clip export.
+
+---
+
+## Phase 15: Video-moment search and clip export (2026-10-07)
+
+**Changes:** `api_search.py` (`media_types: ["video"]` with `video_signal` visual|audio|joint, per-video grouping with **overlap de-duplication**
+(windows overlapping a kept moment by ≥50% are merged; `overlapping_windows_merged` count), window thumbnails, image or image+text → video targets,
+`POST /api/search/video-window` for **moment → sounds (experimental)** and moment → similar moments), `backend/mediaindex/clips.py` and clip endpoints
+(`/api/assets/{id}/clip/preview`, `/clip` with confirm), video moments in selection exports become accurate clips, UI (Videos/All targets, moment cells,
+`VideoMoment` player that seeks to and stops at the window, other-moment thumbnails, sound suggestions, clip export panel with accurate or fast modes),
+`docs/clip-export.md`, `backend/tests/test_video_search_clips.py`, `scripts/ui_check_video.py`.
+
+**Commands and observed results (REAL MODEL)**
+- Text → video moments on `scenes.mp4` and its silent copy: "a dog" gave 12–20 s, "an insect on a flower" 20–28 s, "a city skyline at night" 32–40 s (all on their scenes).
+  "a train on railway tracks" gave 8–16 s, which only partly overlaps the 0–10 s train scene. The soundtrack signal for "a dog barking" gave 12–20 s.
+  Image + text (dog photo + "running in a field") → video gave 16–24 s, a partial overlap.
+- Moment → sound suggestions (experimental): train moment → **train clip**, insect moment → **cricket clips**, dog moment → traffic noise 1st and **bark 2nd**.
+- Clip export on the real file: accurate [12, 20] gave **8.000 s**, H.264+AAC. Fast [13.3, 18] gave an effective start of **13.023 s** (keyframe) and 5.18 s.
+  The source SHA-256 was unchanged.
+- Browser (`scripts/ui_check_video.py`): Videos + "a dog" gave 2 grouped results at 0:12–0:20. The detail player **seeked to 12.00 s**, Play matched moment
+  **stopped by itself at 20.16 s**, and the other-moment button seeked to 4.93 s. UI export wrote the clip and manifest, and a second export got a **numbered name instead of overwriting**.
+  Find sounds showed the experimental banner. External requests: none.
+- `uv run pytest -q`: `67 passed` (grouping and merged overlaps, window thumbnails, soundtrack signal, moment → sounds caveat, preview validation:
+  reversed or too-short ranges, destination inside a library, relative path, bad mode, non-video; clamping to duration; **exported content is exactly the green segment**;
+  exported duration; no overwrite of a user file; no partials; fast-mode keyframe start; cancel before or while rendering; codec failure; selection export of a moment as a clip)
+
+**Limitations:** timestamps are only as precise as the 8 s / 4 s windows, never exact boundaries. Fast exports start early, at a keyframe. Sound suggestions are
+similarity candidates, not synchronized audio. Retrieval was verified only on a generated 40 s demo video.
+
+**Gate:** PASSED. Users can search, watch the retrieved window, and export a playable clip with a provenance manifest.
+
+**Next:** Phase 16, offline operation and robustness.
