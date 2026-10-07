@@ -221,6 +221,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     app.state.asset_path = _asset_path
     api_search.register(app)
     api_selections.register(app)
+    api_selections.register_clips(app)
     mount_frontend(app)
     return app
 

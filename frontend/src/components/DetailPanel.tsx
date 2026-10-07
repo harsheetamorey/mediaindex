@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type Result } from '../api'
 import { fmtSpan, fmtTime } from '../lib/time'
+import VideoMoment from './VideoMoment'
 
 type Props = {
   result: Result
@@ -13,6 +14,9 @@ type Props = {
   added: boolean
   onPlaySegment: (start: number | null, end: number | null) => void
   playing: boolean
+  queryContext: Record<string, unknown> | null
+  onFindSounds: (start: number) => void
+  onFindSimilarMoments: (start: number) => void
 }
 
 function fmtBytes(n: number | null) {
@@ -27,7 +31,7 @@ function fmtBytes(n: number | null) {
   return `${v.toFixed(i ? 1 : 0)} ${u[i]}`
 }
 
-export default function DetailPanel({ result, onClose, onUseAsReference, onPrev, onNext, showScores, onAdd, added, onPlaySegment, playing }: Props) {
+export default function DetailPanel({ result, onClose, onUseAsReference, onPrev, onNext, showScores, onAdd, added, onPlaySegment, playing, queryContext, onFindSounds, onFindSimilarMoments }: Props) {
   const a = result.asset
   const [note, setNote] = useState<string | null>(null)
   useEffect(() => {
@@ -46,6 +50,8 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
         <div className="detail-media">
           {a.media_type === 'image' ? (
             <img src={a.file_url} alt={a.rel_path} />
+          ) : a.media_type === 'video' ? (
+            <VideoMoment result={result} queryContext={queryContext} onFindSounds={onFindSounds} onFindSimilarMoments={onFindSimilarMoments} />
           ) : (
             <div className="detail-audio">
               <img src={a.thumbnail_url} alt="Waveform" />
@@ -76,6 +82,15 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
               <>
                 <dt>Dimensions</dt>
                 <dd>{a.width && a.height ? `${a.width} × ${a.height}` : '—'}</dd>
+              </>
+            ) : a.media_type === 'video' ? (
+              <>
+                <dt>Duration</dt>
+                <dd>{fmtTime(a.duration)}</dd>
+                <dt>Frame size</dt>
+                <dd>{a.width && a.height ? `${a.width} × ${a.height}` : '—'}</dd>
+                <dt>Matched window</dt>
+                <dd>{fmtSpan(result.start_s, result.end_s)} <span className="muted">({result.modality === 'video-audio' ? 'soundtrack' : result.modality === 'video-joint' ? 'joint picture+sound' : 'picture'})</span></dd>
               </>
             ) : (
               <>
@@ -119,8 +134,10 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
             )}
           </dl>
           <div className="detail-actions">
-            <button className="btn primary" onClick={onUseAsReference}>Use as reference</button>
-            <button className="btn" onClick={onAdd} disabled={added}>{added ? 'In selection ✓' : 'Add to selection'}</button>
+            {a.media_type !== 'video' && <button className="btn primary" onClick={onUseAsReference}>Use as reference</button>}
+            <button className="btn" onClick={onAdd} disabled={added}>
+              {added ? 'In selection ✓' : a.media_type === 'video' ? 'Add moment to selection' : 'Add to selection'}
+            </button>
             <a className="btn" href={a.file_url} target="_blank" rel="noreferrer">Open original</a>
             <button
               className="btn"

@@ -50,7 +50,7 @@ export default function ResultsGrid(props: Props) {
     } else if (e.key === 'a' || e.key === '+') {
       e.preventDefault()
       onAdd(focused)
-    } else if (e.key === 'p' && results[focused]?.asset.media_type !== 'image') {
+    } else if (e.key === 'p' && results[focused]?.asset.media_type === 'audio') {
       e.preventDefault()
       onPlay(focused)
     }
@@ -72,7 +72,7 @@ export default function ResultsGrid(props: Props) {
           }}
           title={r.asset.rel_path}
         >
-          <img src={r.asset.thumbnail_url} alt={r.asset.rel_path} loading="lazy" />
+          <img src={r.window_thumbnail_url ?? r.asset.thumbnail_url} alt={r.asset.rel_path} loading="lazy" />
           <button
             className={`cell-add ${addedKeys.has(resultKey(r)) ? 'added' : ''}`}
             tabIndex={-1}
@@ -84,7 +84,7 @@ export default function ResultsGrid(props: Props) {
           >
             {addedKeys.has(resultKey(r)) ? '✓' : '+ Add'}
           </button>
-          {r.asset.media_type !== 'image' && (
+          {r.asset.media_type === 'audio' && (
             <button
               className={`cell-play ${playingKey === resultKey(r) ? 'on' : ''}`}
               tabIndex={-1}
@@ -97,6 +97,7 @@ export default function ResultsGrid(props: Props) {
               {playingKey === resultKey(r) ? '■' : '▶'}
             </button>
           )}
+          {r.asset.media_type === 'video' && <span className="cell-video" aria-hidden="true">▶ video</span>}
           {r.start_s != null && (
             <span className="cell-span">
               {fmtSpan(r.start_s, r.end_s)}

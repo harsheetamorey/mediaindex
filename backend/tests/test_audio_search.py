@@ -37,7 +37,12 @@ def test_text_to_audio_grouped_segments(client):
     assert len(ids) == len(set(ids)) == 4  # one result per asset
     long = next(x for x in r["results"] if x["asset"]["rel_path"] == "long.wav")
     assert long["modality"] == "audio" and long["end_s"] - long["start_s"] == pytest.approx(10)
-    assert len(long["other_segments"]) == 3
+    # 4 windows (0,10),(5,15),(10,20),(13,23): windows overlapping a kept one by >50% are merged
+    assert len(long["other_segments"]) + long["overlapping_windows_merged"] == 3
+    kept = [(long["start_s"], long["end_s"])] + [(o["start_s"], o["end_s"]) for o in long["other_segments"]]
+    for i, a in enumerate(kept):
+        for b in kept[i + 1:]:
+            assert max(0, min(a[1], b[1]) - max(a[0], b[0])) <= 5
     assert long["asset"]["duration"] == pytest.approx(23, abs=0.1)
     ungrouped = c.post("/api/search/text", json={"text": "beep", "media_types": ["audio"], "limit": 10,
                                                  "group_segments": False}).json()

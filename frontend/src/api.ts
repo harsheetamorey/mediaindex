@@ -35,7 +35,7 @@ export type Asset = {
   file_url: string
 }
 
-export type Segment = { start_s: number | null; end_s: number | null; similarity: number }
+export type Segment = { start_s: number | null; end_s: number | null; similarity: number; window_thumbnail_url?: string }
 
 export type Result = {
   rank: number
@@ -45,10 +45,26 @@ export type Result = {
   end_s: number | null
   asset: Asset
   other_segments?: Segment[]
+  window_thumbnail_url?: string
+  overlapping_windows_merged?: number
 }
 
-export type MediaType = 'image' | 'audio'
-export type Target = MediaType | 'both'
+export type MediaType = 'image' | 'audio' | 'video'
+export type Target = MediaType | 'all'
+
+export type ClipPlan = {
+  plan_id: string
+  start_s: number
+  end_s: number
+  duration_s: number
+  mode: 'accurate' | 'fast'
+  effective_start_s: number
+  destination: string
+  dest_name: string
+  manifest_name: string
+  overwrites: number
+  note: string
+}
 
 export type QueryMode = { query: string; target: string; status: string; available: boolean }
 
@@ -186,6 +202,17 @@ export const api = {
       '/api/search/text',
       json({ text, library_ids: libraryIds, media_types: mediaTypes, limit, global_rank: globalRank }),
     ),
+  videoWindow: (assetId: string, startS: number, target: MediaType, libraryIds: string[] | null, includeSameVideo = false) =>
+    request<SearchResponse>(
+      '/api/search/video-window',
+      json({ asset_id: assetId, start_s: startS, target, library_ids: libraryIds, include_same_video: includeSameVideo, limit: 48 }),
+    ),
+  clipPreview: (assetId: string, start: number, end: number, mode: 'accurate' | 'fast', destination: string, queryContext: Record<string, unknown> | null) =>
+    request<ClipPlan>(
+      `/api/assets/${assetId}/clip/preview`,
+      json({ start_s: start, end_s: end, mode, destination, query_context: queryContext }),
+    ),
+  clipExport: (assetId: string, planId: string) => request<Job>(`/api/assets/${assetId}/clip`, json({ plan_id: planId, confirm: true })),
   capabilities: () => request<{ modes: QueryMode[]; notes: string[] }>('/api/capabilities'),
 
   searchAudioReference: (
