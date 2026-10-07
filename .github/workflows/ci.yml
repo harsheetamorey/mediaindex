@@ -1,0 +1,69 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      real_model:
+        description: "Also run the opt-in real-model suite (downloads ~1.5 GB of weights)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    # Apple-silicon runner: matches the primary target and avoids multi-GB CUDA wheels.
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install FFmpeg
+        run: brew install ffmpeg
+      - name: Python deps (locked)
+        run: uv sync --frozen
+      - name: Unit tests (mocked model)
+        run: uv run pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend build + lint
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          npx oxlint src
+
+  real-model:
+    if: github.event_name == 'workflow_dispatch' && inputs.real_model
+    needs: tests
+    runs-on: macos-14
+    env:
+      MEDIAINDEX_ALLOW_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: brew install ffmpeg && uv sync --frozen
+      - name: Sample images (generated, no third-party media)
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          d = Path("data/samples/smoke"); d.mkdir(parents=True, exist_ok=True)
+          for name, color in (("red", "red"), ("green", "green"), ("blue", "blue"), ("stripes", "white")):
+              im = Image.new("RGB", (256, 256), color)
+              if name == "stripes":
+                  dr = ImageDraw.Draw(im)
+                  for x in range(0, 256, 32):
+                      dr.rectangle([x, 0, x + 15, 255], fill="black")
+              im.save(d / f"{name}.jpg")
+          PY
+      - name: Real-model smoke (downloads weights)
+        run: uv run python scripts/model_smoke.py --images data/samples/smoke --revision 914f7f89142e33e77833254d9c9b90c3cef7303b --device cpu --dtype float32 --mixed-ref stripes.jpg
+      - name: Real-model tests
+        run: HF_HUB_OFFLINE=1 MEDIAINDEX_DEVICE=cpu uv run pytest -m real_model -q
