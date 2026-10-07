@@ -16,12 +16,12 @@ data/
 *.db
 *.npy
 *.npz
-indexes/
+/indexes/
 
 # Media (never commit user or demo media)
-media/
-samples/
-demo_data/
+/media/
+/samples/
+/demo_data/
 *.jpg
 *.jpeg
 *.png
@@ -37,8 +37,8 @@ demo_data/
 
 # Model caches / weights
 .cache/
-hf_cache/
-models/
+/hf_cache/
+/models/
 *.safetensors
 *.bin
 *.gguf
