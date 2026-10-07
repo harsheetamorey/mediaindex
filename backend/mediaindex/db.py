@@ -78,6 +78,28 @@ MIGRATIONS: list[str] = [
         updated_at REAL NOT NULL
     );
     """,
+    # v2: selections (asset_id is deliberately not a cascading FK: items survive index removal with a snapshot)
+    """
+    CREATE TABLE selections (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        updated_at REAL NOT NULL
+    );
+    CREATE TABLE selection_items (
+        id TEXT PRIMARY KEY,
+        selection_id TEXT NOT NULL REFERENCES selections(id) ON DELETE CASCADE,
+        asset_id TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        start_s REAL,
+        end_s REAL,
+        snapshot_json TEXT NOT NULL,
+        query_context_json TEXT,
+        added_at REAL NOT NULL
+    );
+    CREATE UNIQUE INDEX sel_item_unique ON selection_items(selection_id, asset_id, IFNULL(start_s, -1), IFNULL(end_s, -1));
+    CREATE INDEX sel_item_order ON selection_items(selection_id, position);
+    """,
 ]
 
 

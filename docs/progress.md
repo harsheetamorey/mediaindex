@@ -14,6 +14,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 7 Reference-image search | PASSED |
 | 8 Image plus text refinement | PASSED (quality caveats documented) |
 | 9 Creator interface: **Version 1** | PASSED |
+| 10 Selections and image exports | PASSED |
 
 ---
 
@@ -300,3 +301,41 @@ by automation (the file-input path was). Tested only in Chrome on macOS.
 **Gate:** PASSED. A user can complete import → text → image → refinement → preview → restart with real data. **Version 1.**
 
 **Next:** Phase 10, selections and image exports.
+
+---
+
+## Phase 10: Selections and image exports (2026-10-07)
+
+**Changes:** DB migration v2 (`selections`, `selection_items` with a snapshot of each asset so items survive index removal), `backend/mediaindex/selections.py`,
+`backend/mediaindex/api_selections.py`, UI (`SelectionView.tsx`, "+ Add" on result cells and the `a` key, detail-panel Add/Reveal/Copy path, selections list
+in the sidebar), `backend/tests/test_selections.py`, `scripts/ui_check_selection.py`.
+
+**Behaviour**
+- Persistent named selections: add (idempotent, with query context: mode, text or reference, rank), remove, reorder (must list every item), rename, delete.
+  Item status is `ok`, `missing` (file gone), `removed` (no longer indexed), or `changed` (hash differs).
+- Manifest (`GET /api/selections/{id}/manifest`, downloaded as an attachment): asset IDs, absolute source paths, library, sha256, size, dimensions,
+  publisher source/licence record (with a "not a rights audit" note), query context. No similarity scores.
+- Copy export uses two steps: `export/preview` returns a plan (destination, final names, clash renames, skipped items, `overwrites: 0`), then `export` with
+  `{plan_id, confirm: true}` runs a cancellable job. Destination rules: absolute; not `/` or `$HOME`; not a file; parent must exist; **must not overlap
+  any library root**. Each file is copied to `.mediaindex-partial-*`, verified against the indexed SHA-256, then **hard-linked into place (never
+  overwrites; it re-picks a name on a race)**. Partial files are always removed. A manifest with `exported_as` names is written the same way.
+- Reveal in folder runs `open -R <path>` on macOS (or the Linux/Windows equivalent) as an argument list with `shell=False`, using a path from the ID resolver.
+  Copy path returns the resolved path.
+
+**Commands and observed results**
+- `uv run pytest -q`: `40 passed` (CRUD, idempotent add, reorder validation, persistence across app restart, missing/removed status, manifest contents,
+  destination restrictions: relative, `/`, inside a library, parent of a library, existing file; duplicate filenames → `shared (2).jpg`, `shared (3).jpg`; a
+  pre-existing user file is not overwritten; plan is single-use; a second export gives `photo one (2).jpg` and `mediaindex-manifest (2).json`;
+  cancel during the 2nd file → 2 complete files and no partials; simulated "No space left on device" → 3 failed, empty destination; reveal uses an argument list without a shell)
+- Browser (real app, REAL MODEL search): searched "a zebra", added 4 results with "+ Add" and 1 with the `a` key, opened the selection, moved up, removed,
+  downloaded the manifest (`query_context: {mode: text, text: "a zebra", rank: 2}`), `/` destination rejected, then previewed and exported into
+  `…/export dest` (a path with a space): `zebra.jpg`, **`zebra (2).jpg` (renamed clash between two libraries)**, 2 stock images and the manifest.
+- **After a server restart** the selection order persisted. Moving one source file away showed a **"File missing"** badge.
+- `shasum` over all sample and demo originals before and after: identical.
+
+**Limitations:** reveal was verified with a mocked subprocess, not by opening Finder during automation. Copy path uses the browser clipboard API (loopback origin).
+Video-segment items are skipped by the file exporter until Phase 15.
+
+**Gate:** PASSED.
+
+**Next:** Phase 11, audio inference and segmentation.
