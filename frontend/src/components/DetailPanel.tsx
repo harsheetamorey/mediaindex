@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type Result } from '../api'
+import { fmtSpan, fmtTime } from '../lib/time'
 
 type Props = {
   result: Result
@@ -10,6 +11,8 @@ type Props = {
   showScores: boolean
   onAdd: () => void
   added: boolean
+  onPlaySegment: (start: number | null, end: number | null) => void
+  playing: boolean
 }
 
 function fmtBytes(n: number | null) {
@@ -24,7 +27,7 @@ function fmtBytes(n: number | null) {
   return `${v.toFixed(i ? 1 : 0)} ${u[i]}`
 }
 
-export default function DetailPanel({ result, onClose, onUseAsReference, onPrev, onNext, showScores, onAdd, added }: Props) {
+export default function DetailPanel({ result, onClose, onUseAsReference, onPrev, onNext, showScores, onAdd, added, onPlaySegment, playing }: Props) {
   const a = result.asset
   const [note, setNote] = useState<string | null>(null)
   useEffect(() => {
@@ -41,7 +44,25 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
     <div className="overlay" role="dialog" aria-modal="true" aria-label={a.rel_path} onClick={onClose}>
       <div className="detail" onClick={(e) => e.stopPropagation()}>
         <div className="detail-media">
-          <img src={a.file_url} alt={a.rel_path} />
+          {a.media_type === 'image' ? (
+            <img src={a.file_url} alt={a.rel_path} />
+          ) : (
+            <div className="detail-audio">
+              <img src={a.thumbnail_url} alt="Waveform" />
+              <div className="seg-bar" aria-hidden="true">
+                {a.duration ? (
+                  <div
+                    className="seg-mark"
+                    style={{ left: `${(100 * (result.start_s ?? 0)) / a.duration}%`, width: `${(100 * ((result.end_s ?? 0) - (result.start_s ?? 0))) / a.duration}%` }}
+                  />
+                ) : null}
+              </div>
+              <button className="btn primary" onClick={() => onPlaySegment(result.start_s, result.end_s)}>
+                {playing ? '■ Stop' : `▶ Play matched segment ${fmtSpan(result.start_s, result.end_s)}`}
+              </button>
+              <audio controls preload="metadata" src={a.file_url} aria-label="Full file player" />
+            </div>
+          )}
         </div>
         <div className="detail-info">
           <div className="detail-head">
@@ -51,8 +72,31 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
           <dl>
             <dt>Path in library</dt>
             <dd><code>{a.rel_path}</code></dd>
-            <dt>Dimensions</dt>
-            <dd>{a.width && a.height ? `${a.width} × ${a.height}` : '—'}</dd>
+            {a.media_type === 'image' ? (
+              <>
+                <dt>Dimensions</dt>
+                <dd>{a.width && a.height ? `${a.width} × ${a.height}` : '—'}</dd>
+              </>
+            ) : (
+              <>
+                <dt>Duration</dt>
+                <dd>{fmtTime(a.duration)}</dd>
+                <dt>Matched window</dt>
+                <dd>{fmtSpan(result.start_s, result.end_s)} <span className="muted">(index window, not an exact event boundary)</span></dd>
+                {result.other_segments && result.other_segments.length > 0 && (
+                  <>
+                    <dt>Other windows</dt>
+                    <dd className="seg-list">
+                      {result.other_segments.map((s) => (
+                        <button key={`${s.start_s}`} className="link" onClick={() => onPlaySegment(s.start_s, s.end_s)}>
+                          {fmtSpan(s.start_s, s.end_s)}
+                        </button>
+                      ))}
+                    </dd>
+                  </>
+                )}
+              </>
+            )}
             <dt>Size</dt>
             <dd>{fmtBytes(a.size)}</dd>
             <dt>Result rank</dt>

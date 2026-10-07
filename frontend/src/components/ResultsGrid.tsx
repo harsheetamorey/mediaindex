@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Result } from '../api'
+import { fmtSpan, fmtTime } from '../lib/time'
 
 type Props = {
   results: Result[]
@@ -9,11 +10,13 @@ type Props = {
   showScores: boolean
   onAdd: (i: number) => void
   addedKeys: Set<string>
+  onPlay: (i: number) => void
+  playingKey: string | null
 }
 
 export const resultKey = (r: Result) => `${r.asset.id}|${r.start_s ?? ''}|${r.end_s ?? ''}`
 
-export default function ResultsGrid({ results, focused, onFocus, onOpen, showScores, onAdd, addedKeys }: Props) {
+export default function ResultsGrid({ results, focused, onFocus, onOpen, showScores, onAdd, addedKeys, onPlay, playingKey }: Props) {
   const grid = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
@@ -36,6 +39,9 @@ export default function ResultsGrid({ results, focused, onFocus, onOpen, showSco
     } else if (e.key === 'a' || e.key === '+') {
       e.preventDefault()
       onAdd(focused)
+    } else if (e.key === 'p' && results[focused]?.asset.media_type !== 'image') {
+      e.preventDefault()
+      onPlay(focused)
     }
   }
 
@@ -67,6 +73,25 @@ export default function ResultsGrid({ results, focused, onFocus, onOpen, showSco
           >
             {addedKeys.has(resultKey(r)) ? '✓' : '+ Add'}
           </button>
+          {r.asset.media_type !== 'image' && (
+            <button
+              className={`cell-play ${playingKey === resultKey(r) ? 'on' : ''}`}
+              tabIndex={-1}
+              aria-label={playingKey === resultKey(r) ? 'Stop' : `Play ${fmtSpan(r.start_s, r.end_s)}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onPlay(i)
+              }}
+            >
+              {playingKey === resultKey(r) ? '■' : '▶'}
+            </button>
+          )}
+          {r.start_s != null && (
+            <span className="cell-span">
+              {fmtSpan(r.start_s, r.end_s)}
+              {r.asset.duration ? ` of ${fmtTime(r.asset.duration)}` : ''}
+            </span>
+          )}
           <div className="cell-label">
             <span className="name">{r.asset.rel_path.split('/').pop()}</span>
             {showScores && <span className="score" title="Raw cosine similarity (not a probability)">{r.similarity.toFixed(3)}</span>}

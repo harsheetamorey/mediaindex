@@ -152,6 +152,25 @@ button { font: inherit; }
 .warn-text { color: var(--warn-text); }
 .banner.ok { background: var(--thumb-bg); color: var(--text); }
 
+.query-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: none; background: var(--panel); color: var(--text); padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.seg button.on { background: var(--accent); color: var(--accent-text); }
+.seg button:disabled { opacity: 0.4; cursor: default; }
+.ref-audio { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: var(--thumb-bg); }
+.ref-audio img { width: 100%; height: 60%; object-fit: cover; }
+.ref-audio-icon { font-size: 28px; color: var(--accent); }
+.ref-audio-label { font-size: 11px; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.cell-play { position: absolute; left: 8px; top: 8px; width: 34px; height: 34px; border-radius: 17px; border: none; background: rgba(0,0,0,0.65); color: #fff; cursor: pointer; font-size: 13px; }
+.cell-play.on { background: var(--accent); color: var(--accent-text); }
+.cell-span { position: absolute; left: 8px; bottom: 34px; font-size: 11px; background: rgba(0,0,0,0.6); color: #fff; padding: 1px 6px; border-radius: 8px; font-variant-numeric: tabular-nums; }
+.detail-audio { width: 100%; padding: 24px; display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.detail-audio img { width: 100%; border-radius: 6px; }
+.detail-audio audio { width: 100%; }
+.seg-bar { position: relative; height: 8px; background: #333; border-radius: 4px; }
+.seg-mark { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 4px; min-width: 3px; }
+.seg-list { display: flex; flex-wrap: wrap; gap: 8px; }
+
 @media (max-width: 760px) {
   .body { flex-direction: column; }
   .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }

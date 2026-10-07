@@ -16,6 +16,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 9 Creator interface: **Version 1** | PASSED |
 | 10 Selections and image exports | PASSED |
 | 11 Audio inference and segmentation | PASSED |
+| 12 Audio search and playback | PASSED |
 
 ---
 
@@ -371,3 +372,37 @@ ingest support for `.wav/.flac/.mp3`, profile changes (`audio` encoder loaded by
 **Gate:** PASSED. Real audio segments have finite embeddings and verified source offsets, and image search still works.
 
 **Next:** Phase 12, audio search and playback.
+
+---
+
+## Phase 12: Audio search and playback (2026-10-07)
+
+**Changes:** `api_search.py` (`media_types` accepts `audio`, segment grouping with `other_segments`, `POST /api/search/audio` with an upload or
+`asset_id` plus optional `start_s` to pick a window), UI (Images/Sounds toggle, sound references in the drop zone, play/stop on result cells and the `p` key,
+segment time labels, detail view with waveform, matched-window bar, "Play matched segment", other windows, full-file player),
+`frontend/src/lib/{player,time}.ts`, `backend/tests/test_audio_search.py`, `scripts/ui_check_audio.py`.
+
+**Behaviour:** only audio samples are indexed (no captions or filenames). Results are grouped per file by default (best window, plus up to 5 other matching windows).
+Upload references accept WAV, FLAC and MP3 up to 50 MB, embed the first 10 s (or from `start_s`), and are deleted after use. A missing FFmpeg returns 503 with install guidance.
+Unsupported types return 415, undecodable files 422. Playback uses HTTP Range requests on `/api/assets/{id}/file`. A single audio element seeks to `start` and pauses at `end`.
+Text refinement is disabled for sound references in the UI. Native audio+text queries are not offered here (see Phase 13).
+
+**Commands and observed results (REAL MODEL, MPS bf16; 60 FSD50K CC0 clips + medley, 93 windows)**
+- Text → sound (top 1): "a dog barking" gave the bark clip (0.757), with medley 10–20 s second. "a snare drum hit" gave drum and snare clips in the top 3. "birds singing" gave a chicken/rooster clip, a partial hit.
+  **Misses:** "glass shattering" (gunshot, tearing and keys; the glass clip is not in the top 3), "a door slamming" (gunshot first; the slam clip is not in the top 3),
+  "a person speaking" (snare hits first). Warm query embedding takes about 40 ms (up to about 1 s cold).
+- Sound → sound by asset: dog bark → **medley 0–10 s (0.997, the same bark inside the medley)**, then other animal sounds. Snare → **medley 29.25–39.25 s
+  (0.984)**, then drum clips. Crickets → **medley 20–30 s (0.972)**, then the other cricket clip. Identical files are excluded.
+- Upload of an MP3 transcode of fsd-146343 finds the FLAC original first (0.979) and the medley bark window second.
+- Browser (`scripts/ui_check_audio.py`, headless Chrome): with Sounds selected, "a dog barking" returned 48 results. Playing medley 0:10–0:20 gave **player currentTime 10.58 s, playing**.
+  The "other window 0:20–0:30" button gave **21.15 s**. Use as reference set the reference to "medley.wav 0:10–0:20" with the text box disabled, and the `/api/search/audio` span was [10, 20].
+  An MP3 upload reference returned the original first. **Stop at end:** playing the 0:10–0:20 window and waiting 12 s ended **paused at 20.21 s**. External requests: none.
+- **After a server restart:** the same text→sound results came back, and image search was unchanged.
+- `uv run pytest -q`: `50 passed`
+
+**Limitations:** retrieval quality is uneven, with clear misses above. Similar-sounding clips are candidates, not guaranteed-suitable sound effects. Stop-at-end accuracy is
+about ±0.25 s (browser `timeupdate` granularity). Uploaded sound references use only one 10 s window.
+
+**Gate:** PASSED. Imported sounds can be searched by text or sound, and the matching segment plays entirely locally. Image features are unchanged.
+
+**Next:** Phase 13, cross-modal workspace.
