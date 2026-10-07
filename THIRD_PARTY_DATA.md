@@ -31,3 +31,9 @@ to `data/demo/`, which is git-ignored.
   of Human-Labeled Sound Events*, arXiv:2010.00475 (2020).
 - Licence declarations come from Freesound uploaders through the dataset. **No independent rights audit has been performed.**
 - FSD50K labels are kept as inspection metadata only and are never embedded.
+
+## Generated demo video (no third-party video downloaded)
+`uv run python scripts/make_demo_video.py` builds `data/demo/videos/scenes.mp4` (40 s: four 10 s scenes, each a slow zoom over one CC0-declared
+stock photo with one CC0 FSD50K clip as audio) and `scenes-silent.mp4` (the same video without audio). Each scene's source image and sound,
+with their declared licences, are listed in `data/demo/videos/mediaindex-provenance.json`. It needs both optional demo packs. No video from any
+website is redistributed.

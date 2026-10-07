@@ -18,6 +18,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 11 Audio inference and segmentation | PASSED |
 | 12 Audio search and playback | PASSED |
 | 13 Cross-modal workspace | PASSED (experimental modes labelled) |
+| 14 Video ingestion and indexing | PASSED |
 
 ---
 
@@ -436,3 +437,37 @@ not synchronization or quality judgements.
 **Gate:** PASSED. Real cross-modal retrieval can be previewed, index compatibility is enforced, and experimental modes are clearly identified.
 
 **Next:** Phase 14, video ingestion and indexing.
+
+---
+
+## Phase 14: Video ingestion and indexing (2026-10-07)
+
+**Changes:** `backend/mediaindex/media/video.py` (ffprobe probing with container and codec checks, accurate per-slot frame sampling, frame thumbnails),
+`GemmaBackend.embed_video` / `embed_video_audio` / `embed_video_text`, `indexer.make_video_embedder` (windowed native-video, audio and optional joint
+embeddings, per-window thumbnails, one transaction per file), MP4 support in ingest, profile video fields (`video_fps` and `video_max_soft_tokens` are in the key,
+windowing is not), `GET /api/assets/{id}/window-thumbnail?start=`, **single-instance data-dir lock** (`instance.py`), the `plan_windows` tail fix,
+`scripts/{make_demo_video,video_smoke,video_offsets_check}.py`, `backend/tests/test_video.py`, and docs.
+
+**Commands and observed results (REAL MODEL, MPS bf16)**
+- `uv run python scripts/make_demo_video.py`: `scenes.mp4` (40.02 s, 1280x720 H.264 25 fps + AAC) and `scenes-silent.mp4`, built from CC0 demo items.
+- `uv run python scripts/video_smoke.py ...`: **soundtrack not included in video input (diff 0.0)**. Native video differs from the frame average (cos 0.922).
+  Joint runs. Visual windows rank the dog, insect and city scenes on the right intervals.
+- **Interrupted ingestion (real SIGKILL of the server process mid-video):** after restart the job was `interrupted`, the half-processed `scenes.mp4` was
+  `pending` with **0 vectors** (not searchable), and the finished `scenes-silent.mp4` kept its 9 windows. Re-import resumed and finished in 147 s.
+  This test exposed a real bug, now fixed: `pkill -9` had hit only the `uv` wrapper, and a second server instance ran startup recovery while the
+  first was still working. A per-data-dir `flock` now refuses a second instance (`another MediaIndex process is already using …`).
+- After the window-tail fix, a clean reindex of the video library: 2 files, **18 windows** (9 visual + 9 audio for scenes.mp4, 9 visual for the silent copy), 232 s
+  (about 13 s per 8 s window on the M1 for visual+audio).
+- `uv run python scripts/video_offsets_check.py --rel-path scenes.mp4`: every stored visual window matches an **independent torchcodec re-decode of the
+  same interval: cos 0.980–0.998**. The control (+2 s shift) gave mean 0.952. `OFFSETS OK`. Scene text queries: dog, insect and city landed on their scenes (8 s overlap).
+  **The train query missed** (best window 8–16 s; the train scene is 0–10 s).
+- `uv run pytest -q`: `60 passed` (probe, frame offsets on solid-colour segments, straddling windows, bad container and MJPEG codec rejected,
+  visual/audio/joint windows `(0,8),(4,12),(8,16),(12,20)`, silent video has visual windows only, window thumbnails, duplicate reuse, idempotent re-import,
+  cancel mid-video leaves it unsearchable then resumes, broken video marked failed, single-instance lock)
+
+**Limitations:** indexing is slow on the M1 (about 13 s per window with visual+audio, about 1.6x real time). Timestamps are only as precise as the 8 s / 4 s windows.
+Only H.264 MP4 was exercised. An interrupted video restarts from its first window (the all-or-nothing write keeps partial windows out of search).
+
+**Gate:** PASSED. Real indexed windows refer to correct source intervals, and interrupted ingestion recovers.
+
+**Next:** Phase 15, video-moment search and clip export.

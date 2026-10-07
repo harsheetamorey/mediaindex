@@ -127,6 +127,32 @@ class GemmaBackend:
         return self._encode([{"audio": {"array": np.asarray(a, np.float32), "sampling_rate": sampling_rate}}
                              for a in arrays], batch_size=2)
 
+    def _video_input(self, frames: np.ndarray, fps: float) -> dict:
+        meta = {"fps": float(fps), "total_num_frames": int(len(frames)), "duration": float(len(frames) / fps)}
+        return {"array": np.asarray(frames, np.uint8), "video_metadata": meta}
+
+    def _video_kwargs(self) -> dict:
+        return {"video": {"max_soft_tokens": self.profile.video_max_soft_tokens, "fps": self.profile.video_fps}}
+
+    def embed_video(self, clips: Sequence[np.ndarray], fps: float) -> np.ndarray:
+        """Native video input: one embedding per clip of (T,H,W,3) uint8 frames. No audio (verified)."""
+        if not self.capabilities()["video"]:
+            raise CapabilityUnavailable("video requires the vision encoder")
+        return self._encode([{"video": self._video_input(f, fps)} for f in clips], batch_size=1,
+                            processing_kwargs=self._video_kwargs())
+
+    def embed_video_audio(self, frames: np.ndarray, fps: float, wav: np.ndarray, sampling_rate: int = 16000) -> np.ndarray:
+        """Genuinely joint audio+visual embedding: frames and the window's audio in one forward pass."""
+        if not (self.capabilities()["video"] and self.capabilities()["audio"]):
+            raise CapabilityUnavailable("joint video+audio requires vision and audio encoders")
+        return self._encode([{"video": self._video_input(frames, fps),
+                              "audio": {"array": np.asarray(wav, np.float32), "sampling_rate": sampling_rate}}],
+                            batch_size=1, processing_kwargs=self._video_kwargs())
+
+    def embed_video_text(self, frames: np.ndarray, fps: float, text: str) -> np.ndarray:
+        return self._encode([{"text": self.profile.query_prompt + text, "video": self._video_input(frames, fps)}],
+                            batch_size=1, processing_kwargs=self._video_kwargs())
+
     def embed_audio_text(self, array: np.ndarray, text: str, sampling_rate: int = 16000) -> np.ndarray:
         """Native single-pass audio+text embedding (verified to run in Phase 13; quality experimental)."""
         if not self.capabilities()["audio"]:
@@ -165,6 +191,16 @@ class FakeBackend:
 
     def embed_image_text(self, image, text):
         return self._vec(b"m:" + image.convert("RGB").resize((16, 16)).tobytes() + text.encode())
+
+    def embed_video(self, clips, fps):
+        return np.vstack([self._vec(b"v:" + np.asarray(f, np.uint8)[:, ::32, ::32].tobytes()) for f in clips])
+
+    def embed_video_audio(self, frames, fps, wav, sampling_rate: int = 16000):
+        return self._vec(b"va:" + np.asarray(frames, np.uint8)[:, ::32, ::32].tobytes()
+                         + np.asarray(wav, np.float32)[:: max(1, len(wav) // 64)].tobytes())
+
+    def embed_video_text(self, frames, fps, text):
+        return self._vec(b"vt:" + np.asarray(frames, np.uint8)[:, ::32, ::32].tobytes() + text.encode())
 
     def embed_audio_text(self, array, text, sampling_rate: int = 16000):
         return self._vec(b"at:" + np.asarray(array, np.float32)[:: max(1, len(array) // 64)].tobytes() + text.encode())

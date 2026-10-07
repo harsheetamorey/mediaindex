@@ -15,8 +15,8 @@ from . import __version__
 from .config import Settings
 from .db import Database
 from . import api_search, api_selections
-from .indexer import make_audio_embedder, make_image_embedder
-from .ingest import run_image_import, thumb_path
+from .indexer import make_audio_embedder, make_image_embedder, make_video_embedder
+from .ingest import run_image_import, thumb_path, window_thumb_path
 from .search import MatrixCache
 from .uploads import cleanup_stale_uploads
 from .jobs import JobRunner, QueueFull
@@ -67,6 +67,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     app.state.matrix_cache = MatrixCache(store)
     app.state.embed_batch = make_image_embedder(store, host)
     app.state.embed_audio = make_audio_embedder(store, host)
+    app.state.embed_video = make_video_embedder(store, host, settings.thumbs_dir)
 
     app.add_middleware(
         CORSMiddleware,
@@ -143,7 +144,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
 
         def fn(ctx):
             return run_image_import(ctx, store, settings.thumbs_dir, library_id, _embed_batch_factory(),
-                                    embed_audio=app.state.embed_audio)
+                                    embed_audio=app.state.embed_audio, embed_video=app.state.embed_video)
 
         try:
             job = runner.submit("import", fn, library_id=library_id)
@@ -195,6 +196,16 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
         if a is None or not a["content_hash"]:
             raise HTTPException(404, "thumbnail not found")
         tp = thumb_path(settings.thumbs_dir, a["content_hash"])
+        if not tp.is_file():
+            raise HTTPException(404, "thumbnail not found")
+        return FileResponse(tp, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
+
+    @app.get("/api/assets/{asset_id}/window-thumbnail")
+    def window_thumbnail(asset_id: str, start: float):
+        a = store.get_asset(asset_id)
+        if a is None or not a["content_hash"] or a["media_type"] != "video":
+            raise HTTPException(404, "thumbnail not found")
+        tp = window_thumb_path(settings.thumbs_dir, a["content_hash"], float(start))
         if not tp.is_file():
             raise HTTPException(404, "thumbnail not found")
         return FileResponse(tp, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
