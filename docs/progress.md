@@ -8,6 +8,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 1 Real model compatibility | PASSED |
 | 2 Model adapter and execution worker | PASSED |
 | 3 SQLite library and persistence | PASSED |
+| 4 Image import and thumbnails | PASSED |
 
 ---
 
@@ -113,3 +114,37 @@ clean shutdown in lifespan), `config.py` (device/precision settings), `backend/t
 **Gate:** PASSED.
 
 **Next:** Phase 4, image import and thumbnails.
+
+---
+
+## Phase 4: Image import and thumbnails (2026-10-07)
+
+**Changes:** `backend/mediaindex/paths.py` (root validation, traversal and symlink guards, safe walk), `backend/mediaindex/media/images.py`
+(format sniffing, size and pixel limits, EXIF orientation, thumbnails), `backend/mediaindex/ingest.py` (idempotent import job),
+`app.py` (library CRUD, import job, asset listing, thumbnail and file serving by asset ID), `backend/tests/{conftest,test_ingest}.py`.
+
+**Behaviour**
+- Pillow decoders verified: JPEG, PNG and WebP are all available. Formats are sniffed from content (`JPEG|PNG|WEBP|MPO`), not trusted from the extension.
+  Limits are 200 MB per file and 80 MP (decompression-bomb guard). Corrupt or truncated files are marked `failed` with the error text.
+- Discovery covers only the explicitly selected root. It refuses `/` and `$HOME` itself, never follows symlinked dirs, accepts symlinked files only when their target is inside the root,
+  and skips hidden files.
+- Thumbnails are 384 px JPEGs at `data/thumbs/<hash[:2]>/<sha256>.jpg`, shared by duplicate content. Originals are opened read-only.
+- Re-import skips files with unchanged size and mtime. Changed content keeps its asset ID and returns to pending. Vanished files become `missing`, and they return
+  to pending when they reappear. Cancellation is checked between files, and re-running resumes.
+- Files are served only through `/api/assets/{id}/file|thumbnail`, resolved from the stored root and relative path with escape checks. A missing original returns 410.
+  Deleting a library removes only index rows.
+
+**Commands and observed results**
+- `uv run pytest -q`: `25 passed, 1 deselected` (mixed formats, corrupt/truncated, symlink escape, hidden files, EXIF rotation 80x40 to 40x80,
+  duplicate content, originals byte-identical with identical mtime, idempotent re-import, change/missing tracking, cancel then resume, API serving,
+  traversal 404, missing 410, delete-preserves-files)
+- Live server on a real folder (`data/samples/p4`: 6 JPEG photos + 1 garbage file):
+  first import `discovered 7, new 6, failed 1 (broken.jpg: cannot identify image file)`. **After a server restart**, re-import gave `new 0, unchanged 7`.
+  `shasum -c` confirms all 7 originals are unchanged.
+
+**Limitations:** assets stay `pending` because embedding is connected in Phase 6. Cancelling during a live import was tested in unit tests only, since the
+real folder imports in under a second.
+
+**Gate:** PASSED.
+
+**Next:** Phase 5, optional demo image pack.
