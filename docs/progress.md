@@ -10,6 +10,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 3 SQLite library and persistence | PASSED |
 | 4 Image import and thumbnails | PASSED |
 | 5 Optional demo image pack | PASSED |
+| 6 Image embeddings and text search | PASSED |
 
 ---
 
@@ -173,3 +174,37 @@ The card declares CC0-1.0 with no per-image provenance. Some rows contain HTML e
 **Gate:** PASSED.
 
 **Next:** Phase 6, image embeddings and text search.
+
+---
+
+## Phase 6: Image embeddings and text search (2026-10-07)
+
+**Changes:** `backend/mediaindex/indexer.py` (batched real image embedding during import, duplicate-content vector reuse, per-item fallback),
+`backend/mediaindex/search.py` (exact dot-product ranking over L2-normalized vectors, generation-checked matrix cache),
+`backend/mediaindex/api_search.py` (`POST /api/search/text`), `store.index_state`, ingest changes (re-embed when vectors for the
+*current* profile are missing), `scripts/search_check.py`, `backend/tests/test_search.py`.
+
+**API:** `POST /api/search/text {text, library_ids?, media_types: ["image"], limit≤200}` returns asset IDs, preview URLs, raw `similarity`,
+`timing_ms.query_embedding` and `timing_ms.ranking` (measured separately), `candidates_searched`, `index_state`
+(`ready|partial|empty|not_indexed|incompatible`), and a note that similarity is not a probability. An incompatible profile returns 409, and a busy model returns 503.
+
+**Commands and observed results (REAL MODEL, MPS bf16)**
+- Live import of the 500-image demo pack: `embedded 500, failed 0` in **about 913 s (about 1.8 s/image)**, plus the 6-image smoke folder
+- `uv run python scripts/search_check.py text ... --library <demo>` (top-1 shown with its publisher tags, which are used only for inspection):
+  - "waves crashing on a rocky beach": 0.737 stock-02096 (beach, sea, coast, rock)
+  - "a city skyline at night": 0.726 stock-00163 (skyline, night, city)
+  - "snowy mountains": 0.726 stock-00171 (snow, winter, mountain)
+  - "close-up of a flower": 0.718 stock-02063 (flower, close up, macro)
+  - "a car on a road": 0.680 stock-03482 (sports car)
+  - "a laptop on a desk": 0.699 stock-00134 (work, table, mouse), with a tagged laptop image at rank 3
+  - Warm query embedding takes 36–50 ms. Ranking 500 vectors takes about 0.1 ms (cache hit) or about 8 ms (first load after restart).
+- **After a server restart:** the same query returned identical results. Re-import gave `unchanged 500, embedded 0` (no recomputation), and `load_count 1`.
+- `uv run pytest -q`: `30 passed` (known-vector ranking, exclusion, dim mismatch, cache invalidation on write and delete (stale IDs),
+  library filter, empty/not-indexed/ready states, validation, 409 on profile mismatch, reindex under the new profile)
+
+**Limitations:** these are inspection queries, not an evaluation (see Phase 17). Raw similarities cluster between 0.63 and 0.74, so scores are not
+comparable across queries. Indexing speed on the M1 is about 1.8 s/image.
+
+**Gate:** PASSED.
+
+**Next:** Phase 7, reference-image search.

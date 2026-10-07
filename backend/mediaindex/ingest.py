@@ -119,6 +119,15 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
         s.failed.extend(r.get("failed", []))
         batch.clear()
 
+    profile_key = getattr(embed_batch, "profile_key", None)
+
+    def has_vectors(asset_id: str) -> bool:
+        if embed_batch is None:
+            return True
+        if profile_key is None:
+            return store.get_asset(asset_id)["status"] == INDEXED
+        return store.get_asset_vectors(asset_id, profile_key, "image") is not None
+
     try:
         for i, (path, rel) in enumerate(files):
             ctx.check_cancelled()
@@ -128,7 +137,8 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
             done_status = INDEXED if embed_batch else PENDING
             if (ex and ex["size"] == st.st_size and ex["mtime_ns"] == st.st_mtime_ns and ex["content_hash"]
                     and (ex["status"] in (done_status, INDEXED, FAILED))
-                    and (ex["status"] == FAILED or thumb_path(thumbs_dir, ex["content_hash"]).exists())):
+                    and (ex["status"] == FAILED or (thumb_path(thumbs_dir, ex["content_hash"]).exists()
+                                                    and has_vectors(ex["id"])))):
                 s.unchanged += 1
                 ctx.progress(i + 1, message=f"unchanged {rel}")
                 continue
@@ -157,8 +167,7 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
                 s.changed += 1
             else:
                 s.unchanged += 1
-            asset = store.get_asset(aid)
-            if embed_batch is not None and asset["status"] != INDEXED:
+            if embed_batch is not None and (changed or not has_vectors(aid)):
                 batch.append(PendingImage(aid, h, im, rel))
                 if len(batch) >= batch_size:
                     flush()
