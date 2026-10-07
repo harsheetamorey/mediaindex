@@ -35,6 +35,8 @@ export type Asset = {
   file_url: string
 }
 
+export type Segment = { start_s: number | null; end_s: number | null; similarity: number }
+
 export type Result = {
   rank: number
   similarity: number
@@ -42,7 +44,11 @@ export type Result = {
   start_s: number | null
   end_s: number | null
   asset: Asset
+  other_segments?: Segment[]
 }
+
+export type MediaType = 'image' | 'audio'
+
 
 export type IndexState = {
   state: 'ready' | 'partial' | 'empty' | 'not_indexed' | 'incompatible'
@@ -169,8 +175,24 @@ export const api = {
   assetPath: (id: string) => request<{ path: string }>(`/api/assets/${id}/path`),
   reveal: (id: string) => request<{ revealed: boolean }>(`/api/assets/${id}/reveal`, { method: 'POST' }),
 
-  searchText: (text: string, libraryIds: string[] | null, limit = 48) =>
-    request<SearchResponse>('/api/search/text', json({ text, library_ids: libraryIds, limit })),
+  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48) =>
+    request<SearchResponse>('/api/search/text', json({ text, library_ids: libraryIds, media_types: mediaTypes, limit })),
+
+  searchAudioReference: (
+    ref: { file?: File; assetId?: string; startS?: number | null },
+    libraryIds: string[] | null,
+    includeIdentical: boolean,
+    limit = 48,
+  ) => {
+    const form = new FormData()
+    if (ref.file) form.append('file', ref.file)
+    if (ref.assetId) form.append('asset_id', ref.assetId)
+    if (ref.startS != null) form.append('start_s', String(ref.startS))
+    if (libraryIds?.length) form.append('library_ids', libraryIds.join(','))
+    form.append('limit', String(limit))
+    form.append('include_identical', String(includeIdentical))
+    return request<SearchResponse>('/api/search/audio', { method: 'POST', body: form })
+  },
 
   searchReference: (
     ref: { file?: File; assetId?: string },

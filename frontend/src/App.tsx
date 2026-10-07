@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, type Job, type Library, type Result, type SearchResponse, type Selection } from './api'
+import { api, ApiError, type Job, type Library, type MediaType, type Result, type SearchResponse, type Selection } from './api'
+import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
 import ResultsGrid, { resultKey } from './components/ResultsGrid'
 import SearchBar, { type Reference } from './components/SearchBar'
@@ -31,6 +32,8 @@ export default function App() {
   const [text, setText] = useState('')
   const [reference, setReference] = useState<Reference | null>(null)
   const [includeIdentical, setIncludeIdentical] = useState(false)
+  const [target, setTarget] = useState<MediaType>('image')
+  const player = useSegmentPlayer()
   const [searching, setSearching] = useState(false)
   const [response, setResponse] = useState<SearchResponse | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
@@ -148,14 +151,21 @@ export default function App() {
     setSearching(true)
     setSearchError(null)
     try {
+      player.stop()
       const r = reference
-        ? await api.searchReference(
-            reference.kind === 'file' ? { file: reference.file } : { assetId: reference.assetId },
-            text,
-            libraryIds,
-            includeIdentical,
-          )
-        : await api.searchText(text.trim(), libraryIds)
+        ? reference.media === 'audio'
+          ? await api.searchAudioReference(
+              reference.kind === 'file' ? { file: reference.file } : { assetId: reference.assetId, startS: reference.startS },
+              libraryIds,
+              includeIdentical,
+            )
+          : await api.searchReference(
+              reference.kind === 'file' ? { file: reference.file } : { assetId: reference.assetId },
+              text,
+              libraryIds,
+              includeIdentical,
+            )
+        : await api.searchText(text.trim(), libraryIds, [target])
       if (seq !== searchSeq.current) return
       setResponse(r)
       setFocused(0)
@@ -166,7 +176,7 @@ export default function App() {
     } finally {
       if (seq === searchSeq.current) setSearching(false)
     }
-  }, [reference, text, libraryIds, includeIdentical])
+  }, [reference, text, libraryIds, includeIdentical, target, player])
 
   const results = response?.results ?? []
   const openResult = open != null ? results[open] : null
@@ -298,7 +308,7 @@ export default function App() {
                 onBack={() => setView('search')}
                 onChanged={refreshSelections}
                 onUseAsReference={(assetId, thumb, label) => {
-                  setReference({ kind: 'asset', assetId, previewUrl: thumb, label })
+                  setReference({ kind: 'asset', media: 'image', assetId, previewUrl: thumb, label })
                   setView('search')
                 }}
               />
@@ -312,6 +322,8 @@ export default function App() {
             onReference={setReference}
             includeIdentical={includeIdentical}
             onIncludeIdentical={setIncludeIdentical}
+            target={target}
+            onTarget={setTarget}
             onSearch={runSearch}
             searching={searching}
           />
@@ -333,7 +345,7 @@ export default function App() {
               <>
                 <div className="results-head small">
                   <span>
-                    {results.length} closest matches
+                    {results.length} closest {response.mode === 'audio' || results[0]?.modality === 'audio' ? 'sounds' : 'matches'}
                     {selected.size ? ` in ${selected.size} selected ${selected.size === 1 ? 'library' : 'libraries'}` : ''}
                   </span>
                   {showScores && (
@@ -364,6 +376,11 @@ export default function App() {
                   showScores={showScores}
                   onAdd={(i) => addToSelection(results[i])}
                   addedKeys={addedKeys}
+                  playingKey={player.playing}
+                  onPlay={(i) => {
+                    const r = results[i]
+                    player.play(resultKey(r), r.asset.file_url, r.start_s, r.end_s)
+                  }}
                 />
               </>
             )}
@@ -379,12 +396,24 @@ export default function App() {
           showScores={showScores}
           onAdd={() => addToSelection(openResult)}
           added={addedKeys.has(resultKey(openResult))}
+          playing={player.playing === resultKey(openResult)}
+          onPlaySegment={(start, end) =>
+            player.play(
+              start === openResult.start_s ? resultKey(openResult) : `${openResult.asset.id}|${start}|${end}`,
+              openResult.asset.file_url,
+              start,
+              end,
+            )
+          }
           onClose={() => setOpen(null)}
           onPrev={() => setOpen((o) => (o == null ? o : Math.max(0, o - 1)))}
           onNext={() => setOpen((o) => (o == null ? o : Math.min(results.length - 1, o + 1)))}
           onUseAsReference={() => {
             const a = openResult.asset
-            setReference({ kind: 'asset', assetId: a.id, previewUrl: a.thumbnail_url, label: a.rel_path })
+            const media: MediaType = a.media_type === 'image' ? 'image' : 'audio'
+            setReference({ kind: 'asset', media, assetId: a.id, previewUrl: a.thumbnail_url, label: a.rel_path, startS: openResult.start_s, endS: openResult.end_s })
+            setTarget(media)
+            player.stop()
             setOpen(null)
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
