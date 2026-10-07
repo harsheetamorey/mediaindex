@@ -5,6 +5,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | Phase | Status |
 |---|---|
 | 0 Repository and machine setup | PASSED |
+| 1 Real model compatibility | PASSED |
 
 ---
 
@@ -29,3 +30,25 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 **Gate:** PASSED: dependencies install, the health endpoint responds, the frontend builds, and the machine report is accurate.
 
 **Next:** Phase 1, real model compatibility.
+
+---
+
+## Phase 1: Real model compatibility (2026-10-07)
+
+**Changes:** `scripts/model_smoke.py`, `docs/model-compatibility.md`, and pinned deps in `pyproject.toml` and `uv.lock`
+(torch 2.14.1, torchvision 0.29.1, torchcodec 0.17.0, transformers 5.19.0, sentence-transformers 6.1.0).
+
+**Commands and observed results** (real weights, revision `914f7f89142e33e77833254d9c9b90c3cef7303b`)
+- `uv run python scripts/model_smoke.py --images data/samples/smoke` (first run, download): text, image and mixed all OK on `mps:0` bfloat16
+- The same run with `--revision ... --offline`: `all_ok: true` and load 6.0 s
+- `--offline --device cpu --dtype float32`: `all_ok: true`. Scores are within 0.003 of MPS and the rankings are identical.
+- `--no-audio-encoder`: `all_ok: true`, peak RSS about 1.0 GB
+- Text-to-image top-1 is correct for all 3 queries. The mixed query (zebra.jpg + "a musical instrument") moves piano and guitar to ranks 2–3.
+- The first attempt failed with `ModuleNotFoundError: EmbeddingGemma2Processor` because torchvision is a hidden requirement. Adding torchvision fixed it.
+
+**Limitations:** this is a smoke check only (6 images, no accuracy claim). Image encoding on MPS takes about 2.5 s/image when cold.
+Sample images are macOS built-in pictures converted to JPEG under `data/` (not committed).
+
+**Gate:** PASSED: text, image and native image+text run with real weights, both online and with local-only loading.
+
+**Next:** Phase 2, model adapter and execution worker.
