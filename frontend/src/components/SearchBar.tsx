@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { MediaType } from '../api'
+import type { MediaType, QueryMode, Target } from '../api'
+
 import { fmtSpan } from '../lib/time'
 
 export type Reference =
@@ -13,8 +14,9 @@ type Props = {
   onReference: (r: Reference | null) => void
   includeIdentical: boolean
   onIncludeIdentical: (v: boolean) => void
-  target: MediaType
-  onTarget: (t: MediaType) => void
+  target: Target
+  onTarget: (t: Target) => void
+  modes: QueryMode[]
   onSearch: () => void
   searching: boolean
 }
@@ -48,17 +50,20 @@ export default function SearchBar(p: Props) {
     }
     setFileError(null)
     p.onReference({ kind: 'file', media, file: f, previewUrl: media === 'image' ? URL.createObjectURL(f) : '' })
-    if (media === 'audio') p.onTarget('audio')
+    if (p.target === 'both') p.onTarget(media)
   }
 
   const refMedia = p.reference?.media
   const refText = refMedia === 'audio' ? 'sound' : 'image'
-  const textAllowed = refMedia !== 'audio' // native audio+text refinement is not offered (see docs)
+    const targetText = p.target === 'image' ? 'images' : p.target === 'audio' ? 'sounds' : 'images & sounds'
+  const queryKind = p.reference ? `${refMedia}${p.text.trim() ? '+text' : ''}` : 'text'
+  const modeInfo = p.modes.find((m) => m.query === queryKind && m.target === (p.target === 'both' ? 'image+audio' : p.target))
+  const experimental = modeInfo?.status === 'experimental'
   const mode = p.reference
-    ? p.text.trim() && textAllowed
-      ? `Reference ${refText} + refinement text`
-      : `Similar to reference ${refText}`
-    : `Text search · ${p.target === 'image' ? 'images' : 'sounds'}`
+    ? p.text.trim()
+      ? `Reference ${refText} + text → ${targetText}`
+      : `Reference ${refText} → ${targetText}`
+    : `Text → ${targetText}`
   const canSearch = !!p.reference || !!p.text.trim()
 
   return (
@@ -119,20 +124,27 @@ export default function SearchBar(p: Props) {
 
       <div className="query">
         <div className="query-top">
-          <label htmlFor="q" className="mode">{mode}</label>
+          <label htmlFor="q" className="mode">
+            {mode}
+            {experimental && (
+              <span className="badge exp" title="Runs on the shared embedding space, but result quality is unmeasured and uneven">
+                experimental
+              </span>
+            )}
+          </label>
           <div className="seg" role="radiogroup" aria-label="Search in">
-            {(['image', 'audio'] as MediaType[]).map((t) => (
+            {(['image', 'audio', 'both'] as Target[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 role="radio"
                 aria-checked={p.target === t}
                 className={p.target === t ? 'on' : ''}
-                disabled={!!refMedia && refMedia !== t}
-                title={refMedia && refMedia !== t ? 'Cross-media search arrives in a later phase' : undefined}
+                disabled={!!refMedia && t === 'both'}
+                title={refMedia && t === 'both' ? 'Reference searches target one media type at a time' : undefined}
                 onClick={() => p.onTarget(t)}
               >
-                {t === 'image' ? 'Images' : 'Sounds'}
+                {t === 'image' ? 'Images' : t === 'audio' ? 'Sounds' : 'Both'}
               </button>
             ))}
           </div>
@@ -143,10 +155,9 @@ export default function SearchBar(p: Props) {
             type="search"
             value={p.text}
             onChange={(e) => p.onText(e.target.value)}
-            disabled={!textAllowed}
             placeholder={
-              !textAllowed
-                ? 'Text refinement is not available for sound references'
+              p.reference?.media === 'audio'
+                ? 'Optional: refine, e.g. "in a large hall" (experimental)'
                 : p.reference
                   ? 'Optional: refine, e.g. "at night" or "in a forest"'
                   : p.target === 'audio'

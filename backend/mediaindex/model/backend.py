@@ -127,6 +127,14 @@ class GemmaBackend:
         return self._encode([{"audio": {"array": np.asarray(a, np.float32), "sampling_rate": sampling_rate}}
                              for a in arrays], batch_size=2)
 
+    def embed_audio_text(self, array: np.ndarray, text: str, sampling_rate: int = 16000) -> np.ndarray:
+        """Native single-pass audio+text embedding (verified to run in Phase 13; quality experimental)."""
+        if not self.capabilities()["audio"]:
+            raise CapabilityUnavailable("audio encoder not loaded in this profile")
+        return self._encode([{"text": self.profile.query_prompt + text,
+                              "audio": {"array": np.asarray(array, np.float32), "sampling_rate": sampling_rate}}],
+                            batch_size=1)
+
     def close(self) -> None:
         del self.model
         self._empty_cache()
@@ -157,6 +165,9 @@ class FakeBackend:
 
     def embed_image_text(self, image, text):
         return self._vec(b"m:" + image.convert("RGB").resize((16, 16)).tobytes() + text.encode())
+
+    def embed_audio_text(self, array, text, sampling_rate: int = 16000):
+        return self._vec(b"at:" + np.asarray(array, np.float32)[:: max(1, len(array) // 64)].tobytes() + text.encode())
 
     def embed_audio(self, arrays, sampling_rate: int = 16000):
         return np.vstack([self._vec(b"a:" + np.asarray(a, np.float32)[:: max(1, len(a) // 64)].tobytes())

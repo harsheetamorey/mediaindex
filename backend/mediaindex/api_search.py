@@ -28,6 +28,7 @@ class TextSearchRequest(BaseModel):
     media_types: list[Literal["image", "audio"]] = ["image"]
     limit: int = Field(24, ge=1, le=200)
     group_segments: bool = True
+    global_rank: bool = False  # experimental: one list across media types by raw cosine
 
 
 def embed_query(app: FastAPI, fn):
@@ -65,8 +66,43 @@ def group_hits(hits, limit: int, max_extra: int = 5):
     return [best[a] for a in order]
 
 
+GLOBAL_RANK_NOTE = ("EXPERIMENTAL global ranking: images and sound windows are merged by raw cosine similarity. "
+                    "Similarity scales are not calibrated across media types, so this order can favour one type.")
+
+
 def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: float, library_ids, media_types,
-               limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True) -> dict:
+               limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True,
+               global_rank: bool = False) -> dict:
+    media_types = list(dict.fromkeys(media_types))
+    if len(media_types) > 1:
+        parts = [_search_one(app, mode=mode, query_info=query_info, vec=vec, embed_ms=embed_ms,
+                             library_ids=library_ids, media_types=[t], limit=limit, exclude_assets=exclude_assets,
+                             group_segments=group_segments) for t in media_types]
+        out = dict(parts[0])
+        out["candidates_searched"] = sum(p["candidates_searched"] for p in parts)
+        out["timing_ms"] = {"query_embedding": parts[0]["timing_ms"]["query_embedding"],
+                            "ranking": round(sum(p["timing_ms"]["ranking"] for p in parts), 3)}
+        out["index_state"] = {t: p["index_state"] for t, p in zip(media_types, parts)}
+        if global_rank:
+            merged = sorted((r for p in parts for r in p["results"]), key=lambda r: -r["similarity"])[:limit]
+            for i, r in enumerate(merged):
+                r["rank"] = i + 1
+            out["results"] = merged
+            out["grouping"] = "global (experimental)"
+            out["note"] = SIMILARITY_NOTE + ". " + GLOBAL_RANK_NOTE
+        else:
+            out["results"] = [r for p in parts for r in p["results"]]
+            out["groups"] = {t: len(p["results"]) for t, p in zip(media_types, parts)}
+            out["grouping"] = "by_modality"
+        out["media_types"] = media_types
+        return out
+    return _search_one(app, mode=mode, query_info=query_info, vec=vec, embed_ms=embed_ms, library_ids=library_ids,
+                       media_types=media_types, limit=limit, exclude_assets=exclude_assets,
+                       group_segments=group_segments)
+
+
+def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: float, library_ids, media_types,
+                limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True) -> dict:
     store = app.state.store
     profile_key = app.state.profile.key
     if library_ids:
@@ -99,6 +135,8 @@ def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: floa
                                             "similarity": round(o.similarity, 5)} for o in g["others"]]})
     return {
         "mode": mode,
+        "media_types": list(media_types),
+        "grouping": "single",
         "query": query_info,
         "profile_key": profile_key,
         "results": results,
@@ -113,13 +151,14 @@ def register(app: FastAPI) -> None:
     register_reference(app)
     register_mixed(app)
     register_audio(app)
+    register_modes(app)
 
     @app.post("/api/search/text")
     def search_text(req: TextSearchRequest) -> dict:
         vec, ms = embed_query(app, lambda b: b.embed_query_texts([req.text.strip()])[0])
         return run_search(app, mode="text", query_info={"text": req.text}, vec=vec, embed_ms=ms,
                           library_ids=req.library_ids, media_types=req.media_types, limit=req.limit,
-                          group_segments=req.group_segments)
+                          group_segments=req.group_segments, global_rank=req.global_rank)
 
 
 def _parse_libs(library_ids: str | None) -> list[str] | None:
@@ -173,7 +212,8 @@ def register_reference(app: FastAPI) -> None:
     @app.post("/api/search/image")
     def search_image(file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                      library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
-                     include_identical: bool = Form(False)) -> dict:
+                     include_identical: bool = Form(False),
+                     target: Literal["image", "audio"] = Form("image")) -> dict:
         with _reference(app, file, asset_id) as (im, sha, ref_asset, info):
             stored = None
             if ref_asset is not None:
@@ -186,8 +226,9 @@ def register_reference(app: FastAPI) -> None:
                 info["embedding"] = "computed"
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
-        return run_search(app, mode="image", query_info=info, vec=vec, embed_ms=ms,
-                          library_ids=_parse_libs(library_ids), media_types=["image"], limit=limit,
+        _mark_cross(info, "image", target)
+        return run_search(app, mode="image" if target == "image" else "image→audio", query_info=info, vec=vec,
+                          embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target], limit=limit,
                           exclude_assets=excl)
 
 
@@ -200,7 +241,8 @@ def register_mixed(app: FastAPI) -> None:
     def search_image_text(text: str = Form(..., min_length=1, max_length=2000),
                           file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                           library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
-                          include_identical: bool = Form(False)) -> dict:
+                          include_identical: bool = Form(False),
+                          target: Literal["image", "audio"] = Form("image")) -> dict:
         text = text.strip()
         if not text:
             raise HTTPException(422, "refinement text is empty; use /api/search/image for reference-only search")
@@ -222,9 +264,10 @@ def register_mixed(app: FastAPI) -> None:
         })
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
-        return run_search(app, mode="image+text", query_info=info, vec=vec, embed_ms=ms,
-                          library_ids=_parse_libs(library_ids), media_types=["image"], limit=limit,
-                          exclude_assets=excl)
+        _mark_cross(info, "image+text", target)
+        return run_search(app, mode="image+text" if target == "image" else "image+text→audio", query_info=info,
+                          vec=vec, embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target],
+                          limit=limit, exclude_assets=excl)
 
 
 # ---- audio reference search (Phase 12) ------------------------------------------------
@@ -288,15 +331,75 @@ def register_audio(app: FastAPI) -> None:
     def search_audio(file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                      start_s: float | None = Form(None, ge=0), library_ids: str | None = Form(None),
                      limit: int = Form(24, ge=1, le=200), include_identical: bool = Form(False),
-                     target: Literal["audio"] = Form("audio")) -> dict:
+                     target: Literal["audio", "image"] = Form("audio"),
+                     text: str | None = Form(None, max_length=2000)) -> dict:
+        text = (text or "").strip() or None
         with _audio_reference(app, file, asset_id, start_s) as (vec, x, sha, ref_asset, info):
-            if vec is None:
+            if text is not None:
+                if x is None:  # asset reference: re-decode exactly the chosen window
+                    x = _decode_ref_window(app, ref_asset, info["reference_span"])
+                vec, ms = embed_query(app, lambda b: b.embed_audio_text(x, text)[0])
+                info.update({"text": text, "embedding": "computed (native audio+text, single forward pass)",
+                             "caveat": "EXPERIMENTAL: refinement text steers the embedding; no logical constraints"})
+            elif vec is None:
                 vec, ms = embed_query(app, lambda b: b.embed_audio([x])[0])
                 info["embedding"] = "computed (audio encoder, mono 16 kHz)"
             else:
                 ms = 0.0
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
-        return run_search(app, mode="audio", query_info=info, vec=vec, embed_ms=ms,
+        _mark_cross(info, "audio+text" if text else "audio", target)
+        mode = ("audio+text" if text else "audio") + ("" if target == "audio" else "→image")
+        return run_search(app, mode=mode, query_info=info, vec=vec, embed_ms=ms,
                           library_ids=_parse_libs(library_ids), media_types=[target], limit=limit,
                           exclude_assets=excl)
+
+
+def _decode_ref_window(app: FastAPI, asset: dict, span) -> np.ndarray:
+    from .media.audio import AudioRejected, decode_audio
+
+    _, path = app.state.asset_path(asset["id"])
+    try:
+        return decode_audio(path, start=span[0], duration=span[1] - span[0])
+    except AudioRejected as e:
+        raise HTTPException(422, f"cannot decode reference sound: {e}")
+
+
+# Supported query modes. "verified": exercised with real data in an earlier phase; "experimental":
+# runs on the shared embedding space but quality is unmeasured/uneven (see docs/cross-modal-findings.md).
+QUERY_MODES = [
+    {"query": "text", "target": "image", "status": "verified", "endpoint": "/api/search/text", "needs": ["image"]},
+    {"query": "text", "target": "audio", "status": "verified", "endpoint": "/api/search/text", "needs": ["audio"]},
+    {"query": "text", "target": "image+audio", "status": "verified (grouped by type)", "endpoint": "/api/search/text",
+     "needs": ["image", "audio"]},
+    {"query": "image", "target": "image", "status": "verified", "endpoint": "/api/search/image", "needs": ["image"]},
+    {"query": "image+text", "target": "image", "status": "verified (quality caveats)", "endpoint": "/api/search/image-text",
+     "needs": ["image"]},
+    {"query": "audio", "target": "audio", "status": "verified", "endpoint": "/api/search/audio", "needs": ["audio"]},
+    {"query": "image", "target": "audio", "status": "experimental", "endpoint": "/api/search/image", "needs": ["image", "audio"]},
+    {"query": "audio", "target": "image", "status": "experimental", "endpoint": "/api/search/audio", "needs": ["image", "audio"]},
+    {"query": "image+text", "target": "audio", "status": "experimental", "endpoint": "/api/search/image-text",
+     "needs": ["image", "audio"]},
+    {"query": "audio+text", "target": "audio", "status": "experimental", "endpoint": "/api/search/audio", "needs": ["audio"]},
+    {"query": "audio+text", "target": "image", "status": "experimental", "endpoint": "/api/search/audio",
+     "needs": ["image", "audio"]},
+]
+
+
+def _mark_cross(info: dict, query: str, target: str) -> None:
+    m = next((x for x in QUERY_MODES if x["query"] == query and x["target"] == target), None)
+    info["mode_status"] = m["status"] if m else "unsupported"
+    if m and m["status"] == "experimental":
+        info["experimental"] = True
+
+
+def register_modes(app: FastAPI) -> None:
+    @app.get("/api/capabilities")
+    def capabilities() -> dict:
+        enc = set(app.state.profile.encoders)
+        modes = [dict(m, available=all(n in enc for n in m["needs"])) for m in QUERY_MODES]
+        return {"encoders": sorted(enc), "modes": modes,
+                "notes": ["Results are grouped by media type by default because raw similarity scales are not "
+                          "calibrated across images and sounds.", GLOBAL_RANK_NOTE,
+                          "A sound suggested for an image is a similarity candidate, not synchronization or a "
+                          "judgement of artistic quality."]}
