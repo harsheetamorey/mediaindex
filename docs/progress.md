@@ -559,3 +559,20 @@ FFmpeg protocols, upload spooling) are fixed.
 **Gate:** PASSED as specified. The evaluation tools are executable, the performance numbers are measured, and the report states its label coverage honestly with relevance metrics explicitly pending.
 
 **Next:** Phase 18, optional specialist-model comparison.
+
+---
+
+## Phase 18: Optional specialist-model comparison (2026-10-07). SKIPPED for now, partial
+
+**Changes:** `evaluation/bench_clotho.py` (Clotho v2.1 eval-split text→audio benchmark, 5 configs), `evaluation/bench/clotho_clap-{best,ctrl}.json`,
+`docs/model-comparison.md`, optional `bench` extra (`py7zr`) in `pyproject.toml`.
+
+**Observed (REAL MODELS, full 1,045-clip / 5,225-caption pool):** clap-best R@1 0.142 [0.129, 0.157], R@10 0.498; clap-ctrl R@1 0.147, R@10 0.499.
+
+**Not completed:** all three EmbeddingGemma configs. The run was killed by the macOS low-memory monitor during `gemma-ctrl` on the 8 GB laptop.
+The maintainer chose to skip the phase for now. No Gemma-vs-CLAP claim is made. Rerun steps are in `docs/model-comparison.md`.
+The image comparison was skipped (Flickr30k is terms-gated, and the demo pack has no human labels).
+
+**Gate:** optional phase, skipped by the maintainer. The partial results and the reason are documented.
+
+**Next:** Phase 19, open-source release preparation.
