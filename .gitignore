@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Local app state: databases, vectors, thumbnails, uploads, indexes
+data/
+*.sqlite3
+*.sqlite3-*
+*.db
+*.npy
+*.npz
+indexes/
+
+# Media (never commit user or demo media)
+media/
+samples/
+demo_data/
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.gif
+*.wav
+*.flac
+*.mp3
+*.mp4
+*.mov
+*.mkv
+!docs/assets/*.png
+
+# Model caches / weights
+.cache/
+hf_cache/
+models/
+*.safetensors
+*.bin
+*.gguf
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+.huggingface/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
