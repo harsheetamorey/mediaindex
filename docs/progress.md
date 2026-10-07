@@ -576,3 +576,26 @@ The image comparison was skipped (Flickr30k is terms-gated, and the demo pack ha
 **Gate:** optional phase, skipped by the maintainer. The partial results and the reason are documented.
 
 **Next:** Phase 19, open-source release preparation.
+
+---
+
+## Phase 19: Open-source release preparation (2026-10-07)
+
+**Changes:** README rewrite (quick start, formats, query modes with verified/experimental status, hardware numbers, troubleshooting, limitations),
+`LICENSE` (Apache-2.0), `NOTICE.md` (model, locked third-party software, FFmpeg note), `CONTRIBUTING.md`, `docs/architecture.md`,
+`docs/release-checklist.md`, `.github/workflows/ci.yml` (macOS arm64 unit tests + UI build; opt-in real-model job on manual dispatch),
+`docs/assets/screenshot-search.png`. Fix: allowed CORS/Origin values are now derived from `MEDIAINDEX_PORT` (new test in `test_health.py`).
+
+**Commands and observed results**
+- Screenshot: a separate data directory copied from the app DB with every non-demo library removed (only `stockimages-cc0`, `fsd50k-cc0`
+  and the generated demo video remain). Text query "a snowy mountain landscape" (REAL MODEL, port 8790). No personal media appears.
+- `uv run pytest -q`: `74 passed, 1 deselected`
+- `npm run build`: OK. `npx oxlint src`: 0 errors, 2 warnings (set-state-in-effect).
+- Fresh-clone check (after the `.gitignore` fix): `uv sync --frozen`, `npm ci`, build and tests passed.
+- `git ls-files` audit: no media, databases, weights or `data/`, and no private absolute paths.
+
+**Not verified:** CI has not yet been seen running on GitHub.
+
+**Gate:** PASSED. Release files and docs are complete, and the checklist states what remains open. Nothing was published.
+
+**Next:** Phase 20, demo and handoff.

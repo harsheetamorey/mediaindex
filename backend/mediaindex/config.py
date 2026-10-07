@@ -24,12 +24,11 @@ class Settings:
     job_queue_size: int = 8
     query_wait_seconds: float = float(os.environ.get("MEDIAINDEX_QUERY_WAIT", "30"))
     max_request_bytes: int = 60 * 1024 * 1024  # largest accepted upload (50 MB audio) + multipart overhead
-    allowed_origins: tuple[str, ...] = (
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:8765",
-        "http://localhost:8765",
-    )
+    allowed_origins: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.allowed_origins:  # the UI served by this server, plus the Vite dev server
+            self.allowed_origins = tuple(f"http://{h}:{p}" for p in (self.port, 5173) for h in ("127.0.0.1", "localhost"))
 
     @property
     def db_path(self) -> Path:

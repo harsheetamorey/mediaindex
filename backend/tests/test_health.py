@@ -58,3 +58,11 @@ def test_cors_only_allows_local_ui_origins(tmp_path):
     assert r.headers.get("access-control-allow-origin") == "http://127.0.0.1:5173"
     r = c.post("/api/libraries", json={"path": "/tmp"}, headers={"origin": "null"})
     assert r.status_code == 403
+
+
+def test_allowed_origins_follow_configured_port(tmp_path):
+    s = Settings(data_dir=tmp_path, port=8800)
+    assert "http://127.0.0.1:8800" in s.allowed_origins and "http://localhost:5173" in s.allowed_origins
+    c = TestClient(create_app(s))
+    assert c.post("/api/libraries", json={"path": str(tmp_path)}, headers={"origin": "http://127.0.0.1:8800"}).status_code == 200
+    assert c.post("/api/libraries", json={"path": str(tmp_path)}, headers={"origin": "http://127.0.0.1:8765"}).status_code == 403
