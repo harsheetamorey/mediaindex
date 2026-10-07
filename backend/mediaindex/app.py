@@ -18,6 +18,7 @@ from . import api_search
 from .indexer import make_image_embedder
 from .ingest import run_image_import, thumb_path
 from .search import MatrixCache
+from .uploads import cleanup_stale_uploads
 from .jobs import JobRunner, QueueFull
 from .paths import PathRejected, resolve_in_root, validate_root
 from .store import Store
@@ -42,6 +43,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     store = Store(db)
     store.register_profile(profile)
     store.recover_interrupted_jobs()
+    cleanup_stale_uploads(settings.uploads_dir, max_age=0)
     job_libraries: dict[str, str | None] = {}
 
     def persist_job(job) -> None:

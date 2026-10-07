@@ -11,6 +11,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 4 Image import and thumbnails | PASSED |
 | 5 Optional demo image pack | PASSED |
 | 6 Image embeddings and text search | PASSED |
+| 7 Reference-image search | PASSED |
 
 ---
 
@@ -208,3 +209,34 @@ comparable across queries. Indexing speed on the M1 is about 1.8 s/image.
 **Gate:** PASSED.
 
 **Next:** Phase 7, reference-image search.
+
+---
+
+## Phase 7: Reference-image search (2026-10-07)
+
+**Changes:** `backend/mediaindex/uploads.py` (temp upload streaming with a 25 MB limit, an extension allow-list, server-generated names,
+always-delete, and a stale-file sweep at startup), `api_search.py` (`POST /api/search/image`, multipart with exactly one of `file` or `asset_id`),
+`backend/tests/test_reference_search.py`.
+
+**Behaviour**
+- Uploaded references are decoded with the same `load_image` (EXIF orientation, RGB) and embedded with the same backend path as library images.
+- Library references are chosen by **asset ID only**: the stored vector is reused, and the file is read through the ID-based, root-restricted resolver.
+- By default, the reference asset and **every asset with an identical SHA-256** are excluded. `include_identical=true` keeps them.
+- Errors: 415 unsupported extension, 413 oversized, 400 empty, 422 undecodable or ambiguous input, 404 unknown asset. Client filenames are never used as paths.
+
+**Commands and observed results (REAL MODEL)**
+- Asset reference stock-00102 (purple flower): top results are 0.885 stock-02095 (purple viola), then flower images at 0.76. The reference itself is excluded.
+- Asset reference stock-00150 (city): city, street and architecture scenes at 0.74–0.76.
+- **Failure case:** asset reference stock-03482 (sports car) returns dark night and road scenes (0.70–0.74), not other vehicles. Overall tone and lighting
+  seem to dominate for this image.
+- Uploading a byte-identical copy of stock-00102 gives a computed embedding. The default run excludes 1 identical asset. With `include_identical`, the copy ranks first
+  at **1.0000**, which confirms the upload preprocessing matches indexing.
+- Uploading an external sunflower photo returns flower and meadow images. Its identical copy in the smoke library was excluded.
+- `data/tmp_uploads` holds 0 files after the requests. All 500 demo originals match their manifest SHA-256 (0 modified).
+- `uv run pytest -q`: `34 passed`
+
+**Limitations:** uploaded references cost a full image embedding (about 1.7–3 s on MPS while warm). Library references are instant.
+
+**Gate:** PASSED.
+
+**Next:** Phase 8, image plus text refinement.
