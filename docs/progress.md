@@ -13,6 +13,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 6 Image embeddings and text search | PASSED |
 | 7 Reference-image search | PASSED |
 | 8 Image plus text refinement | PASSED (quality caveats documented) |
+| 9 Creator interface: **Version 1** | PASSED |
 
 ---
 
@@ -265,3 +266,37 @@ image+text forward pass (about 1–3 s on MPS).
 **Gate:** PASSED. Real combined-input inference returns candidates, and the API and profile are recorded. Semantic limitations are documented.
 
 **Next:** Phase 9, creator interface (Version 1).
+
+---
+
+## Phase 9: Creator interface, Version 1 (2026-10-07)
+
+**Changes:** `frontend/src/{App.tsx,api.ts,index.css}` and `frontend/src/components/{Sidebar,SearchBar,ResultsGrid,DetailPanel}.tsx`.
+The backend serves `frontend/dist` from the same loopback origin and sets security headers (CSP `default-src 'self'`, nosniff,
+no-referrer). Jobs carry `library_id`. Upload errors no longer echo temp paths. Also `scripts/ui_check.py` (Playwright, dev-only) and a README quick start.
+
+**UI:** library sidebar (add folder by absolute path with a plain-language explanation, import/re-scan, progress bar with cancel,
+import summary listing failed files, remove index), search bar with a reference drop zone, optional refinement text and an include-identical toggle,
+results grid (keyboard: arrows and Enter), and a detail preview (Esc, ←/→, **Use as reference**, open original, source/licence record).
+Empty, loading, error, cancelled and partial states are covered. Technical scores are hidden by default. When shown, they read as raw cosine, never percentages.
+System fonts only, no CDNs, light and dark themes.
+
+**Start command:** `(cd frontend && npm run build) && uv run python -m mediaindex`, then open http://127.0.0.1:8765
+
+**Browser verification:** headless installed Chrome via Playwright on the target laptop, REAL MODEL.
+- `scripts/ui_check.py --folder data/samples/p4`: added the folder in the UI, import finished (`6 new, 1 failed: broken.jpg`), and the failure was listed
+  → text "a zebra" (48 results, zebra.jpg first) → arrow-key focus then Enter opened the matching preview, Esc closed it → **Use as reference** → image search
+  (identical zebra copies excluded; penguin first) → refinement "at night" (HTTP 200, image+text) → scores toggle showed `0.722` labelled as raw similarity.
+  External requests: none. Console errors: none.
+- **After a server restart** (`--skip-import`): libraries persisted. Text "a city skyline at night" put stock-00163 first, refinement "in the snow" returned snowy
+  city scenes, an invalid upload (broken.jpg) showed a readable 422 message, and a valid upload reference returned 200. External requests: none.
+- Fresh data dir (`ui_states.py`): empty-state text shown, `/` rejected with an explanation, cancelling the 500-image import mid-way showed "Import cancelled",
+  and searching the partly indexed library worked.
+- Screenshots were reviewed. Two layout bugs found this way were fixed: the stretched checkbox and long error paths overflowing.
+
+**Limitations:** folders are added by pasting a path, since a browser cannot hand folder paths to a local server. Drag-and-drop of the reference was not exercised
+by automation (the file-input path was). Tested only in Chrome on macOS.
+
+**Gate:** PASSED. A user can complete import → text → image → refinement → preview → restart with real data. **Version 1.**
+
+**Next:** Phase 10, selections and image exports.
