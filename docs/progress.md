@@ -17,6 +17,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 10 Selections and image exports | PASSED |
 | 11 Audio inference and segmentation | PASSED |
 | 12 Audio search and playback | PASSED |
+| 13 Cross-modal workspace | PASSED (experimental modes labelled) |
 
 ---
 
@@ -406,3 +407,32 @@ about ±0.25 s (browser `timeupdate` granularity). Uploaded sound references use
 **Gate:** PASSED. Imported sounds can be searched by text or sound, and the matching segment plays entirely locally. Image features are unchanged.
 
 **Next:** Phase 13, cross-modal workspace.
+
+---
+
+## Phase 13: Cross-modal workspace (2026-10-07)
+
+**Changes:** `api_search.py` (`target` on image, image+text and audio endpoints; native **audio+text** via `embed_audio_text`; multi-type text search
+grouped by modality, or an experimental `global_rank`; `GET /api/capabilities` with per-mode status verified, experimental or unavailable; `mode_status`/`experimental` in
+query provenance), UI (Images/Sounds/Both target, "experimental" badge driven by `/api/capabilities`, grouped "Images" and "Sounds" sections,
+experimental banners, a mixed-ranking toggle behind technical scores, text refinement for sound references), `backend/tests/test_crossmodal.py`,
+`scripts/{crossmodal_check,ui_check_crossmodal}.py`, `docs/cross-modal-findings.md`.
+
+**Native audio+text verification (REAL MODEL):** `encode([{"text": prompt+text, "audio": {...}}])` returns a finite 768-d unit vector distinct from both inputs
+(cos 0.908 to audio-only, 0.785 to text-only, 0.947 to their normalized mean). It is a single forward pass, not an average, so it is exposed as **experimental**.
+
+**Commands and observed results (REAL MODEL)**
+- `uv run python scripts/crossmodal_check.py`: 12 fixed examples. The expected item was in the top 10 in **8 of 12** cases and at rank 1 in **3 of 12**. Image→sound did reasonably well
+  (train and insect at rank 1). **Sound→image mostly failed**, with the same three "hub" images topping most audio queries. Details: `docs/cross-modal-findings.md`.
+- Browser (`scripts/ui_check_crossmodal.py`): Both + "a train" showed sections **Images (48)** and **Sounds (48)**. Image result → reference → Sounds showed the mode
+  "Reference image → sounds" with an experimental badge, and returned the **train clip first**. Sound result → reference → Images ran `audio→image` (experimental) with a hub image first.
+  The mixed-ranking toggle returned `grouping: global (experimental)` with a warning banner.
+- Index compatibility is still enforced per media type (409 on profile mismatch), and every mode uses the single active profile.
+- `uv run pytest -q`: `54 passed`
+
+**Limitations:** sound→image quality is poor on this data (hubness). Similarity scales are not calibrated across types. Cross-media suggestions are candidates,
+not synchronization or quality judgements.
+
+**Gate:** PASSED. Real cross-modal retrieval can be previewed, index compatibility is enforced, and experimental modes are clearly identified.
+
+**Next:** Phase 14, video ingestion and indexing.

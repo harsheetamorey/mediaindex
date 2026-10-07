@@ -48,6 +48,9 @@ export type Result = {
 }
 
 export type MediaType = 'image' | 'audio'
+export type Target = MediaType | 'both'
+
+export type QueryMode = { query: string; target: string; status: string; available: boolean }
 
 
 export type IndexState = {
@@ -59,11 +62,14 @@ export type IndexState = {
 
 export type SearchResponse = {
   mode: string
+  media_types?: MediaType[]
+  grouping?: 'single' | 'by_modality' | 'global (experimental)'
+  groups?: Record<string, number>
   query: Record<string, unknown>
   results: Result[]
   candidates_searched: number
   timing_ms: { query_embedding: number; ranking: number }
-  index_state: IndexState
+  index_state: IndexState | Record<string, IndexState>
   note: string
 }
 
@@ -175,19 +181,27 @@ export const api = {
   assetPath: (id: string) => request<{ path: string }>(`/api/assets/${id}/path`),
   reveal: (id: string) => request<{ revealed: boolean }>(`/api/assets/${id}/reveal`, { method: 'POST' }),
 
-  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48) =>
-    request<SearchResponse>('/api/search/text', json({ text, library_ids: libraryIds, media_types: mediaTypes, limit })),
+  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48, globalRank = false) =>
+    request<SearchResponse>(
+      '/api/search/text',
+      json({ text, library_ids: libraryIds, media_types: mediaTypes, limit, global_rank: globalRank }),
+    ),
+  capabilities: () => request<{ modes: QueryMode[]; notes: string[] }>('/api/capabilities'),
 
   searchAudioReference: (
     ref: { file?: File; assetId?: string; startS?: number | null },
+    text: string,
     libraryIds: string[] | null,
     includeIdentical: boolean,
+    target: MediaType = 'audio',
     limit = 48,
   ) => {
     const form = new FormData()
     if (ref.file) form.append('file', ref.file)
     if (ref.assetId) form.append('asset_id', ref.assetId)
     if (ref.startS != null) form.append('start_s', String(ref.startS))
+    if (text.trim()) form.append('text', text.trim())
+    form.append('target', target)
     if (libraryIds?.length) form.append('library_ids', libraryIds.join(','))
     form.append('limit', String(limit))
     form.append('include_identical', String(includeIdentical))
@@ -199,11 +213,13 @@ export const api = {
     text: string,
     libraryIds: string[] | null,
     includeIdentical: boolean,
+    target: MediaType = 'image',
     limit = 48,
   ) => {
     const form = new FormData()
     if (ref.file) form.append('file', ref.file)
     if (ref.assetId) form.append('asset_id', ref.assetId)
+    form.append('target', target)
     if (libraryIds?.length) form.append('library_ids', libraryIds.join(','))
     form.append('limit', String(limit))
     form.append('include_identical', String(includeIdentical))

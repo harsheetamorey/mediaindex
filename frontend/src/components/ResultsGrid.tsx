@@ -12,17 +12,28 @@ type Props = {
   addedKeys: Set<string>
   onPlay: (i: number) => void
   playingKey: string | null
+  offset?: number
+  label?: string
 }
 
 export const resultKey = (r: Result) => `${r.asset.id}|${r.start_s ?? ''}|${r.end_s ?? ''}`
 
-export default function ResultsGrid({ results, focused, onFocus, onOpen, showScores, onAdd, addedKeys, onPlay, playingKey }: Props) {
+export default function ResultsGrid(props: Props) {
+  const off = props.offset ?? 0
+  const results = props.results
+  const focused = props.focused - off
+  const onFocus = (i: number) => props.onFocus(i + off)
+  const onOpen = (i: number) => props.onOpen(i + off)
+  const onAdd = (i: number) => props.onAdd(i + off)
+  const onPlay = (i: number) => props.onPlay(i + off)
+  const { showScores, addedKeys, playingKey } = props
   const grid = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
+    if (focused < 0 || focused >= results.length) return
     const el = grid.current?.querySelectorAll<HTMLElement>('.cell')[focused]
-    el?.focus({ preventScroll: false })
-  }, [focused])
+    if (el && el !== document.activeElement && grid.current?.contains(document.activeElement)) el.focus({ preventScroll: false })
+  }, [focused, results.length])
 
   const onKey = (e: React.KeyboardEvent) => {
     if (!grid.current || results.length === 0) return
@@ -46,14 +57,14 @@ export default function ResultsGrid({ results, focused, onFocus, onOpen, showSco
   }
 
   return (
-    <ul className="grid" ref={grid} onKeyDown={onKey} role="listbox" aria-label="Search results">
+    <ul className="grid" ref={grid} onKeyDown={onKey} role="listbox" aria-label={props.label ?? 'Search results'}>
       {results.map((r, i) => (
         <li
           key={r.asset.id + (r.start_s ?? '')}
           className="cell"
           role="option"
           aria-selected={i === focused}
-          tabIndex={i === focused ? 0 : -1}
+          tabIndex={i === focused || (i === 0 && (focused < 0 || focused >= results.length)) ? 0 : -1}
           onFocus={() => i !== focused && onFocus(i)}
           onClick={() => {
             onFocus(i)

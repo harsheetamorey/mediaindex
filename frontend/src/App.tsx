@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, type Job, type Library, type MediaType, type Result, type SearchResponse, type Selection } from './api'
+import {
+  api,
+  ApiError,
+  type IndexState,
+  type Job,
+  type Library,
+  type MediaType,
+  type QueryMode,
+  type Result,
+  type SearchResponse,
+  type Selection,
+  type Target,
+} from './api'
 import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
 import ResultsGrid, { resultKey } from './components/ResultsGrid'
@@ -32,7 +44,9 @@ export default function App() {
   const [text, setText] = useState('')
   const [reference, setReference] = useState<Reference | null>(null)
   const [includeIdentical, setIncludeIdentical] = useState(false)
-  const [target, setTarget] = useState<MediaType>('image')
+  const [target, setTarget] = useState<Target>('image')
+  const [modes, setModes] = useState<QueryMode[]>([])
+  const [globalRank, setGlobalRank] = useState(false)
   const player = useSegmentPlayer()
   const [searching, setSearching] = useState(false)
   const [response, setResponse] = useState<SearchResponse | null>(null)
@@ -121,6 +135,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    api.capabilities().then((c) => setModes(c.modes)).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     refreshLibraries()
     api.jobs().then((js) => setJobs(Object.fromEntries(js.map((j) => [j.id, j])))).catch(() => {})
   }, [refreshLibraries])
@@ -152,20 +170,24 @@ export default function App() {
     setSearchError(null)
     try {
       player.stop()
+      const single: MediaType = target === 'both' ? (reference?.media ?? 'image') : target
       const r = reference
         ? reference.media === 'audio'
           ? await api.searchAudioReference(
               reference.kind === 'file' ? { file: reference.file } : { assetId: reference.assetId, startS: reference.startS },
+              text,
               libraryIds,
               includeIdentical,
+              single,
             )
           : await api.searchReference(
               reference.kind === 'file' ? { file: reference.file } : { assetId: reference.assetId },
               text,
               libraryIds,
               includeIdentical,
+              single,
             )
-        : await api.searchText(text.trim(), libraryIds, [target])
+        : await api.searchText(text.trim(), libraryIds, target === 'both' ? ['image', 'audio'] : [target], 48, globalRank)
       if (seq !== searchSeq.current) return
       setResponse(r)
       setFocused(0)
@@ -176,11 +198,32 @@ export default function App() {
     } finally {
       if (seq === searchSeq.current) setSearching(false)
     }
-  }, [reference, text, libraryIds, includeIdentical, target, player])
+  }, [reference, text, libraryIds, includeIdentical, target, player, globalRank])
 
-  const results = response?.results ?? []
+  const results = useMemo(() => {
+    const rs = response?.results ?? []
+    if (response?.grouping !== 'by_modality') return rs
+    return [...rs.filter((r) => r.asset.media_type === 'image'), ...rs.filter((r) => r.asset.media_type !== 'image')]
+  }, [response])
   const openResult = open != null ? results[open] : null
-  const st = response?.index_state
+  const rawState = response?.index_state
+  const st: IndexState | undefined =
+    rawState && 'state' in rawState
+      ? (rawState as IndexState)
+      : rawState
+        ? (Object.values(rawState as Record<string, IndexState>).find((x) => x.state !== 'ready') ??
+          Object.values(rawState as Record<string, IndexState>)[0])
+        : undefined
+  const grouped = response?.grouping === 'by_modality'
+  const sections: { label: string; offset: number; items: Result[] }[] = grouped
+    ? (['image', 'audio'] as MediaType[])
+        .map((m) => ({ m, items: results.filter((r) => (r.asset.media_type === 'image' ? 'image' : 'audio') === m) }))
+        .reduce<{ label: string; offset: number; items: Result[] }[]>((acc, g) => {
+          const offset = acc.reduce((n, x) => n + x.items.length, 0)
+          acc.push({ label: g.m === 'image' ? 'Images' : 'Sounds', offset, items: g.items })
+          return acc
+        }, [])
+    : [{ label: 'Search results', offset: 0, items: results }]
 
   return (
     <div className="app">
@@ -198,6 +241,12 @@ export default function App() {
           />
           Show technical scores
         </label>
+        {showScores && (
+          <label className="check small" title="Merge images and sounds into one list by raw similarity (not calibrated)">
+            <input type="checkbox" checked={globalRank} onChange={(e) => setGlobalRank(e.target.checked)} />
+            Mixed ranking (experimental)
+          </label>
+        )}
       </header>
 
       {backendError && (
@@ -324,6 +373,7 @@ export default function App() {
             onIncludeIdentical={setIncludeIdentical}
             target={target}
             onTarget={setTarget}
+            modes={modes}
             onSearch={runSearch}
             searching={searching}
           />
@@ -345,7 +395,7 @@ export default function App() {
               <>
                 <div className="results-head small">
                   <span>
-                    {results.length} closest {response.mode === 'audio' || results[0]?.modality === 'audio' ? 'sounds' : 'matches'}
+                    {results.length} closest matches
                     {selected.size ? ` in ${selected.size} selected ${selected.size === 1 ? 'library' : 'libraries'}` : ''}
                   </span>
                   {showScores && (
@@ -368,20 +418,43 @@ export default function App() {
                     Results are ranked by similarity. The closest matches are always shown, even when nothing truly matches.
                   </p>
                 )}
-                <ResultsGrid
-                  results={results}
-                  focused={focused}
-                  onFocus={setFocused}
-                  onOpen={(i) => setOpen(i)}
-                  showScores={showScores}
-                  onAdd={(i) => addToSelection(results[i])}
-                  addedKeys={addedKeys}
-                  playingKey={player.playing}
-                  onPlay={(i) => {
-                    const r = results[i]
-                    player.play(resultKey(r), r.asset.file_url, r.start_s, r.end_s)
-                  }}
-                />
+                {response.grouping === 'global (experimental)' && (
+                  <div className="banner warn">
+                    Experimental mixed ranking: images and sounds are merged by raw similarity, which is not calibrated across media
+                    types.
+                  </div>
+                )}
+                {(response.query as { experimental?: boolean }).experimental && (
+                  <div className="banner warn">
+                    Experimental cross-media search: results are similarity candidates, not synchronized or curated matches.
+                  </div>
+                )}
+                {sections.map((sec) => (
+                  <div key={sec.label} className="section">
+                    {grouped && (
+                      <h2 className="section-title">
+                        {sec.label} <span className="muted small">({sec.items.length})</span>
+                      </h2>
+                    )}
+                    {grouped && sec.items.length === 0 && <p className="muted small">No indexed {sec.label.toLowerCase()} in this selection.</p>}
+                    <ResultsGrid
+                      results={sec.items}
+                      offset={sec.offset}
+                      label={sec.label}
+                      focused={focused}
+                      onFocus={setFocused}
+                      onOpen={(i) => setOpen(i)}
+                      showScores={showScores}
+                      onAdd={(i) => addToSelection(results[i])}
+                      addedKeys={addedKeys}
+                      playingKey={player.playing}
+                      onPlay={(i) => {
+                        const r = results[i]
+                        player.play(resultKey(r), r.asset.file_url, r.start_s, r.end_s)
+                      }}
+                    />
+                  </div>
+                ))}
               </>
             )}
           </section>
@@ -412,7 +485,7 @@ export default function App() {
             const a = openResult.asset
             const media: MediaType = a.media_type === 'image' ? 'image' : 'audio'
             setReference({ kind: 'asset', media, assetId: a.id, previewUrl: a.thumbnail_url, label: a.rel_path, startS: openResult.start_s, endS: openResult.end_s })
-            setTarget(media)
+            if (target === 'both') setTarget(media)
             player.stop()
             setOpen(null)
             window.scrollTo({ top: 0, behavior: 'smooth' })

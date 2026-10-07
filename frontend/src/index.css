@@ -171,6 +171,10 @@ button { font: inherit; }
 .seg-mark { position: absolute; top: 0; bottom: 0; background: var(--accent); border-radius: 4px; min-width: 3px; }
 .seg-list { display: flex; flex-wrap: wrap; gap: 8px; }
 
+.badge.exp { background: var(--warn-bg); color: var(--warn-text); text-transform: none; letter-spacing: 0; font-weight: 500; }
+.section { margin-bottom: 18px; }
+.section-title { font-size: 15px; margin: 6px 0 8px; }
+
 @media (max-width: 760px) {
   .body { flex-direction: column; }
   .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
