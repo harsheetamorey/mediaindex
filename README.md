@@ -89,8 +89,9 @@ Precision follows the model card: bfloat16 on MPS, float32 on CPU, **never float
 
 ## Evaluation
 A frozen 50-query image evaluation (20 text, 15 image, 15 image+text) with a local human-labelling page lives in `evaluation/`
-([`docs/evaluation.md`](docs/evaluation.md)). **No relevance metrics are reported yet**, because the labels must come from a person. An optional
-text→audio comparison against LAION-CLAP on Clotho is in [`docs/model-comparison.md`](docs/model-comparison.md).
+([`docs/evaluation.md`](docs/evaluation.md)). **No relevance metrics are reported yet**, because the labels must come from a person. On the Clotho
+text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-CLAP model: R@10 is 0.18 vs 0.50, and CLAP may benefit from training overlap
+([`docs/model-comparison.md`](docs/model-comparison.md)).
 
 ## Troubleshooting
 | Symptom | Fix |
@@ -104,6 +105,7 @@ text→audio comparison against LAION-CLAP on Clotho is in [`docs/model-comparis
 | Out-of-memory on 8 GB | Close other heavy apps, or run on CPU with `MEDIAINDEX_DEVICE=cpu` (slower). |
 
 ## Limitations
+- Text→sound search is a rough candidate finder. On Clotho it scores far below a specialist audio model (see Evaluation).
 - Retrieval quality is uneven. See the documented misses (glass and door sounds, sound→image "hub" images, ignored style refinements, no negation).
 - Text refinement and cross-media results are similarity candidates. They are not logical filters, synchronized audio, or artistic judgements.
 - Indexing is slow on an 8 GB M1, and video indexing runs at about 1.6× real time.

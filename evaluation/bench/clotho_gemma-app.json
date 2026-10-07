@@ -1,0 +1,48 @@
+{
+ "config": "gemma-app",
+ "model": {
+  "id": "google/embeddinggemma-2",
+  "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b"
+ },
+ "clips": 1045,
+ "captions": 5225,
+ "subset": false,
+ "device": "mps",
+ "precision": "bfloat16",
+ "audio_input": "10 s windows / 5 s stride, max",
+ "audio_vectors": 3948,
+ "embed_seconds_total": 2337.3,
+ "peak_rss_mb": 1124.5,
+ "mps_driver_mb": 2590.1,
+ "metrics": {
+  "R@1": {
+   "mean": 0.0367,
+   "ci95": [
+    0.0289,
+    0.0452
+   ]
+  },
+  "R@5": {
+   "mean": 0.1158,
+   "ci95": [
+    0.1016,
+    0.1309
+   ]
+  },
+  "R@10": {
+   "mean": 0.1801,
+   "ci95": [
+    0.1623,
+    0.199
+   ]
+  },
+  "mAP@10": {
+   "mean": 0.0716,
+   "ci95": [
+    0.0616,
+    0.0815
+   ]
+  },
+  "median_rank": 62.0
+ }
+}
