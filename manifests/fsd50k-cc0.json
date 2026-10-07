@@ -1,0 +1,373 @@
+{
+ "dataset": "quinnlue/FSD50K-16k",
+ "revision": "2a60d475f4e2f0db624a902881af2df79d656145",
+ "shard": "data/validation-00000-of-00002.parquet",
+ "seed": 20261007,
+ "row_groups": [
+  20,
+  21
+ ],
+ "count": 60,
+ "items": [
+  {
+   "row": 1287,
+   "file": "fsd-141471.flac",
+   "sha256": "1a4dab1554ce274488d641e695acdd5d6d269b37e1baebb8c5d8cb2cbb6cb781",
+   "freesound_id": 141471
+  },
+  {
+   "row": 1289,
+   "file": "fsd-142008.flac",
+   "sha256": "3c20f87e23247abce971b21b25cdd97171fe48d163dd89c4fbace4db1615fd22",
+   "freesound_id": 142008
+  },
+  {
+   "row": 1292,
+   "file": "fsd-143919.flac",
+   "sha256": "e99d243ea463aaf03cc10dc1b5e5746047d8be974aafc87d638173f859514b45",
+   "freesound_id": 143919
+  },
+  {
+   "row": 1296,
+   "file": "fsd-144028.flac",
+   "sha256": "342d6156a5d7d712962a8f9ca73c8627df66b654a35b07cef236c04ebd684ac6",
+   "freesound_id": 144028
+  },
+  {
+   "row": 1297,
+   "file": "fsd-144070.flac",
+   "sha256": "3276fdeba4b30b4ac2b3bacb4eb43ca1a672a2fd8801037ab21076ee7ad24c46",
+   "freesound_id": 144070
+  },
+  {
+   "row": 1298,
+   "file": "fsd-144126.flac",
+   "sha256": "0675042f7826c548e72267cf9f66fc41c71f0d732241ad600e59e045815744d2",
+   "freesound_id": 144126
+  },
+  {
+   "row": 1299,
+   "file": "fsd-144321.flac",
+   "sha256": "498c0073d04c5cd91e407ef74df48aebc16b1c576c495efcbd6afa3fac437410",
+   "freesound_id": 144321
+  },
+  {
+   "row": 1301,
+   "file": "fsd-144480.flac",
+   "sha256": "a3d6a113dcccf5bb04b93b144d2d451f45464906cba3d29b29f8d8a69e9cba80",
+   "freesound_id": 144480
+  },
+  {
+   "row": 1302,
+   "file": "fsd-144481.flac",
+   "sha256": "14761057848366b9799c0f2f764d396e5df467b1ce3cf15923defcf6b9f75208",
+   "freesound_id": 144481
+  },
+  {
+   "row": 1303,
+   "file": "fsd-144482.flac",
+   "sha256": "3b9cfb5800d73fb9a960f1a02be00f1a04fd61829e8a926d7881ed84dfbf0d04",
+   "freesound_id": 144482
+  },
+  {
+   "row": 1304,
+   "file": "fsd-144483.flac",
+   "sha256": "f02cd4675ce37023e23e59b43105acd929e4b3742153938f9a835241edce176d",
+   "freesound_id": 144483
+  },
+  {
+   "row": 1305,
+   "file": "fsd-144484.flac",
+   "sha256": "6f9b6b0d485f383414c4c3bce415bae3226cc6b05cc1ae1864564fc317b08385",
+   "freesound_id": 144484
+  },
+  {
+   "row": 1306,
+   "file": "fsd-144485.flac",
+   "sha256": "0c29d4f4dd8a90c40a2b4186ee8a3c9c89a1d770ce187012efdda6df00d0e608",
+   "freesound_id": 144485
+  },
+  {
+   "row": 1309,
+   "file": "fsd-145209.flac",
+   "sha256": "0303d8747508c4f68582f6674266c4acc74378d2dddda39700f0cc8ea55bc0fd",
+   "freesound_id": 145209
+  },
+  {
+   "row": 1313,
+   "file": "fsd-146335.flac",
+   "sha256": "c5f51addd104f349473e4421ccb3cd414dfb4ca10599d6da1dc8983c36e1a0fc",
+   "freesound_id": 146335
+  },
+  {
+   "row": 1314,
+   "file": "fsd-146342.flac",
+   "sha256": "c1067ade2dbbb90409f280f85fa0f0b17aeb91697f1d1d4a87ef3fddae21704d",
+   "freesound_id": 146342
+  },
+  {
+   "row": 1315,
+   "file": "fsd-146343.flac",
+   "sha256": "61f5f74e52cad6929171a2b6cecd804d1eb21d57e1d5e2a062a59dae0290ce6c",
+   "freesound_id": 146343
+  },
+  {
+   "row": 1316,
+   "file": "fsd-146351.flac",
+   "sha256": "32be0d9af4e3b0b4ee888c4d9f42fe67c2ad56f0faa82618a206a768db10e592",
+   "freesound_id": 146351
+  },
+  {
+   "row": 1318,
+   "file": "fsd-146977.flac",
+   "sha256": "f401e8a5e3bd5455a9301a4ae4864cffe223db92c83c7ee232cd0c2c87bd91e6",
+   "freesound_id": 146977
+  },
+  {
+   "row": 1319,
+   "file": "fsd-147019.flac",
+   "sha256": "70ba4c28ebfee9f7a03aa99bf6f38b8414cde97060c101ebc8f87737a0d1b9a7",
+   "freesound_id": 147019
+  },
+  {
+   "row": 1321,
+   "file": "fsd-147317.flac",
+   "sha256": "8540f7601026e1915fabc635597d35998b035e85d39d4e6990653799cc0107fb",
+   "freesound_id": 147317
+  },
+  {
+   "row": 1329,
+   "file": "fsd-147867.flac",
+   "sha256": "d49512a553f366a3c04855521d9fc975f00b11c88f44c9b0f0ddc83fa10bb619",
+   "freesound_id": 147867
+  },
+  {
+   "row": 1332,
+   "file": "fsd-148166.flac",
+   "sha256": "ae762634632c193c726d3e39a23dbe93c011bd243b11f9756b3d64062870520c",
+   "freesound_id": 148166
+  },
+  {
+   "row": 1345,
+   "file": "fsd-148444.flac",
+   "sha256": "872387f5f8a2304bad98a78927d3b094dcbcd4ed9bc6199c70f79db86922c78a",
+   "freesound_id": 148444
+  },
+  {
+   "row": 1346,
+   "file": "fsd-148845.flac",
+   "sha256": "6296177d5af30e647e319d2e8b9a44965408ec47ca964bc81a9e481fd0b6b489",
+   "freesound_id": 148845
+  },
+  {
+   "row": 1347,
+   "file": "fsd-149024.flac",
+   "sha256": "1063a33d9cfd5836fcdb2b8a464b69b052a808f00f1b583bc9db908a35b16e19",
+   "freesound_id": 149024
+  },
+  {
+   "row": 1348,
+   "file": "fsd-149034.flac",
+   "sha256": "c284ec74402b1fd53027d9680913a976b2d55cd9abe6290010ee259fe1dfbded",
+   "freesound_id": 149034
+  },
+  {
+   "row": 1349,
+   "file": "fsd-149092.flac",
+   "sha256": "c7c7ffa7f93d02149036764076bcda9204d2922ace312b84b50c7ff67a9ff8d8",
+   "freesound_id": 149092
+  },
+  {
+   "row": 1350,
+   "file": "fsd-149177.flac",
+   "sha256": "98c4575fcf845ea2bc60d5a5b1951e5f8bf87f44f3bb0065f5c1bd6bca5017f7",
+   "freesound_id": 149177
+  },
+  {
+   "row": 1351,
+   "file": "fsd-149825.flac",
+   "sha256": "f4d518a47f2ccd01badc82b619ab853618625a39143ba772d4ba85570b3b5531",
+   "freesound_id": 149825
+  },
+  {
+   "row": 1352,
+   "file": "fsd-149836.flac",
+   "sha256": "5f657a8a8fe5418e0c70f76b39fc9e32f58ea46bccff31b06f81b019712b83c3",
+   "freesound_id": 149836
+  },
+  {
+   "row": 1354,
+   "file": "fsd-149895.flac",
+   "sha256": "1ecc390d71d9a22087fd022b6c74baeb2edc91d8fff717f13eac07827e5fa655",
+   "freesound_id": 149895
+  },
+  {
+   "row": 1355,
+   "file": "fsd-149897.flac",
+   "sha256": "d6c302cda18541be160218a5ee72886bf3419a64f99a1b6cc2a2834680934b59",
+   "freesound_id": 149897
+  },
+  {
+   "row": 1356,
+   "file": "fsd-149966.flac",
+   "sha256": "84da9d85d67089cf19b62fdbb8cb9f9ebaa428a1c1a2fe5dca55c3ba4837d1c2",
+   "freesound_id": 149966
+  },
+  {
+   "row": 1361,
+   "file": "fsd-150978.flac",
+   "sha256": "71b97fbcb43039a6bdd8514cf96f92052aa8e7a8ab3ee124dd3462183dd73d1e",
+   "freesound_id": 150978
+  },
+  {
+   "row": 1362,
+   "file": "fsd-151088.flac",
+   "sha256": "98bfd0d8f26efd000473126d39f0f366fce39e8f810afbf6e3e18bc0293cfcd0",
+   "freesound_id": 151088
+  },
+  {
+   "row": 1363,
+   "file": "fsd-151089.flac",
+   "sha256": "27dac49f46be67d59ad7324c9a174d18fdbc8f4852a0e0911fe2ce222da495de",
+   "freesound_id": 151089
+  },
+  {
+   "row": 1369,
+   "file": "fsd-151359.flac",
+   "sha256": "f55469f4d8f3492020c05a339210547957e2b73edce10e2e94c4819117be7fe4",
+   "freesound_id": 151359
+  },
+  {
+   "row": 1370,
+   "file": "fsd-151373.flac",
+   "sha256": "9e054729163eb6f8e7fcbbae4da90bebb5874bc089f837c5ba7794d7712131db",
+   "freesound_id": 151373
+  },
+  {
+   "row": 1371,
+   "file": "fsd-151407.flac",
+   "sha256": "d49125a296f825fe473939ec9ffacd365fe54e06c6d68e3f8756cbd4c84fe704",
+   "freesound_id": 151407
+  },
+  {
+   "row": 1372,
+   "file": "fsd-151417.flac",
+   "sha256": "405df9fe5d6147fd1e204a3ee2dc7e4b8aa1e94b4d1f27a3b6f869928f3ae593",
+   "freesound_id": 151417
+  },
+  {
+   "row": 1373,
+   "file": "fsd-151433.flac",
+   "sha256": "11c6e602284ba7944c952a2f120d078f4eda7590cf1dd408b8f9453f95cecf6f",
+   "freesound_id": 151433
+  },
+  {
+   "row": 1374,
+   "file": "fsd-151434.flac",
+   "sha256": "15155b657cb731a4e61e52477ee8b86bc3d20267debb61c207c325e4b4fd5ad3",
+   "freesound_id": 151434
+  },
+  {
+   "row": 1375,
+   "file": "fsd-151435.flac",
+   "sha256": "2920f5c7b1e988126ee0f1f9fa7a1b5d22b4483f1e2be267b33be92d57c0a89b",
+   "freesound_id": 151435
+  },
+  {
+   "row": 1376,
+   "file": "fsd-151443.flac",
+   "sha256": "be316a470315ac482cb8b8443d3bffd42283347c81e75ebaa76d4ae4ec36b0c9",
+   "freesound_id": 151443
+  },
+  {
+   "row": 1377,
+   "file": "fsd-151445.flac",
+   "sha256": "6fe4052a44ad18c664a47241992b5d1988ed7138c0afc8b4bf48d27bf6e4beb5",
+   "freesound_id": 151445
+  },
+  {
+   "row": 1380,
+   "file": "fsd-151776.flac",
+   "sha256": "f2d49e8cb2ccd2d9ecfe5ee488563d3516cfd7e55c15fa381bbe791d9c966647",
+   "freesound_id": 151776
+  },
+  {
+   "row": 1381,
+   "file": "fsd-151842.flac",
+   "sha256": "3b7c5f3e072a283b75941bcaae21ddc5cc8660aef09daa438f2922517ccbb628",
+   "freesound_id": 151842
+  },
+  {
+   "row": 1382,
+   "file": "fsd-152367.flac",
+   "sha256": "4113eff7bb15a36a301b5396fb9def6abb67881e88b2337107e2b01eb3a9a448",
+   "freesound_id": 152367
+  },
+  {
+   "row": 1385,
+   "file": "fsd-152605.flac",
+   "sha256": "dff6329055ab74804b9a52d376c0c06d27235edcf5f79c686ec70ba985f4d820",
+   "freesound_id": 152605
+  },
+  {
+   "row": 1386,
+   "file": "fsd-152606.flac",
+   "sha256": "361155399a496d0b6aabffcb14add3786ec79c49ac600c4661611c32f8be487b",
+   "freesound_id": 152606
+  },
+  {
+   "row": 1395,
+   "file": "fsd-154529.flac",
+   "sha256": "957d947560390709107e751d06ae244d582f60b9b0c69849793ef6ec0d4cdbbe",
+   "freesound_id": 154529
+  },
+  {
+   "row": 1396,
+   "file": "fsd-154687.flac",
+   "sha256": "f5d1a736feaefa20667e185ffffa3f889059158bf119f3efca6f7c1243826026",
+   "freesound_id": 154687
+  },
+  {
+   "row": 1397,
+   "file": "fsd-154691.flac",
+   "sha256": "5236211884f15ef0e654e43f850da3231b672e210c7c1ff28bf03f993b579c66",
+   "freesound_id": 154691
+  },
+  {
+   "row": 1398,
+   "file": "fsd-154795.flac",
+   "sha256": "a0a72ff6abfa5bc94934c4c7a0f4e91ea58da4ba3d70b62857018573ed13c20c",
+   "freesound_id": 154795
+  },
+  {
+   "row": 1399,
+   "file": "fsd-154831.flac",
+   "sha256": "a9d14bdea548d0666207d89f4bcbf6538d70d2a354cbd8176d66a3fe53f68b90",
+   "freesound_id": 154831
+  },
+  {
+   "row": 1400,
+   "file": "fsd-154957.flac",
+   "sha256": "557ca32a776d91a452183ef34c5a36c2b7bd57c650c13434cdca5446ea4de30c",
+   "freesound_id": 154957
+  },
+  {
+   "row": 1401,
+   "file": "fsd-155010.flac",
+   "sha256": "5b6262529d86d4d5c35671618301fb01fee4b6135b94b47b0d9e1609844dd76d",
+   "freesound_id": 155010
+  },
+  {
+   "row": 1402,
+   "file": "fsd-155145.flac",
+   "sha256": "154f6bffce45d5c1a1486dbbdd0be4cdb9256642ef4e9d2e70f4165c943e22c3",
+   "freesound_id": 155145
+  },
+  {
+   "row": 1403,
+   "file": "fsd-155516.flac",
+   "sha256": "838d8fd4c8e228e5d004925a30c2e951c9c53209c5cd42c537167052d6d804fb",
+   "freesound_id": 155516
+  }
+ ]
+}

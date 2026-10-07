@@ -42,6 +42,7 @@ class EmbeddingBackend(Protocol):
     def embed_query_texts(self, texts: Sequence[str]) -> np.ndarray: ...
     def embed_images(self, images: Sequence[Image.Image]) -> np.ndarray: ...
     def embed_image_text(self, image: Image.Image, text: str) -> np.ndarray: ...
+    def embed_audio(self, arrays: Sequence[np.ndarray]) -> np.ndarray: ...
 
 
 def _is_oom(e: BaseException) -> bool:
@@ -61,7 +62,7 @@ class GemmaBackend:
         self.device = device
         self.profile = profile
         config_kwargs = {}
-        if "image" not in profile.encoders and "video" not in profile.encoders:
+        if "image" not in profile.encoders:
             config_kwargs["vision_config"] = None
         if "audio" not in profile.encoders:
             config_kwargs["audio_config"] = None
@@ -83,7 +84,7 @@ class GemmaBackend:
             "image": "image" in enc,
             "image+text": "image" in enc,
             "audio": "audio" in enc,
-            "video": "video" in enc,
+            "video": "image" in enc,  # video frames go through the vision encoder (verified in Phase 14)
         }
 
     def _encode(self, inputs, **kw) -> np.ndarray:
@@ -119,6 +120,13 @@ class GemmaBackend:
             raise CapabilityUnavailable("image+text requires the image encoder")
         return self._encode([{"text": self.profile.query_prompt + text, "image": image.convert("RGB")}], batch_size=1)
 
+    def embed_audio(self, arrays: Sequence[np.ndarray], sampling_rate: int = 16000) -> np.ndarray:
+        """Mono float32 arrays at 16 kHz (model card), no prompt prefix."""
+        if not self.capabilities()["audio"]:
+            raise CapabilityUnavailable("audio encoder not loaded in this profile")
+        return self._encode([{"audio": {"array": np.asarray(a, np.float32), "sampling_rate": sampling_rate}}
+                             for a in arrays], batch_size=2)
+
     def close(self) -> None:
         del self.model
         self._empty_cache()
@@ -132,8 +140,9 @@ class FakeBackend:
         self.calls = 0
 
     def capabilities(self) -> dict[str, bool]:
-        return {"text": True, "image": True, "image+text": True, "audio": "audio" in self.profile.encoders,
-                "video": "video" in self.profile.encoders}
+        enc = set(self.profile.encoders)
+        return {"text": True, "image": "image" in enc, "image+text": "image" in enc, "audio": "audio" in enc,
+                "video": "image" in enc}
 
     def _vec(self, key: bytes) -> np.ndarray:
         self.calls += 1
@@ -148,6 +157,10 @@ class FakeBackend:
 
     def embed_image_text(self, image, text):
         return self._vec(b"m:" + image.convert("RGB").resize((16, 16)).tobytes() + text.encode())
+
+    def embed_audio(self, arrays, sampling_rate: int = 16000):
+        return np.vstack([self._vec(b"a:" + np.asarray(a, np.float32)[:: max(1, len(a) // 64)].tobytes())
+                          for a in arrays])
 
     def close(self) -> None:
         pass

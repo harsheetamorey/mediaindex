@@ -17,6 +17,13 @@ QUERY_PROMPT = "task: search result | query: "
 DOCUMENT_PROMPT = "title: none | text: "
 
 
+# Fields that do not change the vector space. Verified on the target laptop (Phase 11,
+# scripts/audio_smoke.py): image and text vectors are bit-identical (max abs diff 0.0) whether or
+# not the audio encoder is loaded, so the loaded encoder set is a capability, not part of the key.
+# Audio windowing only changes which segments exist, not the space they live in.
+KEY_EXCLUDED_FIELDS = ("encoders", "audio_window_s", "audio_stride_s")
+
+
 class ProfileMismatch(Exception):
     """Raised when vectors from incompatible profiles would be mixed."""
 
@@ -27,7 +34,9 @@ class IndexProfile:
     revision: str = MODEL_REVISION
     dim: int = 768
     precision: str = "bfloat16"  # bfloat16 | float32; float16 is prohibited by the model card
-    encoders: tuple[str, ...] = ("text", "image")
+    encoders: tuple[str, ...] = ("text", "image", "audio")
+    audio_window_s: float = 10.0
+    audio_stride_s: float = 5.0
     image_max_soft_tokens: int = 280
     audio_sample_rate: int = 16000
     query_prompt: str = QUERY_PROMPT
@@ -48,15 +57,22 @@ class IndexProfile:
         d["extra"] = sorted([list(x) for x in self.extra])
         return d
 
+    def space_dict(self) -> dict:
+        """The fields that determine the vector space (everything except KEY_EXCLUDED_FIELDS)."""
+        d = self.to_dict()
+        for f in KEY_EXCLUDED_FIELDS:
+            d.pop(f, None)
+        return d
+
     @property
     def key(self) -> str:
         """Stable content hash; equal keys mean vectors are comparable."""
-        blob = json.dumps(self.to_dict(), sort_keys=True).encode()
+        blob = json.dumps(self.space_dict(), sort_keys=True).encode()
         return hashlib.sha256(blob).hexdigest()[:16]
 
     @classmethod
     def from_dict(cls, d: dict) -> "IndexProfile":
-        d = dict(d)
+        d = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         d["encoders"] = tuple(d.get("encoders", ()))
         d["extra"] = tuple(tuple(x) for x in d.get("extra", ()))
         return cls(**d)

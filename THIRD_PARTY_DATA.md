@@ -17,3 +17,17 @@ to `data/demo/`, which is git-ignored.
 - The dataset's `tags` field is kept as inspection metadata only. It is never used in embeddings or as ground truth.
 - Known data quality issue: some rows in this dataset hold HTML error pages instead of image bytes. The downloader excludes
   undecodable rows and records them in the manifest. The pinned 500-image selection has none.
+
+## Optional demo sound pack: quinnlue/FSD50K-16k (CC0 clips only)
+- Source: https://huggingface.co/datasets/quinnlue/FSD50K-16k, pinned revision `2a60d475f4e2f0db624a902881af2df79d656145`.
+  This is a 16 kHz mono FLAC repack of FSD50K (Fonseca et al., 2020). (The build guide's Phase 11 link reads "F50K-16k". That repository does not
+  exist, and the guide's source list gives FSD50K-16k.)
+- Download: `uv run --extra demo python scripts/download_demo_audio.py` gets 60 clips, about 17 MB transferred (2 parquet row groups of the
+  `validation` split).
+- **Only clips whose own `license` field is CC0 1.0 are selected.** In the 128 rows read, 64 non-CC0 clips (CC BY, CC BY-NC, Sampling+) were skipped.
+  The committed manifest `manifests/fsd50k-cc0.json` lists rows, Freesound IDs and SHA-256 hashes.
+- Each clip's Freesound ID, URL, uploader, title and declared licence are kept in `mediaindex-provenance.json`.
+- FSD50K as a curated collection is CC BY 4.0. Please cite: Fonseca, E., Favory, X., Pons, J., Font, F., Serra, X. *FSD50K: An Open Dataset
+  of Human-Labeled Sound Events*, arXiv:2010.00475 (2020).
+- Licence declarations come from Freesound uploaders through the dataset. **No independent rights audit has been performed.**
+- FSD50K labels are kept as inspection metadata only and are never embedded.
