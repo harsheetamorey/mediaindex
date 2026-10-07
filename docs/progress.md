@@ -21,6 +21,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 14 Video ingestion and indexing | PASSED |
 | 15 Video-moment search and clip export | PASSED |
 | 16 Offline operation and robustness | PASSED |
+| 17 Product-quality evaluation | PASSED (harness + performance); relevance metrics PENDING human labels |
 
 ---
 
@@ -521,7 +522,7 @@ the `ui_check.py` label update, and **`docs/offline-and-robustness.md`** (full r
 - 20 concurrent searches gave all 200s and a single model instance. With a short wait budget during indexing, `503 model is busy`. Disk-full export onto a 4 MB RAM disk failed the one file
   cleanly with no partials. Footprint was about 3.4 GB on MPS.
 - Exact search reached 22 ms median at 200k vectors, so no ANN or quantization was added.
-- `uv run pytest -q`: `72 passed`
+- `uv run pytest -q`: `70 passed`
 
 **Limitations:** the network block used a macOS sandbox profile, not a full firewall test. FFmpeg subprocesses were covered by the sandbox but not by the Python audit hook.
 Memory headroom on 8 GB is modest. Only tested on this M1 laptop.
@@ -530,3 +531,31 @@ Memory headroom on 8 GB is modest. Only tested on this M1 laptop.
 FFmpeg protocols, upload spooling) are fixed.
 
 **Next:** Phase 17, product-quality evaluation.
+
+---
+
+## Phase 17: Product-quality evaluation (2026-10-07)
+
+**Changes:** `evaluation/queries.json` (frozen: 50 queries = 20 text, 15 image-reference, 15 image+text; dev queries listed separately),
+`evaluation/run_eval.py`, `evaluation/label_server.py` (local human labelling page), `evaluation/report.py`, `evaluation/benchmark.py`,
+`backend/mediaindex/eval_metrics.py` + `backend/tests/test_eval_metrics.py` (synthetic labels, logic only), `docs/evaluation.md`,
+`docs/evaluation-report.md` (generated), `evaluation/{pool-v1.json,runs/…,perf-latest.json}`.
+
+**Commands and observed results**
+- `uv run python evaluation/benchmark.py` (REAL MODEL, MPS bf16, server stopped, synchronized timing):
+  - Cold start in a new process took 12.5–17.3 s (median 13.2 s).
+  - Warm query embedding: text **38.7 ms** median (p95 44.6), image 1,775 ms, image+text 1,879 ms, audio 10 s 592 ms, video window 7.6 s.
+  - Exact ranking over 512 image vectors and 632 all-media vectors: **0.1 ms**.
+  - Image embedding throughput was 0.41 images/s.
+  - Peak physical footprint (incl. Metal) **3,552 MB**, MPS driver 2,618 MB, CPU-side RSS 1,047 MB. Model cache 1,451 MB, DB 4.1 MB, thumbnails 12.4 MB.
+- `uv run python evaluation/run_eval.py --library <demo>`: 50 queries ran, and the pool holds 500 candidates. End-to-end HTTP latency is in the report.
+- `uv run python evaluation/report.py`: **label coverage 0/50 → Hit@1, Hit@5, Recall@5 and nDCG@10 are PENDING for every mode.** No labels were fabricated.
+  Model output, tags and AI judgement were not used as ground truth.
+- Labelling tool smoke test: the page renders 50 queries and 1,500 grade buttons, images outside the manifest return 404, and invalid labels return 400. No labels file was written.
+- `uv run pytest -q`: `73 passed`
+
+**Pending (needs a human):** label the pool with `evaluation/label_server.py`, then rerun `report.py`. Until then this phase reports **no retrieval quality numbers**.
+
+**Gate:** PASSED as specified. The evaluation tools are executable, the performance numbers are measured, and the report states its label coverage honestly with relevance metrics explicitly pending.
+
+**Next:** Phase 18, optional specialist-model comparison.

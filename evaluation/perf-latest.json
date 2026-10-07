@@ -1,0 +1,68 @@
+{
+ "created": "2026-10-07T09:04:35Z",
+ "machine": "arm64 macOS-14.0-arm64-arm-64bit (Apple M1, 8 GB)",
+ "device": "mps",
+ "precision": "bfloat16",
+ "profile_key": "3e76b03f5fdbe69e",
+ "latency": [
+  {
+   "name": "cold start: import + model load + first query (new process)",
+   "median_ms": 13226.701417006552,
+   "p95_ms": 17307.631417002995,
+   "n": 3
+  },
+  {
+   "name": "warm query embedding: text",
+   "median_ms": 38.65504149871413,
+   "p95_ms": 44.55158399650827,
+   "n": 30
+  },
+  {
+   "name": "warm query embedding: image (reference)",
+   "median_ms": 1775.21470899228,
+   "p95_ms": 1803.9149169926532,
+   "n": 15
+  },
+  {
+   "name": "warm query embedding: image + text",
+   "median_ms": 1878.8356659933925,
+   "p95_ms": 2058.3648750034627,
+   "n": 15
+  },
+  {
+   "name": "warm query embedding: audio 10 s",
+   "median_ms": 591.9976250006584,
+   "p95_ms": 758.5890420014039,
+   "n": 10
+  },
+  {
+   "name": "warm embedding: video window (8 frames, 1,120 tokens)",
+   "median_ms": 7574.241666996386,
+   "p95_ms": 10496.518083004048,
+   "n": 5
+  },
+  {
+   "name": "ranking: exact dot product over 512 image vectors",
+   "median_ms": 0.09677100752014667,
+   "p95_ms": 0.2086249878630042,
+   "n": 200
+  },
+  {
+   "name": "ranking: exact over all 632 vectors (all media)",
+   "median_ms": 0.08754199370741844,
+   "p95_ms": 0.09250000584870577,
+   "n": 200
+  }
+ ],
+ "resources": {
+  "process peak RSS (CPU side)": "1047 MB",
+  "process physical footprint peak (incl. Metal)": "3552 MB",
+  "MPS driver allocated": "2618 MB",
+  "image indexing throughput (embedding only)": "0.41 images/s",
+  "model cache on disk": "1450.7 MB",
+  "SQLite database": "4.1 MB",
+  "thumbnails": "12.4 MB",
+  "indexed vectors (all media)": "632"
+ },
+ "notes": "Warm timings exclude decoding and HTTP. Ranking uses the in-memory matrix (cache hit). End-to-end HTTP latency per query mode is in the evaluation run file (client_latency_ms). Library indexing is precomputed; query-time cost is one query embedding plus ranking."
+}

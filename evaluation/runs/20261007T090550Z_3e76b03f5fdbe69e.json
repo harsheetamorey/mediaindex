@@ -1,0 +1,1686 @@
+{
+ "spec_version": 1,
+ "created": "20261007T090550Z",
+ "profile_key": "3e76b03f5fdbe69e",
+ "profile": {
+  "model_id": "google/embeddinggemma-2",
+  "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+  "dim": 768,
+  "precision": "bfloat16",
+  "encoders": [
+   "audio",
+   "image",
+   "text"
+  ],
+  "audio_window_s": 10.0,
+  "audio_stride_s": 5.0,
+  "video_fps": 1.0,
+  "video_max_soft_tokens": 140,
+  "video_window_s": 8.0,
+  "video_stride_s": 4.0,
+  "video_modalities": [
+   "video-audio",
+   "video-visual"
+  ],
+  "image_max_soft_tokens": 280,
+  "audio_sample_rate": 16000,
+  "query_prompt": "task: search result | query: ",
+  "document_prompt": "title: none | text: ",
+  "media_prompt": "",
+  "normalization": "l2-float32",
+  "extra": []
+ },
+ "device": "mps",
+ "results": [
+  {
+   "id": "T01",
+   "ranked": [
+    "stock-01657.jpg",
+    "stock-03456.jpg",
+    "stock-00163.jpg",
+    "stock-02424.jpg",
+    "stock-02084.jpg",
+    "stock-02477.jpg",
+    "stock-01659.jpg",
+    "stock-02420.jpg",
+    "stock-01632.jpg",
+    "stock-00137.jpg"
+   ],
+   "similarity": [
+    0.7134,
+    0.6905,
+    0.67661,
+    0.67526,
+    0.67062,
+    0.6685,
+    0.66666,
+    0.66361,
+    0.66207,
+    0.66188
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 402.7,
+   "timing_ms": {
+    "query_embedding": 391.57,
+    "ranking": 3.931
+   }
+  },
+  {
+   "id": "T02",
+   "ranked": [
+    "stock-01629.jpg",
+    "stock-02024.jpg",
+    "stock-02056.jpg",
+    "stock-01689.jpg",
+    "stock-02433.jpg",
+    "stock-03401.jpg",
+    "stock-02027.jpg",
+    "stock-02467.jpg",
+    "stock-03448.jpg",
+    "stock-02417.jpg"
+   ],
+   "similarity": [
+    0.70812,
+    0.69035,
+    0.68829,
+    0.6869,
+    0.68481,
+    0.6785,
+    0.67395,
+    0.67358,
+    0.67324,
+    0.66917
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 420.4,
+   "timing_ms": {
+    "query_embedding": 415.94,
+    "ranking": 0.26
+   }
+  },
+  {
+   "id": "T03",
+   "ranked": [
+    "stock-03457.jpg",
+    "stock-02475.jpg",
+    "stock-03430.jpg",
+    "stock-02059.jpg",
+    "stock-02077.jpg",
+    "stock-03485.jpg",
+    "stock-01661.jpg",
+    "stock-00132.jpg",
+    "stock-00139.jpg",
+    "stock-02483.jpg"
+   ],
+   "similarity": [
+    0.69204,
+    0.68215,
+    0.67783,
+    0.67542,
+    0.67413,
+    0.66816,
+    0.66797,
+    0.66636,
+    0.6656,
+    0.66373
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 438.7,
+   "timing_ms": {
+    "query_embedding": 433.38,
+    "ranking": 0.249
+   }
+  },
+  {
+   "id": "T04",
+   "ranked": [
+    "stock-01614.jpg",
+    "stock-01617.jpg",
+    "stock-00113.jpg",
+    "stock-02026.jpg",
+    "stock-03402.jpg",
+    "stock-03496.jpg",
+    "stock-01666.jpg",
+    "stock-02020.jpg",
+    "stock-01620.jpg",
+    "stock-00185.jpg"
+   ],
+   "similarity": [
+    0.73381,
+    0.72343,
+    0.70588,
+    0.67672,
+    0.6477,
+    0.6427,
+    0.64051,
+    0.64024,
+    0.64019,
+    0.63936
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 52.0,
+   "timing_ms": {
+    "query_embedding": 47.94,
+    "ranking": 0.166
+   }
+  },
+  {
+   "id": "T05",
+   "ranked": [
+    "stock-03423.jpg",
+    "stock-02082.jpg",
+    "stock-02446.jpg",
+    "stock-03445.jpg",
+    "stock-02441.jpg",
+    "stock-02451.jpg",
+    "stock-01653.jpg",
+    "stock-00145.jpg",
+    "stock-02413.jpg",
+    "stock-00197.jpg"
+   ],
+   "similarity": [
+    0.70145,
+    0.69804,
+    0.68361,
+    0.67074,
+    0.66854,
+    0.66568,
+    0.66058,
+    0.64839,
+    0.6411,
+    0.63467
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 442.8,
+   "timing_ms": {
+    "query_embedding": 437.12,
+    "ranking": 0.258
+   }
+  },
+  {
+   "id": "T06",
+   "ranked": [
+    "stock-00133.jpg",
+    "stock-00121.jpg",
+    "stock-00172.jpg",
+    "stock-00122.jpg",
+    "stock-03462.jpg",
+    "stock-00143.jpg",
+    "stock-00199.jpg",
+    "stock-00161.jpg",
+    "stock-00142.jpg",
+    "stock-03401.jpg"
+   ],
+   "similarity": [
+    0.7342,
+    0.73183,
+    0.72621,
+    0.7247,
+    0.71213,
+    0.71206,
+    0.70752,
+    0.66791,
+    0.66204,
+    0.66084
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 47.7,
+   "timing_ms": {
+    "query_embedding": 43.57,
+    "ranking": 0.141
+   }
+  },
+  {
+   "id": "T07",
+   "ranked": [
+    "stock-02045.jpg",
+    "stock-00127.jpg",
+    "stock-00148.jpg",
+    "stock-02056.jpg",
+    "stock-02077.jpg",
+    "stock-00123.jpg",
+    "stock-02046.jpg",
+    "stock-00159.jpg",
+    "stock-02028.jpg",
+    "stock-01688.jpg"
+   ],
+   "similarity": [
+    0.73907,
+    0.732,
+    0.71192,
+    0.71093,
+    0.70179,
+    0.69843,
+    0.69835,
+    0.69774,
+    0.69239,
+    0.68883
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 49.5,
+   "timing_ms": {
+    "query_embedding": 43.26,
+    "ranking": 0.241
+   }
+  },
+  {
+   "id": "T08",
+   "ranked": [
+    "stock-02083.jpg",
+    "stock-00185.jpg",
+    "stock-01658.jpg",
+    "stock-01620.jpg",
+    "stock-02017.jpg",
+    "stock-02494.jpg",
+    "stock-00169.jpg",
+    "stock-02407.jpg",
+    "stock-02450.jpg",
+    "stock-02492.jpg"
+   ],
+   "similarity": [
+    0.71963,
+    0.71553,
+    0.71468,
+    0.71465,
+    0.70592,
+    0.70437,
+    0.69563,
+    0.67962,
+    0.67766,
+    0.67389
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 58.4,
+   "timing_ms": {
+    "query_embedding": 49.94,
+    "ranking": 0.249
+   }
+  },
+  {
+   "id": "T09",
+   "ranked": [
+    "stock-01697.jpg",
+    "stock-01632.jpg",
+    "stock-03404.jpg",
+    "stock-00183.jpg",
+    "stock-03417.jpg",
+    "stock-01636.jpg",
+    "stock-00181.jpg",
+    "stock-02089.jpg",
+    "stock-01655.jpg",
+    "stock-00176.jpg"
+   ],
+   "similarity": [
+    0.72603,
+    0.7145,
+    0.69646,
+    0.69085,
+    0.68157,
+    0.68134,
+    0.67996,
+    0.67662,
+    0.67644,
+    0.67551
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 45.9,
+   "timing_ms": {
+    "query_embedding": 41.8,
+    "ranking": 0.151
+   }
+  },
+  {
+   "id": "T10",
+   "ranked": [
+    "stock-01623.jpg",
+    "stock-02056.jpg",
+    "stock-02080.jpg",
+    "stock-01643.jpg",
+    "stock-02034.jpg",
+    "stock-01667.jpg",
+    "stock-01688.jpg",
+    "stock-02083.jpg",
+    "stock-01697.jpg",
+    "stock-01691.jpg"
+   ],
+   "similarity": [
+    0.71665,
+    0.65707,
+    0.65431,
+    0.64986,
+    0.64118,
+    0.6404,
+    0.63817,
+    0.63686,
+    0.63348,
+    0.62513
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 47.5,
+   "timing_ms": {
+    "query_embedding": 42.81,
+    "ranking": 0.19
+   }
+  },
+  {
+   "id": "T11",
+   "ranked": [
+    "stock-02403.jpg",
+    "stock-00150.jpg",
+    "stock-02401.jpg",
+    "stock-02457.jpg",
+    "stock-00193.jpg",
+    "stock-03467.jpg",
+    "stock-03421.jpg",
+    "stock-03408.jpg",
+    "stock-00115.jpg",
+    "stock-02050.jpg"
+   ],
+   "similarity": [
+    0.71177,
+    0.70156,
+    0.70016,
+    0.6841,
+    0.67894,
+    0.67765,
+    0.67561,
+    0.6747,
+    0.67398,
+    0.67064
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 49.3,
+   "timing_ms": {
+    "query_embedding": 44.82,
+    "ranking": 0.147
+   }
+  },
+  {
+   "id": "T12",
+   "ranked": [
+    "stock-03479.jpg",
+    "stock-00192.jpg",
+    "stock-03463.jpg",
+    "stock-00189.jpg",
+    "stock-00198.jpg",
+    "stock-01634.jpg",
+    "stock-01608.jpg",
+    "stock-01638.jpg",
+    "stock-02010.jpg",
+    "stock-00149.jpg"
+   ],
+   "similarity": [
+    0.7692,
+    0.71924,
+    0.71226,
+    0.70751,
+    0.70219,
+    0.69976,
+    0.69919,
+    0.69637,
+    0.69472,
+    0.69264
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 448.6,
+   "timing_ms": {
+    "query_embedding": 443.8,
+    "ranking": 0.196
+   }
+  },
+  {
+   "id": "T13",
+   "ranked": [
+    "stock-03477.jpg",
+    "stock-03406.jpg",
+    "stock-02461.jpg",
+    "stock-02492.jpg",
+    "stock-02074.jpg",
+    "stock-01688.jpg",
+    "stock-00187.jpg",
+    "stock-02010.jpg",
+    "stock-03448.jpg",
+    "stock-01689.jpg"
+   ],
+   "similarity": [
+    0.72613,
+    0.70315,
+    0.70085,
+    0.69664,
+    0.68869,
+    0.68769,
+    0.68427,
+    0.67795,
+    0.67711,
+    0.67623
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 51.5,
+   "timing_ms": {
+    "query_embedding": 46.75,
+    "ranking": 0.174
+   }
+  },
+  {
+   "id": "T14",
+   "ranked": [
+    "stock-03481.jpg",
+    "stock-03416.jpg",
+    "stock-02413.jpg",
+    "stock-00134.jpg",
+    "stock-01672.jpg",
+    "stock-02056.jpg",
+    "stock-01685.jpg",
+    "stock-00196.jpg",
+    "stock-02037.jpg",
+    "stock-02451.jpg"
+   ],
+   "similarity": [
+    0.67584,
+    0.66098,
+    0.65712,
+    0.65673,
+    0.65568,
+    0.65446,
+    0.6526,
+    0.64943,
+    0.64898,
+    0.64846
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 49.6,
+   "timing_ms": {
+    "query_embedding": 45.09,
+    "ranking": 0.14
+   }
+  },
+  {
+   "id": "T15",
+   "ranked": [
+    "stock-02025.jpg",
+    "stock-02078.jpg",
+    "stock-02492.jpg",
+    "stock-02067.jpg",
+    "stock-03471.jpg",
+    "stock-03440.jpg",
+    "stock-02024.jpg",
+    "stock-01629.jpg",
+    "stock-02433.jpg",
+    "stock-02404.jpg"
+   ],
+   "similarity": [
+    0.73012,
+    0.72779,
+    0.72347,
+    0.71697,
+    0.69057,
+    0.67786,
+    0.67659,
+    0.67627,
+    0.67326,
+    0.67194
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 54.1,
+   "timing_ms": {
+    "query_embedding": 49.84,
+    "ranking": 0.159
+   }
+  },
+  {
+   "id": "T16",
+   "ranked": [
+    "stock-00121.jpg",
+    "stock-01627.jpg",
+    "stock-01688.jpg",
+    "stock-02029.jpg",
+    "stock-00169.jpg",
+    "stock-02492.jpg",
+    "stock-02429.jpg",
+    "stock-00132.jpg",
+    "stock-00144.jpg",
+    "stock-03400.jpg"
+   ],
+   "similarity": [
+    0.69641,
+    0.66013,
+    0.65323,
+    0.64221,
+    0.64215,
+    0.63878,
+    0.63863,
+    0.63852,
+    0.63603,
+    0.63572
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 47.5,
+   "timing_ms": {
+    "query_embedding": 43.2,
+    "ranking": 0.148
+   }
+  },
+  {
+   "id": "T17",
+   "ranked": [
+    "stock-03410.jpg",
+    "stock-01694.jpg",
+    "stock-02005.jpg",
+    "stock-01683.jpg",
+    "stock-03443.jpg",
+    "stock-03416.jpg",
+    "stock-03459.jpg",
+    "stock-02056.jpg",
+    "stock-00185.jpg",
+    "stock-02002.jpg"
+   ],
+   "similarity": [
+    0.6504,
+    0.62691,
+    0.62493,
+    0.5974,
+    0.59644,
+    0.59494,
+    0.59485,
+    0.5937,
+    0.59351,
+    0.59065
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 49.2,
+   "timing_ms": {
+    "query_embedding": 44.08,
+    "ranking": 0.144
+   }
+  },
+  {
+   "id": "T18",
+   "ranked": [
+    "stock-01601.jpg",
+    "stock-02443.jpg",
+    "stock-02492.jpg",
+    "stock-01683.jpg",
+    "stock-02048.jpg",
+    "stock-02083.jpg",
+    "stock-01651.jpg",
+    "stock-03440.jpg",
+    "stock-02056.jpg",
+    "stock-03459.jpg"
+   ],
+   "similarity": [
+    0.71069,
+    0.64119,
+    0.64034,
+    0.62896,
+    0.6261,
+    0.62577,
+    0.62553,
+    0.62282,
+    0.61969,
+    0.61571
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 52.9,
+   "timing_ms": {
+    "query_embedding": 48.17,
+    "ranking": 0.142
+   }
+  },
+  {
+   "id": "T19",
+   "ranked": [
+    "stock-00115.jpg",
+    "stock-03406.jpg",
+    "stock-02067.jpg",
+    "stock-00126.jpg",
+    "stock-00108.jpg",
+    "stock-02059.jpg",
+    "stock-02448.jpg",
+    "stock-01674.jpg",
+    "stock-02019.jpg",
+    "stock-01613.jpg"
+   ],
+   "similarity": [
+    0.74049,
+    0.73059,
+    0.72919,
+    0.72864,
+    0.72687,
+    0.72428,
+    0.72172,
+    0.69292,
+    0.68744,
+    0.68339
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 50.2,
+   "timing_ms": {
+    "query_embedding": 43.44,
+    "ranking": 0.213
+   }
+  },
+  {
+   "id": "T20",
+   "ranked": [
+    "stock-00151.jpg",
+    "stock-01673.jpg",
+    "stock-01684.jpg",
+    "stock-02089.jpg",
+    "stock-01682.jpg",
+    "stock-02065.jpg",
+    "stock-03465.jpg",
+    "stock-00149.jpg",
+    "stock-03450.jpg",
+    "stock-01632.jpg"
+   ],
+   "similarity": [
+    0.72357,
+    0.6878,
+    0.68759,
+    0.68087,
+    0.67024,
+    0.6677,
+    0.66743,
+    0.66323,
+    0.65683,
+    0.65657
+   ],
+   "excluded_identical": 0,
+   "client_latency_ms": 52.1,
+   "timing_ms": {
+    "query_embedding": 47.81,
+    "ranking": 0.15
+   }
+  },
+  {
+   "id": "I01",
+   "ranked": [
+    "stock-00146.jpg",
+    "stock-00127.jpg",
+    "stock-00135.jpg",
+    "stock-02045.jpg",
+    "stock-00148.jpg",
+    "stock-02404.jpg",
+    "stock-00124.jpg",
+    "stock-02478.jpg",
+    "stock-01629.jpg",
+    "stock-01646.jpg"
+   ],
+   "similarity": [
+    0.84252,
+    0.8377,
+    0.81893,
+    0.8161,
+    0.81118,
+    0.80694,
+    0.79667,
+    0.79497,
+    0.79355,
+    0.79335
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 26.8,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.239
+   }
+  },
+  {
+   "id": "I02",
+   "ranked": [
+    "stock-00139.jpg",
+    "stock-02418.jpg",
+    "stock-02087.jpg",
+    "stock-03485.jpg",
+    "stock-02488.jpg",
+    "stock-00136.jpg",
+    "stock-01626.jpg",
+    "stock-00135.jpg",
+    "stock-00183.jpg",
+    "stock-00123.jpg"
+   ],
+   "similarity": [
+    0.77949,
+    0.76851,
+    0.75831,
+    0.73997,
+    0.73381,
+    0.72661,
+    0.72383,
+    0.72302,
+    0.72154,
+    0.72125
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 27.8,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.315
+   }
+  },
+  {
+   "id": "I03",
+   "ranked": [
+    "stock-03493.jpg",
+    "stock-01658.jpg",
+    "stock-03477.jpg",
+    "stock-02416.jpg",
+    "stock-03446.jpg",
+    "stock-01674.jpg",
+    "stock-02063.jpg",
+    "stock-03444.jpg",
+    "stock-02403.jpg",
+    "stock-00101.jpg"
+   ],
+   "similarity": [
+    0.75794,
+    0.75703,
+    0.74363,
+    0.72861,
+    0.72319,
+    0.72107,
+    0.72,
+    0.7199,
+    0.71932,
+    0.71737
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 12.1,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.204
+   }
+  },
+  {
+   "id": "I04",
+   "ranked": [
+    "stock-00165.jpg",
+    "stock-03479.jpg",
+    "stock-03463.jpg",
+    "stock-00167.jpg",
+    "stock-00143.jpg",
+    "stock-02466.jpg",
+    "stock-01684.jpg",
+    "stock-03441.jpg",
+    "stock-03454.jpg",
+    "stock-00101.jpg"
+   ],
+   "similarity": [
+    0.86231,
+    0.84931,
+    0.84608,
+    0.83399,
+    0.83185,
+    0.80883,
+    0.80732,
+    0.80659,
+    0.8053,
+    0.80428
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 13.5,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.203
+   }
+  },
+  {
+   "id": "I05",
+   "ranked": [
+    "stock-00144.jpg",
+    "stock-02023.jpg",
+    "stock-02448.jpg",
+    "stock-01671.jpg",
+    "stock-02442.jpg",
+    "stock-02029.jpg",
+    "stock-00108.jpg",
+    "stock-02043.jpg",
+    "stock-03436.jpg",
+    "stock-02019.jpg"
+   ],
+   "similarity": [
+    0.7301,
+    0.72544,
+    0.7254,
+    0.72034,
+    0.71756,
+    0.71546,
+    0.7061,
+    0.69548,
+    0.69456,
+    0.69313
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 12.3,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.207
+   }
+  },
+  {
+   "id": "I06",
+   "ranked": [
+    "stock-00159.jpg",
+    "stock-01634.jpg",
+    "stock-00127.jpg",
+    "stock-00146.jpg",
+    "stock-00123.jpg",
+    "stock-00171.jpg",
+    "stock-02077.jpg",
+    "stock-02045.jpg",
+    "stock-00157.jpg",
+    "stock-02028.jpg"
+   ],
+   "similarity": [
+    0.8874,
+    0.84334,
+    0.83791,
+    0.8311,
+    0.81118,
+    0.7961,
+    0.79541,
+    0.79357,
+    0.78576,
+    0.78537
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 21.8,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.391
+   }
+  },
+  {
+   "id": "I07",
+   "ranked": [
+    "stock-00171.jpg",
+    "stock-03441.jpg",
+    "stock-03469.jpg",
+    "stock-00182.jpg",
+    "stock-00151.jpg",
+    "stock-03463.jpg",
+    "stock-02065.jpg",
+    "stock-02030.jpg",
+    "stock-02466.jpg",
+    "stock-02425.jpg"
+   ],
+   "similarity": [
+    0.88317,
+    0.85142,
+    0.8478,
+    0.83399,
+    0.82373,
+    0.80624,
+    0.79447,
+    0.79135,
+    0.78507,
+    0.78471
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 10.6,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.193
+   }
+  },
+  {
+   "id": "I08",
+   "ranked": [
+    "stock-02475.jpg",
+    "stock-02445.jpg",
+    "stock-01692.jpg",
+    "stock-02476.jpg",
+    "stock-01690.jpg",
+    "stock-01695.jpg",
+    "stock-02447.jpg",
+    "stock-01693.jpg",
+    "stock-00164.jpg",
+    "stock-02402.jpg"
+   ],
+   "similarity": [
+    0.74367,
+    0.7369,
+    0.7369,
+    0.73674,
+    0.73643,
+    0.7281,
+    0.72732,
+    0.71954,
+    0.7143,
+    0.71032
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 12.3,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.197
+   }
+  },
+  {
+   "id": "I09",
+   "ranked": [
+    "stock-00165.jpg",
+    "stock-00122.jpg",
+    "stock-00121.jpg",
+    "stock-00182.jpg",
+    "stock-03462.jpg",
+    "stock-01699.jpg",
+    "stock-03468.jpg",
+    "stock-00172.jpg",
+    "stock-03479.jpg",
+    "stock-02461.jpg"
+   ],
+   "similarity": [
+    0.8574,
+    0.84695,
+    0.83569,
+    0.83185,
+    0.81558,
+    0.8126,
+    0.80987,
+    0.80567,
+    0.80368,
+    0.80259
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 11.3,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.197
+   }
+  },
+  {
+   "id": "I10",
+   "ranked": [
+    "stock-01698.jpg",
+    "stock-03406.jpg",
+    "stock-01689.jpg",
+    "stock-03412.jpg",
+    "stock-02437.jpg",
+    "stock-00126.jpg",
+    "stock-01628.jpg",
+    "stock-02436.jpg",
+    "stock-00169.jpg",
+    "stock-03478.jpg"
+   ],
+   "similarity": [
+    0.74289,
+    0.72295,
+    0.71266,
+    0.71256,
+    0.70399,
+    0.70008,
+    0.69455,
+    0.69384,
+    0.68322,
+    0.67847
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 21.9,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.398
+   }
+  },
+  {
+   "id": "I11",
+   "ranked": [
+    "stock-00113.jpg",
+    "stock-01614.jpg",
+    "stock-02411.jpg",
+    "stock-02023.jpg",
+    "stock-00163.jpg",
+    "stock-02084.jpg",
+    "stock-01644.jpg",
+    "stock-03451.jpg",
+    "stock-01654.jpg",
+    "stock-03404.jpg"
+   ],
+   "similarity": [
+    0.763,
+    0.75771,
+    0.7459,
+    0.73882,
+    0.73602,
+    0.73446,
+    0.72495,
+    0.72051,
+    0.72041,
+    0.71955
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 12.6,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.198
+   }
+  },
+  {
+   "id": "I12",
+   "ranked": [
+    "stock-03486.jpg",
+    "stock-00139.jpg",
+    "stock-02029.jpg",
+    "stock-01671.jpg",
+    "stock-02408.jpg",
+    "stock-00168.jpg",
+    "stock-01664.jpg",
+    "stock-02418.jpg",
+    "stock-03427.jpg",
+    "stock-02475.jpg"
+   ],
+   "similarity": [
+    0.75831,
+    0.74118,
+    0.73878,
+    0.72753,
+    0.72712,
+    0.72634,
+    0.72389,
+    0.7224,
+    0.71902,
+    0.71726
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 13.3,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.204
+   }
+  },
+  {
+   "id": "I13",
+   "ranked": [
+    "stock-00194.jpg",
+    "stock-01624.jpg",
+    "stock-00196.jpg",
+    "stock-01676.jpg",
+    "stock-00149.jpg",
+    "stock-02423.jpg",
+    "stock-01627.jpg",
+    "stock-02002.jpg",
+    "stock-02414.jpg",
+    "stock-02434.jpg"
+   ],
+   "similarity": [
+    0.78563,
+    0.75074,
+    0.74946,
+    0.7438,
+    0.74141,
+    0.72448,
+    0.72299,
+    0.71867,
+    0.71775,
+    0.71703
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 17.0,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.372
+   }
+  },
+  {
+   "id": "I14",
+   "ranked": [
+    "stock-02065.jpg",
+    "stock-02455.jpg",
+    "stock-00161.jpg",
+    "stock-02021.jpg",
+    "stock-00167.jpg",
+    "stock-02030.jpg",
+    "stock-00171.jpg",
+    "stock-01681.jpg",
+    "stock-03453.jpg",
+    "stock-03465.jpg"
+   ],
+   "similarity": [
+    0.84401,
+    0.80615,
+    0.79838,
+    0.79241,
+    0.78471,
+    0.77477,
+    0.76335,
+    0.76302,
+    0.76216,
+    0.76147
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 17.8,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.217
+   }
+  },
+  {
+   "id": "I15",
+   "ranked": [
+    "stock-00155.jpg",
+    "stock-02063.jpg",
+    "stock-00169.jpg",
+    "stock-01625.jpg",
+    "stock-02494.jpg",
+    "stock-01658.jpg",
+    "stock-03440.jpg",
+    "stock-02027.jpg",
+    "stock-03418.jpg",
+    "stock-02056.jpg"
+   ],
+   "similarity": [
+    0.8032,
+    0.79584,
+    0.79514,
+    0.78577,
+    0.78369,
+    0.7789,
+    0.76921,
+    0.76856,
+    0.76501,
+    0.76284
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 13.3,
+   "timing_ms": {
+    "query_embedding": 0.0,
+    "ranking": 0.217
+   }
+  },
+  {
+   "id": "M01",
+   "ranked": [
+    "stock-02066.jpg",
+    "stock-02028.jpg",
+    "stock-02433.jpg",
+    "stock-01675.jpg",
+    "stock-03479.jpg",
+    "stock-01629.jpg",
+    "stock-02056.jpg",
+    "stock-01646.jpg",
+    "stock-02067.jpg",
+    "stock-02004.jpg"
+   ],
+   "similarity": [
+    0.79164,
+    0.78758,
+    0.78158,
+    0.77514,
+    0.75341,
+    0.75112,
+    0.74482,
+    0.74162,
+    0.73997,
+    0.73504
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2903.5,
+   "timing_ms": {
+    "query_embedding": 2856.18,
+    "ranking": 1.038
+   }
+  },
+  {
+   "id": "M02",
+   "ranked": [
+    "stock-03430.jpg",
+    "stock-02492.jpg",
+    "stock-02040.jpg",
+    "stock-02403.jpg",
+    "stock-03483.jpg",
+    "stock-01658.jpg",
+    "stock-00171.jpg",
+    "stock-02402.jpg",
+    "stock-02473.jpg",
+    "stock-02047.jpg"
+   ],
+   "similarity": [
+    0.73731,
+    0.72425,
+    0.72344,
+    0.71838,
+    0.71751,
+    0.7127,
+    0.71208,
+    0.71013,
+    0.71006,
+    0.70791
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2723.8,
+   "timing_ms": {
+    "query_embedding": 2657.63,
+    "ranking": 0.889
+   }
+  },
+  {
+   "id": "M03",
+   "ranked": [
+    "stock-00101.jpg",
+    "stock-03404.jpg",
+    "stock-01693.jpg",
+    "stock-02411.jpg",
+    "stock-02091.jpg",
+    "stock-02468.jpg",
+    "stock-00182.jpg",
+    "stock-02477.jpg",
+    "stock-03455.jpg",
+    "stock-03495.jpg"
+   ],
+   "similarity": [
+    0.74051,
+    0.73878,
+    0.73338,
+    0.7297,
+    0.7293,
+    0.72855,
+    0.72593,
+    0.7232,
+    0.72299,
+    0.72295
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2206.3,
+   "timing_ms": {
+    "query_embedding": 2123.25,
+    "ranking": 2.138
+   }
+  },
+  {
+   "id": "M04",
+   "ranked": [
+    "stock-01694.jpg",
+    "stock-01695.jpg",
+    "stock-02477.jpg",
+    "stock-01690.jpg",
+    "stock-03496.jpg",
+    "stock-01630.jpg",
+    "stock-00103.jpg",
+    "stock-00156.jpg",
+    "stock-01672.jpg",
+    "stock-02403.jpg"
+   ],
+   "similarity": [
+    0.75114,
+    0.74885,
+    0.74282,
+    0.74234,
+    0.74081,
+    0.73866,
+    0.73262,
+    0.72949,
+    0.72748,
+    0.72721
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2949.7,
+   "timing_ms": {
+    "query_embedding": 2840.36,
+    "ranking": 5.852
+   }
+  },
+  {
+   "id": "M05",
+   "ranked": [
+    "stock-00192.jpg",
+    "stock-02400.jpg",
+    "stock-03430.jpg",
+    "stock-01693.jpg",
+    "stock-02090.jpg",
+    "stock-00136.jpg",
+    "stock-01630.jpg",
+    "stock-00101.jpg",
+    "stock-03496.jpg",
+    "stock-03495.jpg"
+   ],
+   "similarity": [
+    0.75028,
+    0.74663,
+    0.74208,
+    0.73252,
+    0.73049,
+    0.73011,
+    0.72843,
+    0.72721,
+    0.7251,
+    0.72487
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2571.8,
+   "timing_ms": {
+    "query_embedding": 2457.2,
+    "ranking": 1.048
+   }
+  },
+  {
+   "id": "M06",
+   "ranked": [
+    "stock-00122.jpg",
+    "stock-00143.jpg",
+    "stock-00172.jpg",
+    "stock-00133.jpg",
+    "stock-00177.jpg",
+    "stock-00199.jpg",
+    "stock-02016.jpg",
+    "stock-01680.jpg",
+    "stock-03459.jpg",
+    "stock-02039.jpg"
+   ],
+   "similarity": [
+    0.73057,
+    0.72314,
+    0.72155,
+    0.71659,
+    0.69781,
+    0.6942,
+    0.69357,
+    0.6888,
+    0.6881,
+    0.68733
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2071.2,
+   "timing_ms": {
+    "query_embedding": 1949.18,
+    "ranking": 5.035
+   }
+  },
+  {
+   "id": "M07",
+   "ranked": [
+    "stock-01634.jpg",
+    "stock-01688.jpg",
+    "stock-03455.jpg",
+    "stock-02447.jpg",
+    "stock-00192.jpg",
+    "stock-02487.jpg",
+    "stock-01673.jpg",
+    "stock-02028.jpg",
+    "stock-00123.jpg",
+    "stock-02056.jpg"
+   ],
+   "similarity": [
+    0.75259,
+    0.74902,
+    0.74593,
+    0.72761,
+    0.72524,
+    0.72185,
+    0.72152,
+    0.72128,
+    0.72051,
+    0.71866
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2509.2,
+   "timing_ms": {
+    "query_embedding": 2425.15,
+    "ranking": 0.795
+   }
+  },
+  {
+   "id": "M08",
+   "ranked": [
+    "stock-01639.jpg",
+    "stock-02423.jpg",
+    "stock-02434.jpg",
+    "stock-03416.jpg",
+    "stock-02488.jpg",
+    "stock-03436.jpg",
+    "stock-02412.jpg",
+    "stock-01645.jpg",
+    "stock-02419.jpg",
+    "stock-00103.jpg"
+   ],
+   "similarity": [
+    0.72351,
+    0.7145,
+    0.71309,
+    0.70822,
+    0.70821,
+    0.70669,
+    0.7066,
+    0.70525,
+    0.70405,
+    0.70361
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2464.1,
+   "timing_ms": {
+    "query_embedding": 2344.23,
+    "ranking": 25.634
+   }
+  },
+  {
+   "id": "M09",
+   "ranked": [
+    "stock-00101.jpg",
+    "stock-03470.jpg",
+    "stock-03454.jpg",
+    "stock-02461.jpg",
+    "stock-02460.jpg",
+    "stock-02045.jpg",
+    "stock-00199.jpg",
+    "stock-00157.jpg",
+    "stock-03480.jpg",
+    "stock-00123.jpg"
+   ],
+   "similarity": [
+    0.776,
+    0.75323,
+    0.73801,
+    0.73673,
+    0.7363,
+    0.73561,
+    0.73132,
+    0.72835,
+    0.72364,
+    0.72338
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 1917.5,
+   "timing_ms": {
+    "query_embedding": 1868.52,
+    "ranking": 1.322
+   }
+  },
+  {
+   "id": "M10",
+   "ranked": [
+    "stock-03483.jpg",
+    "stock-00131.jpg",
+    "stock-01638.jpg",
+    "stock-00149.jpg",
+    "stock-01688.jpg",
+    "stock-00196.jpg",
+    "stock-01634.jpg",
+    "stock-00123.jpg",
+    "stock-00192.jpg",
+    "stock-00103.jpg"
+   ],
+   "similarity": [
+    0.75706,
+    0.73158,
+    0.7274,
+    0.72531,
+    0.71945,
+    0.71806,
+    0.7158,
+    0.71565,
+    0.71481,
+    0.71106
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2559.1,
+   "timing_ms": {
+    "query_embedding": 2515.32,
+    "ranking": 1.119
+   }
+  },
+  {
+   "id": "M11",
+   "ranked": [
+    "stock-02450.jpg",
+    "stock-00106.jpg",
+    "stock-01620.jpg",
+    "stock-02017.jpg",
+    "stock-02480.jpg",
+    "stock-01615.jpg",
+    "stock-02492.jpg",
+    "stock-01625.jpg",
+    "stock-01651.jpg",
+    "stock-00179.jpg"
+   ],
+   "similarity": [
+    0.72091,
+    0.70593,
+    0.70571,
+    0.69282,
+    0.69007,
+    0.68837,
+    0.68804,
+    0.68641,
+    0.68489,
+    0.68369
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2023.0,
+   "timing_ms": {
+    "query_embedding": 1940.31,
+    "ranking": 3.888
+   }
+  },
+  {
+   "id": "M12",
+   "ranked": [
+    "stock-02420.jpg",
+    "stock-02056.jpg",
+    "stock-00192.jpg",
+    "stock-03430.jpg",
+    "stock-00137.jpg",
+    "stock-01657.jpg",
+    "stock-01630.jpg",
+    "stock-03496.jpg",
+    "stock-00118.jpg",
+    "stock-01632.jpg"
+   ],
+   "similarity": [
+    0.75039,
+    0.72859,
+    0.72814,
+    0.71737,
+    0.7139,
+    0.71365,
+    0.71278,
+    0.71112,
+    0.71026,
+    0.70738
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2092.1,
+   "timing_ms": {
+    "query_embedding": 2001.33,
+    "ranking": 8.059
+   }
+  },
+  {
+   "id": "M13",
+   "ranked": [
+    "stock-00167.jpg",
+    "stock-03441.jpg",
+    "stock-02492.jpg",
+    "stock-00171.jpg",
+    "stock-02484.jpg",
+    "stock-03469.jpg",
+    "stock-02060.jpg",
+    "stock-03474.jpg",
+    "stock-02482.jpg",
+    "stock-00151.jpg"
+   ],
+   "similarity": [
+    0.73874,
+    0.73779,
+    0.73291,
+    0.73078,
+    0.73043,
+    0.72963,
+    0.72131,
+    0.71398,
+    0.71315,
+    0.71219
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 4282.4,
+   "timing_ms": {
+    "query_embedding": 4130.71,
+    "ranking": 7.414
+   }
+  },
+  {
+   "id": "M14",
+   "ranked": [
+    "stock-00199.jpg",
+    "stock-03487.jpg",
+    "stock-02453.jpg",
+    "stock-02063.jpg",
+    "stock-00172.jpg",
+    "stock-00123.jpg",
+    "stock-02428.jpg",
+    "stock-00101.jpg",
+    "stock-03476.jpg",
+    "stock-03483.jpg"
+   ],
+   "similarity": [
+    0.74945,
+    0.73836,
+    0.72801,
+    0.71939,
+    0.71811,
+    0.7044,
+    0.69926,
+    0.69911,
+    0.69838,
+    0.69718
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2684.3,
+   "timing_ms": {
+    "query_embedding": 2600.78,
+    "ranking": 1.352
+   }
+  },
+  {
+   "id": "M15",
+   "ranked": [
+    "stock-01650.jpg",
+    "stock-02480.jpg",
+    "stock-03428.jpg",
+    "stock-02461.jpg",
+    "stock-02054.jpg",
+    "stock-01620.jpg",
+    "stock-00113.jpg",
+    "stock-01651.jpg",
+    "stock-02097.jpg",
+    "stock-01666.jpg"
+   ],
+   "similarity": [
+    0.73427,
+    0.73384,
+    0.72507,
+    0.71839,
+    0.71503,
+    0.71342,
+    0.71316,
+    0.71283,
+    0.71271,
+    0.71246
+   ],
+   "excluded_identical": 1,
+   "client_latency_ms": 2464.3,
+   "timing_ms": {
+    "query_embedding": 2344.2,
+    "ranking": 15.634
+   }
+  }
+ ]
+}
