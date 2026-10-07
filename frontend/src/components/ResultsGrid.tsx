@@ -7,9 +7,13 @@ type Props = {
   onFocus: (i: number) => void
   onOpen: (i: number) => void
   showScores: boolean
+  onAdd: (i: number) => void
+  addedKeys: Set<string>
 }
 
-export default function ResultsGrid({ results, focused, onFocus, onOpen, showScores }: Props) {
+export const resultKey = (r: Result) => `${r.asset.id}|${r.start_s ?? ''}|${r.end_s ?? ''}`
+
+export default function ResultsGrid({ results, focused, onFocus, onOpen, showScores, onAdd, addedKeys }: Props) {
   const grid = useRef<HTMLUListElement>(null)
 
   useEffect(() => {
@@ -29,6 +33,9 @@ export default function ResultsGrid({ results, focused, onFocus, onOpen, showSco
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onOpen(focused)
+    } else if (e.key === 'a' || e.key === '+') {
+      e.preventDefault()
+      onAdd(focused)
     }
   }
 
@@ -41,6 +48,7 @@ export default function ResultsGrid({ results, focused, onFocus, onOpen, showSco
           role="option"
           aria-selected={i === focused}
           tabIndex={i === focused ? 0 : -1}
+          onFocus={() => i !== focused && onFocus(i)}
           onClick={() => {
             onFocus(i)
             onOpen(i)
@@ -48,6 +56,17 @@ export default function ResultsGrid({ results, focused, onFocus, onOpen, showSco
           title={r.asset.rel_path}
         >
           <img src={r.asset.thumbnail_url} alt={r.asset.rel_path} loading="lazy" />
+          <button
+            className={`cell-add ${addedKeys.has(resultKey(r)) ? 'added' : ''}`}
+            tabIndex={-1}
+            aria-label={addedKeys.has(resultKey(r)) ? 'In selection' : 'Add to selection'}
+            onClick={(e) => {
+              e.stopPropagation()
+              onAdd(i)
+            }}
+          >
+            {addedKeys.has(resultKey(r)) ? '✓' : '+ Add'}
+          </button>
           <div className="cell-label">
             <span className="name">{r.asset.rel_path.split('/').pop()}</span>
             {showScores && <span className="score" title="Raw cosine similarity (not a probability)">{r.similarity.toFixed(3)}</span>}

@@ -10,9 +10,10 @@ type Props = {
   onImport: (id: string) => void
   onCancel: (jobId: string) => void
   onRemove: (id: string) => void
+  footer?: React.ReactNode
 }
 
-export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, onImport, onCancel, onRemove }: Props) {
+export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, onImport, onCancel, onRemove, footer }: Props) {
   const [adding, setAdding] = useState(false)
   const [path, setPath] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -120,6 +121,7 @@ export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, on
           )
         })}
       </ul>
+      {footer}
     </aside>
   )
 }

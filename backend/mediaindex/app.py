@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from . import __version__
 from .config import Settings
 from .db import Database
-from . import api_search
+from . import api_search, api_selections
 from .indexer import make_image_embedder
 from .ingest import run_image_import, thumb_path
 from .search import MatrixCache
@@ -203,8 +203,9 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
         return FileResponse(p, media_type=media.get(p.suffix.lower(), "application/octet-stream"))
 
     app.state.public_asset = _public_asset
-    api_search.register(app)
     app.state.asset_path = _asset_path
+    api_search.register(app)
+    api_selections.register(app)
     mount_frontend(app)
     return app
 

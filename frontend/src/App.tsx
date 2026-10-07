@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, ApiError, type Job, type Library, type SearchResponse } from './api'
+import { api, ApiError, type Job, type Library, type Result, type SearchResponse, type Selection } from './api'
 import DetailPanel from './components/DetailPanel'
-import ResultsGrid from './components/ResultsGrid'
+import ResultsGrid, { resultKey } from './components/ResultsGrid'
 import SearchBar, { type Reference } from './components/SearchBar'
+import SelectionView from './components/SelectionView'
 import Sidebar from './components/Sidebar'
 
 function loadPref(key: string, fallback: boolean) {
@@ -37,6 +38,75 @@ export default function App() {
   const [open, setOpen] = useState<number | null>(null)
   const [showScores, setShowScores] = useState(() => loadPref('mi.showScores', false))
   const searchSeq = useRef(0)
+
+  const [selections, setSelections] = useState<Selection[]>([])
+  const [activeSel, setActiveSel] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('mi.activeSelection')
+    } catch {
+      return null
+    }
+  })
+  const [view, setView] = useState<'search' | 'selection'>('search')
+  const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set())
+  const [toast, setToast] = useState<string | null>(null)
+
+  const refreshSelections = useCallback(async () => {
+    try {
+      const list = await api.selections()
+      setSelections(list)
+      setActiveSel((cur) => (cur && list.some((s) => s.id === cur) ? cur : list[0]?.id ?? null))
+    } catch {
+      /* backend error banner covers this */
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshSelections()
+  }, [refreshSelections])
+
+  useEffect(() => {
+    try {
+      if (activeSel) localStorage.setItem('mi.activeSelection', activeSel)
+    } catch {
+      /* storage unavailable */
+    }
+    if (!activeSel) return
+    api
+      .selection(activeSel)
+      .then((d) => setAddedKeys(new Set(d.items.map((i) => `${i.asset_id}|${i.start_s ?? ''}|${i.end_s ?? ''}`))))
+      .catch(() => setAddedKeys(new Set()))
+  }, [activeSel])
+
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(t)
+  }, [toast])
+
+  const addToSelection = useCallback(
+    async (r: Result) => {
+      try {
+        let sid = activeSel
+        if (!sid) {
+          const created = await api.createSelection('Selection 1')
+          sid = created.id
+          setActiveSel(sid)
+        }
+        const ctx = response
+          ? { mode: response.mode, ...Object.fromEntries(Object.entries(response.query).filter(([k]) => ['text', 'reference', 'rel_path', 'filename', 'asset_id'].includes(k))), rank: r.rank }
+          : null
+        const res = await api.addToSelection(sid, r.asset.id, ctx, r.start_s, r.end_s)
+        setAddedKeys((s) => new Set(s).add(resultKey(r)))
+        const name = selections.find((s) => s.id === sid)?.name ?? 'selection'
+        setToast(res.added ? `Added to “${name}”` : `Already in “${name}”`)
+        refreshSelections()
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : String(e))
+      }
+    },
+    [activeSel, response, selections, refreshSelections],
+  )
 
   const refreshLibraries = useCallback(async () => {
     try {
@@ -166,9 +236,75 @@ export default function App() {
             })
             refreshLibraries()
           }}
+          footer={
+            <section className="selections" aria-label="Selections">
+              <div className="sidebar-head">
+                <h2>Selections</h2>
+                <button
+                  className="btn small"
+                  onClick={async () => {
+                    const s = await api.createSelection(`Selection ${selections.length + 1}`)
+                    setActiveSel(s.id)
+                    refreshSelections()
+                  }}
+                >
+                  + New
+                </button>
+              </div>
+              {selections.length === 0 && <p className="muted small">Use “+ Add” on results to start a selection.</p>}
+              <ul className="lib-list">
+                {selections.map((s) => (
+                  <li key={s.id} className={s.id === activeSel ? 'lib selected' : 'lib'}>
+                    <label className="lib-row">
+                      <input type="radio" name="active-selection" checked={s.id === activeSel} onChange={() => setActiveSel(s.id)} />
+                      <span className="lib-name">{s.name}</span>
+                    </label>
+                    <div className="lib-meta">{s.item_count ?? 0} items{s.id === activeSel ? ' · adding here' : ''}</div>
+                    <div className="lib-actions">
+                      <button
+                        className="link"
+                        onClick={() => {
+                          setActiveSel(s.id)
+                          setView('selection')
+                        }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        className="link danger"
+                        onClick={async () => {
+                          if (!confirm(`Delete selection "${s.name}"? Media files are not affected.`)) return
+                          await api.deleteSelection(s.id)
+                          if (activeSel === s.id) setView('search')
+                          refreshSelections()
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          }
         />
 
         <main className="main">
+          {view === 'selection' && activeSel ? (
+            <section className="results">
+              <SelectionView
+                key={activeSel}
+                selectionId={activeSel}
+                onBack={() => setView('search')}
+                onChanged={refreshSelections}
+                onUseAsReference={(assetId, thumb, label) => {
+                  setReference({ kind: 'asset', assetId, previewUrl: thumb, label })
+                  setView('search')
+                }}
+              />
+            </section>
+          ) : (
+          <>
           <SearchBar
             text={text}
             onText={setText}
@@ -226,10 +362,14 @@ export default function App() {
                   onFocus={setFocused}
                   onOpen={(i) => setOpen(i)}
                   showScores={showScores}
+                  onAdd={(i) => addToSelection(results[i])}
+                  addedKeys={addedKeys}
                 />
               </>
             )}
           </section>
+          </>
+          )}
         </main>
       </div>
 
@@ -237,6 +377,8 @@ export default function App() {
         <DetailPanel
           result={openResult}
           showScores={showScores}
+          onAdd={() => addToSelection(openResult)}
+          added={addedKeys.has(resultKey(openResult))}
           onClose={() => setOpen(null)}
           onPrev={() => setOpen((o) => (o == null ? o : Math.max(0, o - 1)))}
           onNext={() => setOpen((o) => (o == null ? o : Math.min(results.length - 1, o + 1)))}
@@ -248,6 +390,7 @@ export default function App() {
           }}
         />
       )}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   )
 }
