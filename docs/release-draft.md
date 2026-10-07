@@ -23,7 +23,8 @@ What works (verified on an Apple M1, 8 GB, macOS 14):
 Speed (8 GB M1): indexing is precomputed and slow (about 1.8 s per image, about 13 s per 8 s video window). Queries are fast: text embedding is about 40 ms, and exact ranking
 of 600 vectors is 0.1 ms. An image reference query takes about 1.8 s.
 
-Known limitations: retrieval quality has **not** been measured yet (the human relevance labels are pending). Refinement text is a soft steer, not
+Known limitations: image retrieval quality has **not** been measured yet (the human relevance labels are pending). On the Clotho text→audio benchmark,
+EmbeddingGemma 2 scores well below the specialist CLAP model (R@10 0.18 vs 0.50). Refinement text is a soft steer, not
 a filter, and negation is not understood. Video moments are 8 s windows. Tested only on macOS 14 with Apple silicon.
 The model weights (about 1.5 GB) are downloaded once at setup and are not redistributed.
 
@@ -52,18 +53,19 @@ Demo: see `docs/demo.md` (`scripts/demo.sh reset|start|setup`, `scripts/demo_wal
 | Video (MP4) windows, text → moment, moment → moment, clip export | Done, verified (H.264/AAC tested) |
 | Offline operation and robustness | Verified under a network-blocking sandbox |
 | Retrieval-quality metrics (Phase 17) | Tools done. **Metrics pending human labels** |
-| EmbeddingGemma vs CLAP benchmark (Phase 18) | **Skipped for now.** CLAP results recorded, Gemma runs not completed (memory) |
+| EmbeddingGemma vs CLAP benchmark (Phase 18) | Done (audio). EmbeddingGemma R@10 0.18 vs CLAP 0.50 on Clotho. Image comparison skipped |
 | Narrated demo video | **Not recorded.** Storyboard, scripts, stills and a silent 39 s rough cut are ready |
 | Native folder picker, Linux/Windows support, non-MP4 video | Planned / untested |
 
 ### Gates
-Phases 0–17 and 19: PASSED (evidence in `docs/progress.md`). Phase 17 passed as specified, with metrics explicitly pending.
-Phase 18: optional, skipped for now. Phase 20: see `docs/progress.md`.
+Phases 0–19: PASSED (evidence in `docs/progress.md`). Phase 17 passed as specified, with metrics explicitly pending.
+Phase 18: audio comparison done, image comparison skipped. Phase 20: see `docs/progress.md`.
 
 ### Supported hardware
 Tested: Apple M1, 8 GB, macOS 14.0, MPS bf16 (about 3.5 GB peak footprint). CPU fp32 works but is slower. Untested: Linux, Windows, Intel Macs, NVIDIA GPUs.
 
 ### Known issues
+- Text→sound retrieval is weak on Clotho (R@10 0.18, CLAP 0.50; see docs/model-comparison.md).
 - Uneven retrieval: glass and door sounds are missed, "hub" images appear for many sound queries, style refinements ("black and white") can be ignored, and negation fails.
 - Indexing is slow on 8 GB machines (video at about 1.6× real time). Heavy indexing can make queries wait (503 after `MEDIAINDEX_QUERY_WAIT`).
 - Folders are added by pasting a path. CI has not yet been seen running on GitHub. Two oxlint warnings (`set-state-in-effect`) remain.

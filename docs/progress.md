@@ -562,18 +562,22 @@ FFmpeg protocols, upload spooling) are fixed.
 
 ---
 
-## Phase 18: Optional specialist-model comparison (2026-10-07). SKIPPED for now, partial
+## Phase 18: Optional specialist-model comparison (2026-10-07). COMPLETE (audio), image comparison skipped
 
-**Changes:** `evaluation/bench_clotho.py` (Clotho v2.1 eval-split text→audio benchmark, 5 configs), `evaluation/bench/clotho_clap-{best,ctrl}.json`,
+**Changes:** `evaluation/bench_clotho.py` (Clotho v2.1 eval-split text→audio benchmark, 5 configs), `evaluation/bench/clotho_*.json`,
 `docs/model-comparison.md`, optional `bench` extra (`py7zr`) in `pyproject.toml`.
 
-**Observed (REAL MODELS, full 1,045-clip / 5,225-caption pool):** clap-best R@1 0.142 [0.129, 0.157], R@10 0.498; clap-ctrl R@1 0.147, R@10 0.499.
+**Commands:** `uv run --extra bench python evaluation/bench_clotho.py --config <c>` (one at a time), then `--summarize`.
 
-**Not completed:** all three EmbeddingGemma configs. The run was killed by the macOS low-memory monitor during `gemma-ctrl` on the 8 GB laptop.
-The maintainer chose to skip the phase for now. No Gemma-vs-CLAP claim is made. Rerun steps are in `docs/model-comparison.md`.
-The image comparison was skipped (Flickr30k is terms-gated, and the demo pack has no human labels).
+**Observed (REAL MODELS, full 1,045-clip / 5,225-caption pool, M1 8 GB):**
+- CLAP: clap-best R@1 0.142, R@10 0.498. clap-ctrl R@1 0.147, R@10 0.499. Median rank 11 for both.
+- EmbeddingGemma 2: gemma-best R@1 0.039, R@10 0.175. gemma-app R@1 0.037, R@10 0.180. gemma-ctrl R@1 0.031, R@10 0.168. Median rank 62–68.
+- EmbeddingGemma is far below CLAP on this task in every setup, including the controlled one. The app's 10 s windowing matches whole-clip quality (CIs overlap).
+- The first EmbeddingGemma attempt was stopped by the system for low memory. It was rerun after other apps were closed, and all three completed (11, 65 and 39 min).
 
-**Gate:** optional phase, skipped by the maintainer. The partial results and the reason are documented.
+**Caveats:** CLAP's training data includes Clotho and Freesound audio, so its scores may be inflated. The image comparison was skipped (Flickr30k is terms-gated, and the demo pack has no labels).
+
+**Gate:** PASSED for the audio comparison. The results, the training-overlap caveat and the resource settings are recorded, and the image part is documented as skipped.
 
 **Next:** Phase 19, open-source release preparation.
 
