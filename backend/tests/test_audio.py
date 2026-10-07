@@ -158,3 +158,12 @@ def test_api_import_mixed_library(tmp_path):
         assert c.get(assets["beep.mp3"]["file_url"]).headers["content-type"] == "audio/mpeg"
         r = c.post("/api/search/text", json={"text": "x", "library_ids": [lib["id"]]}).json()
         assert [x["asset"]["rel_path"] for x in r["results"]] == ["pic.png"]  # image search unaffected
+
+
+def test_ffmpeg_refuses_network_protocols(tmp_path):
+    playlist = tmp_path / "evil.mp3"  # allowed extension, but content is a playlist pointing at a URL
+    playlist.write_text("#EXTM3U\n#EXTINF:10,\nhttp://127.0.0.1:9/evil.ts\n")
+    with pytest.raises(AudioRejected):
+        probe_audio(playlist)
+    with pytest.raises(AudioRejected):
+        decode_audio(playlist)

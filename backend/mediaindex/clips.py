@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .jobs import JobCancelled, JobContext
-from .media.audio import ffmpeg_bin
+from .media.audio import SAFE_INPUT, ffmpeg_bin
 from .media.video import VideoRejected, probe_video
 from .selections import PARTIAL_PREFIX, SelectionError, _free_name, _place_exclusive, validate_destination
 from .store import Store
@@ -51,7 +51,7 @@ def keyframe_at_or_before(path: Path, t: float) -> float:
     """Timestamp of the last video keyframe at or before t (what a stream-copy cut actually starts on)."""
     if t <= 0:
         return 0.0
-    cmd = [ffmpeg_bin("ffprobe"), "-v", "error", "-select_streams", "v:0", "-skip_frame", "nokey",
+    cmd = [ffmpeg_bin("ffprobe"), *SAFE_INPUT, "-v", "error", "-select_streams", "v:0", "-skip_frame", "nokey",
            "-show_entries", "frame=pts_time", "-of", "csv=p=0", "-read_intervals", f"{max(0.0, t - 20):.3f}%{t + 0.05:.3f}",
            "--", str(path)]
     out = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
@@ -96,7 +96,7 @@ def plan_dict(p: ClipPlan) -> dict:
 
 
 def ffmpeg_cmd(source: Path, start: float, end: float, mode: str, out: Path) -> list[str]:
-    cmd = [ffmpeg_bin("ffmpeg"), "-nostdin", "-v", "error", "-y", "-ss", f"{start:.3f}", "-i", str(source),
+    cmd = [ffmpeg_bin("ffmpeg"), "-nostdin", *SAFE_INPUT, "-v", "error", "-y", "-ss", f"{start:.3f}", "-i", str(source),
            "-t", f"{end - start:.3f}"]
     if mode == "accurate":
         cmd += ["-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
