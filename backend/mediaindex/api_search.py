@@ -114,7 +114,8 @@ def _reference(app: FastAPI, file: UploadFile | None, asset_id: str | None):
                 try:
                     im = load_image(path)
                 except ImageRejected as e:
-                    raise HTTPException(422, f"invalid reference image: {e}")
+                    reason = str(e).split(":")[0]  # never echo the private temp path
+                    raise HTTPException(422, f"invalid reference image ({reason}); use a JPEG, PNG or WebP file")
                 yield im, sha, None, {"reference": "upload", "filename": file.filename}
             return
         a = app.state.store.get_asset(asset_id)

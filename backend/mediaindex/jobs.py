@@ -23,6 +23,7 @@ class JobCancelled(Exception):
 class Job:
     id: str
     kind: str
+    library_id: str | None = None
     status: str = "queued"  # queued | running | done | failed | cancelled
     done: int = 0
     total: int = 0
@@ -72,8 +73,8 @@ class JobRunner:
         self._thread = threading.Thread(target=self._loop, name="mediaindex-jobs", daemon=True)
         self._thread.start()
 
-    def submit(self, kind: str, fn: JobFn, job_id: str | None = None) -> Job:
-        job = Job(id=job_id or uuid.uuid4().hex, kind=kind)
+    def submit(self, kind: str, fn: JobFn, job_id: str | None = None, library_id: str | None = None) -> Job:
+        job = Job(id=job_id or uuid.uuid4().hex, kind=kind, library_id=library_id)
         try:
             self._q.put_nowait((job, fn))
         except queue.Full:

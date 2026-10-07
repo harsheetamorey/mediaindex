@@ -44,10 +44,8 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     store.register_profile(profile)
     store.recover_interrupted_jobs()
     cleanup_stale_uploads(settings.uploads_dir, max_age=0)
-    job_libraries: dict[str, str | None] = {}
-
     def persist_job(job) -> None:
-        store.save_job(job.to_dict(), job_libraries.get(job.id))
+        store.save_job(job.to_dict(), job.library_id)
 
     runner = JobRunner(maxsize=settings.job_queue_size, on_update=persist_job)
 
@@ -65,7 +63,6 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     app.state.db = db
     app.state.store = store
     app.state.profile = profile
-    app.state.job_libraries = job_libraries
     app.state.matrix_cache = MatrixCache(store)
     app.state.embed_batch = make_image_embedder(store, host)
 
@@ -139,18 +136,14 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
         if not store.get_library(library_id):
             raise HTTPException(404, "library not found")
         for j in runner.list():
-            if j.kind == "import" and job_libraries.get(j.id) == library_id and j.status in ("queued", "running"):
+            if j.kind == "import" and j.library_id == library_id and j.status in ("queued", "running"):
                 return j.to_dict()
 
         def fn(ctx):
             return run_image_import(ctx, store, settings.thumbs_dir, library_id, _embed_batch_factory())
 
-        import uuid as _uuid
-
-        jid = _uuid.uuid4().hex
-        job_libraries[jid] = library_id
         try:
-            job = runner.submit("import", fn, job_id=jid)
+            job = runner.submit("import", fn, library_id=library_id)
         except QueueFull as e:
             raise HTTPException(503, str(e))
         return job.to_dict()
@@ -212,4 +205,27 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     app.state.public_asset = _public_asset
     api_search.register(app)
     app.state.asset_path = _asset_path
+    mount_frontend(app)
     return app
+
+
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+CSP = ("default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; "
+       "script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; "
+       "base-uri 'none'; form-action 'self'")
+
+
+def mount_frontend(app: FastAPI) -> None:
+    """Serve the built UI from the same loopback origin (no CDNs, no external fonts)."""
+    from fastapi.staticfiles import StaticFiles
+
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        resp = await call_next(request)
+        resp.headers.setdefault("Content-Security-Policy", CSP)
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
+        return resp
+
+    if FRONTEND_DIST.is_dir():
+        app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="ui")
