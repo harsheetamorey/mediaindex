@@ -54,3 +54,6 @@ data/
 .DS_Store
 .idea/
 .vscode/
+
+# README images (demo-pack only)
+!/docs/assets/*.jpg
