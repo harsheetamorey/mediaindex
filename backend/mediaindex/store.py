@@ -279,3 +279,32 @@ class Store:
                                message='process exited before completion; re-run import to resume'
                                WHERE status IN ('queued','running')""", (now(),))
             return cur.rowcount
+
+
+def index_state(store: Store, profile_key: str, library_ids: list[str] | None, media_types: list[str]) -> dict:
+    """Describe how searchable the selected libraries are under the active profile."""
+    where = "a.media_type IN (%s)" % ",".join("?" * len(media_types))
+    params: list = list(media_types)
+    if library_ids:
+        where += " AND a.library_id IN (%s)" % ",".join("?" * len(library_ids))
+        params += library_ids
+    rows = store.db.query(f"SELECT a.status, COUNT(*) AS n FROM assets a WHERE {where} GROUP BY a.status", params)
+    counts = {r["status"]: r["n"] for r in rows}
+    total = sum(counts.values())
+    other = store.db.one(f"""SELECT COUNT(DISTINCT e.asset_id) AS n FROM embeddings e JOIN assets a ON a.id=e.asset_id
+                             WHERE {where} AND e.profile_key != ?""", params + [profile_key])["n"]
+    current = store.db.one(f"""SELECT COUNT(DISTINCT e.asset_id) AS n FROM embeddings e JOIN assets a ON a.id=e.asset_id
+                               WHERE {where} AND e.profile_key = ? AND a.status='indexed'""",
+                           params + [profile_key])["n"]
+    if total == 0:
+        state = "empty"
+    elif current == 0 and other > 0:
+        state = "incompatible"
+    elif current == 0:
+        state = "not_indexed"
+    elif current < total - counts.get("failed", 0) - counts.get("missing", 0):
+        state = "partial"
+    else:
+        state = "ready"
+    return {"state": state, "total": total, "searchable": current, "other_profile_vectors": other,
+            "by_status": counts}
