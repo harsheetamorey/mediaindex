@@ -158,6 +158,10 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     def _public_asset(a: dict) -> dict:
         out = {k: a[k] for k in ("id", "library_id", "rel_path", "media_type", "size", "content_hash", "width",
                                  "height", "duration", "status", "error")}
+        import json as _json
+
+        meta = _json.loads(a["meta_json"]) if a.get("meta_json") else {}
+        out["source"] = meta.get("source")
         out["thumbnail_url"] = f"/api/assets/{a['id']}/thumbnail"
         out["file_url"] = f"/api/assets/{a['id']}/file"
         return out

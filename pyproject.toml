@@ -21,6 +21,11 @@ dependencies = [
     "soundfile==0.14.0",
 ]
 
+[project.optional-dependencies]
+demo = [
+    "pyarrow>=25.0.1",
+]
+
 [dependency-groups]
 dev = ["pytest", "httpx"]
 

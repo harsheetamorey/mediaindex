@@ -52,6 +52,41 @@ class ImportSummary:
         return d
 
 
+PROVENANCE_FILE = "mediaindex-provenance.json"
+
+
+def load_provenance(root: Path) -> dict[str, dict]:
+    """Optional per-file source records written by scripts/download_demo.py (or by the user).
+
+    Records are stored as asset metadata for display/export. Tags are inspection metadata only
+    and are never passed to the embedding model.
+    """
+    import json
+
+    p = root / PROVENANCE_FILE
+    if not p.is_file() or p.is_symlink():
+        return {}
+    try:
+        data = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return {}
+    items = data.get("items", {})
+    out = {}
+    for rel, e in items.items():
+        out[rel] = {
+            "dataset": data.get("dataset"),
+            "revision": data.get("revision"),
+            "license_declared": e.get("license_declared") or data.get("license_declared"),
+            "source": e.get("source"),
+            "row": e.get("row"),
+            "sha256": e.get("sha256"),
+            "image_provenance": e.get("image_provenance"),
+            "note": data.get("note"),
+            "inspection_tags": e.get("tags"),
+        }
+    return out
+
+
 def thumb_path(thumbs_dir: Path, content_hash: str) -> Path:
     return thumbs_dir / content_hash[:2] / f"{content_hash}.jpg"
 
@@ -70,6 +105,7 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
     s.discovered = len(files)
     ctx.progress(0, len(files), "scanning")
     existing = {a["rel_path"]: a for a in store.list_assets(library_id, media_type="image")}
+    provenance = load_provenance(root)
     seen: set[str] = set()
     batch: list[PendingImage] = []
 
@@ -113,7 +149,8 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
             aid, changed = store.upsert_asset(
                 library_id, rel, "image", size=st.st_size, mtime_ns=st.st_mtime_ns, content_hash=h,
                 width=info.width, height=info.height,
-                meta={"format": info.format, "exif_orientation": info.exif_orientation})
+                meta={"format": info.format, "exif_orientation": info.exif_orientation,
+                      "source": provenance.get(rel)})
             if ex is None:
                 s.new += 1
             elif changed:

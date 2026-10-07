@@ -9,6 +9,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 2 Model adapter and execution worker | PASSED |
 | 3 SQLite library and persistence | PASSED |
 | 4 Image import and thumbnails | PASSED |
+| 5 Optional demo image pack | PASSED |
 
 ---
 
@@ -148,3 +149,27 @@ real folder imports in under a second.
 **Gate:** PASSED.
 
 **Next:** Phase 5, optional demo image pack.
+
+---
+
+## Phase 5: Optional demo image pack (2026-10-07)
+
+**Changes:** `scripts/download_demo.py`, `manifests/stockimages-cc0-500.json` (committed selection: rows and hashes, no images),
+`THIRD_PARTY_DATA.md`, importer support for the `mediaindex-provenance.json` sidecar (stored as asset `source` metadata), and the `demo` optional dependency (pyarrow).
+
+**Dataset inspection:** revision `206f357…`, 3,999 rows in 2 parquet shards (422 MB + 467 MB) with 100-row row groups. Features are `image` and `tags`.
+The card declares CC0-1.0 with no per-image provenance. Some rows contain HTML error pages instead of images, and the downloader now excludes them.
+
+**Commands and observed results**
+- `uv run --extra demo python scripts/download_demo.py --write-manifest`: 5 row groups ((1,14), (0,1), (0,16), (1,0), (1,4)), 500 images,
+  **about 114.8 MB transferred** (versus about 889 MB for the full dataset), 0 rows excluded
+- Rerun into a fresh folder: `selection matches committed manifest`, and `shasum` across both folders matches for all 500 files
+- Live API import of `data/demo/stockimages-cc0`: `discovered 500, new 500, failed 0`. **All 500 assets have a source record**
+  (dataset URL and revision, row, publisher-declared license). Tags stay separate as `inspection_tags`.
+- `uv run pytest -q`: `26 passed`
+
+**Limitations:** publisher-declared CC0 only, with no rights audit (see THIRD_PARTY_DATA.md). The app works without this pack.
+
+**Gate:** PASSED.
+
+**Next:** Phase 6, image embeddings and text search.
