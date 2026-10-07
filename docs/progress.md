@@ -599,3 +599,25 @@ The image comparison was skipped (Flickr30k is terms-gated, and the demo pack ha
 **Gate:** PASSED. Release files and docs are complete, and the checklist states what remains open. Nothing was published.
 
 **Next:** Phase 20, demo and handoff.
+
+---
+
+## Phase 20: Demo recording and final handoff (2026-10-07)
+
+**Changes:** `scripts/demo.sh` (reset/start/setup on a separate `data/demo-app` state dir), `scripts/demo_setup.py` (idempotent demo indexing via the
+local API), `scripts/demo_walkthrough.py` (plays the storyboard in Chrome, one screenshot per beat, optional silent video), `docs/demo.md`
+(storyboard, commands, recording checklist), `docs/release-draft.md` (repository and release description drafts, final handoff), README demo stills.
+
+**Commands and observed results** (REAL MODEL, demo-only copy of the index, port 8790):
+- `scripts/demo_setup.py --port 8790`: 500, 60 and 2 files unchanged, done in about 3 s (re-scan path).
+- `scripts/demo_walkthrough.py --video --pause 2.5`: all 8 beats passed, external requests: none. Clip `scenes-silent_00m12_0s-00m20_0s.mp4`
+  (8.00 s) plus provenance, and 3 copies plus a manifest exported. Silent 39 s `.webm` rough cut kept locally in `data/demo-walkthrough/`.
+- Actual results: "a dog" → dog scene 0:12–0:20. "a dog barking" → #1 a dog clip, then a horse whinny and a whip. Viola + "without any flowers" → still flowers (the honest miss).
+- `scripts/demo.sh start` on an empty state dir: health OK and 0 libraries. `reset` refuses while a server runs, and otherwise removes only `data/demo-app`.
+- `uv run pytest -q`: `74 passed, 1 deselected`
+
+**Not done:** narrated 60–90 s recording (needs a person). A full fresh demo index was not timed (about 25 min estimated from measured rates).
+Nothing was posted or released.
+
+**Gate:** PASSED for the deliverables. A newcomer can reset, launch, index and replay the demo scenario with the documented commands, and
+every feature's status is stated truthfully in `docs/release-draft.md`.

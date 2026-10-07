@@ -37,6 +37,16 @@ uv run python scripts/make_demo_video.py                    # 40 s demo MP4 buil
 ```
 Each item keeps its source record. Publisher declarations are **not** a rights audit. See [`THIRD_PARTY_DATA.md`](THIRD_PARTY_DATA.md).
 
+### Demo
+`scripts/demo.sh reset`, then `scripts/demo.sh start` and, in a second terminal, `scripts/demo.sh setup`. This indexes the demo packs into a separate
+`data/demo-app` state directory. The storyboard, the automatic walkthrough and the recording checklist are in [`docs/demo.md`](docs/demo.md).
+
+| Image + text: "at sunset" | Honest miss: "without any flowers" |
+|---|---|
+| ![reference plus "at sunset"](docs/assets/demo-refine.jpg) | ![negation is not understood](docs/assets/demo-honest-miss.jpg) |
+| **Text → sounds: "a dog barking"** | **Text → video moment: "a dog"** |
+| ![sound results with waveforms](docs/assets/demo-sounds.jpg) | ![matched 8 s video window](docs/assets/demo-video-moment.jpg) |
+
 ## Offline use
 After setup, `python -m mediaindex` forces offline model loading (`HF_HUB_OFFLINE=1` and `local_files_only`) and disables library telemetry.
 Every media flow was verified with outbound networking blocked by a macOS sandbox, and a socket audit recorded zero outgoing connections
@@ -103,7 +113,8 @@ text→audio comparison against LAION-CLAP on Clotho is in [`docs/model-comparis
 ## Documentation
 [Architecture](docs/architecture.md) · [Environment](docs/environment.md) · [Model compatibility](docs/model-compatibility.md) ·
 [Progress & gates](docs/progress.md) · [Offline & robustness](docs/offline-and-robustness.md) · [Evaluation](docs/evaluation.md) ·
-[Release checklist](docs/release-checklist.md) · [Contributing](CONTRIBUTING.md)
+[Release checklist](docs/release-checklist.md) · [Demo](docs/demo.md) · [Release draft & handoff](docs/release-draft.md) ·
+[Model comparison](docs/model-comparison.md) · [Contributing](CONTRIBUTING.md)
 
 ## Licence
 Original code: Apache-2.0 ([`LICENSE`](LICENSE)). The model, third-party software and data have their own terms: [`NOTICE.md`](NOTICE.md) and
