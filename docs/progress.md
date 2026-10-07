@@ -12,6 +12,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 5 Optional demo image pack | PASSED |
 | 6 Image embeddings and text search | PASSED |
 | 7 Reference-image search | PASSED |
+| 8 Image plus text refinement | PASSED (quality caveats documented) |
 
 ---
 
@@ -240,3 +241,27 @@ always-delete, and a stale-file sweep at startup), `api_search.py` (`POST /api/s
 **Gate:** PASSED.
 
 **Next:** Phase 8, image plus text refinement.
+
+---
+
+## Phase 8: Image plus text refinement (2026-10-07)
+
+**Changes:** `api_search.py` (`POST /api/search/image-text`: multipart `text` plus exactly one of `file`/`asset_id`), `scripts/refinement_check.py`,
+`docs/refinement-findings.md`, and new tests in `backend/tests/test_reference_search.py`.
+
+**Behaviour:** one native query embedding from the reference image plus the refinement text (`embed_image_text`, verified in Phase 1). Result provenance
+in `query` records the reference, text, interface description, model id and revision, prompt, identical-asset exclusions, and a caveat that no logical
+constraints are applied. Empty text returns 422 (pointing to the image-only endpoint). If the loaded encoders lack image support, the request is rejected explicitly.
+Text-only and image-only modes are unchanged.
+
+**Commands and observed results (REAL MODEL)**
+- `uv run python scripts/refinement_check.py --library <demo>` ran 6 cases. See `docs/refinement-findings.md`.
+  Helped: "at night" and "at sunset". Partly helped: "yellow flowers" and "a car". **Ignored:** "black and white photo". **Negation failed:** "without any flowers".
+- `uv run pytest -q`: `35 passed`
+
+**Limitations:** refinement quality is inconsistent, and the reference often dominates. No negation or logical constraints. Each mixed query needs a full
+image+text forward pass (about 1–3 s on MPS).
+
+**Gate:** PASSED. Real combined-input inference returns candidates, and the API and profile are recorded. Semantic limitations are documented.
+
+**Next:** Phase 9, creator interface (Version 1).

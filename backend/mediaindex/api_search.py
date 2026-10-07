@@ -86,6 +86,7 @@ def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: floa
 
 def register(app: FastAPI) -> None:
     register_reference(app)
+    register_mixed(app)
 
     @app.post("/api/search/text")
     def search_text(req: TextSearchRequest) -> dict:
@@ -158,5 +159,41 @@ def register_reference(app: FastAPI) -> None:
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
         return run_search(app, mode="image", query_info=info, vec=vec, embed_ms=ms,
+                          library_ids=_parse_libs(library_ids), media_types=["image"], limit=limit,
+                          exclude_assets=excl)
+
+
+MIXED_INTERFACE = ("single forward pass: SentenceTransformer.encode({'text': query_prompt + text, 'image': <PIL image>}); "
+                   "not an average of separate text and image vectors")
+
+
+def register_mixed(app: FastAPI) -> None:
+    @app.post("/api/search/image-text")
+    def search_image_text(text: str = Form(..., min_length=1, max_length=2000),
+                          file: UploadFile | None = File(None), asset_id: str | None = Form(None),
+                          library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
+                          include_identical: bool = Form(False)) -> dict:
+        text = text.strip()
+        if not text:
+            raise HTTPException(422, "refinement text is empty; use /api/search/image for reference-only search")
+        caps = app.state.host.capabilities()
+        if caps is not None and not caps.get("image+text"):
+            raise HTTPException(422, "native image+text queries are not available with the loaded encoders")
+        with _reference(app, file, asset_id) as (im, sha, ref_asset, info):
+            vec, ms = embed_query(app, lambda b: b.embed_image_text(im, text)[0])
+        profile = app.state.profile
+        info.update({
+            "text": text,
+            "embedding": "computed (native image+text)",
+            "interface": MIXED_INTERFACE,
+            "model": profile.model_id,
+            "revision": profile.revision,
+            "prompt": profile.query_prompt,
+            "caveat": ("refinement text steers the embedding; it does not enforce logical constraints, negation "
+                       "or exact attributes"),
+        })
+        excl = _exclusions(app, ref_asset, sha, include_identical)
+        info["excluded_identical"] = len(excl)
+        return run_search(app, mode="image+text", query_info=info, vec=vec, embed_ms=ms,
                           library_ids=_parse_libs(library_ids), media_types=["image"], limit=limit,
                           exclude_assets=excl)
