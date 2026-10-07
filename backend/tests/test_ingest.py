@@ -139,3 +139,20 @@ def test_api_import_and_serving(tmp_path, media_folder):
         # library deletion removes index rows only
         assert c.delete(f"/api/libraries/{lib['id']}").status_code == 200
         assert (media_folder / "moved.jpg").exists()
+
+
+def test_provenance_sidecar_attached_as_metadata(tmp_path):
+    import json
+
+    root = tmp_path / "pack"
+    make_image(root / "stock-00001.jpg")
+    (root / "mediaindex-provenance.json").write_text(json.dumps({
+        "dataset": "X/Y", "revision": "abc", "license_declared": "CC0-1.0",
+        "items": {"stock-00001.jpg": {"row": 1, "source": "https://example/row1", "tags": "cat, sofa"}}}))
+    st, lib, thumbs = setup(tmp_path, root)
+    r = run_image_import(Ctx(), st, thumbs, lib["id"])
+    assert r["discovered"] == 1
+    a = st.list_assets(lib["id"])[0]
+    meta = json.loads(a["meta_json"])
+    assert meta["source"]["license_declared"] == "CC0-1.0" and meta["source"]["row"] == 1
+    assert meta["source"]["inspection_tags"] == "cat, sofa"
