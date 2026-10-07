@@ -5,8 +5,20 @@ description = "Local, open-source media-search workspace for creators"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi",
-    "uvicorn",
+    # Web
+    "fastapi==0.142.2",
+    "uvicorn==0.54.0",
+    "python-multipart",
+    # Model stack: pinned after real verification on the target laptop (docs/model-compatibility.md)
+    "torch==2.14.1",
+    "torchvision==0.29.1",
+    "torchcodec==0.17.0",
+    "transformers==5.19.0",
+    "sentence-transformers==6.1.0",
+    # Media / numerics
+    "numpy==2.5.3",
+    "pillow==12.3.0",
+    "soundfile==0.14.0",
 ]
 
 [dependency-groups]
