@@ -92,6 +92,29 @@ class Store:
                       (profile.key, json.dumps(profile.to_dict(), sort_keys=True), now()))
         return profile.key
 
+    def rekey_compatible_profiles(self, current: IndexProfile) -> dict[str, int]:
+        """Move vectors stored under older profile keys that describe the *same* vector space.
+
+        A stored profile is compatible when re-parsing it with today's key rules yields the current
+        key (i.e. it differs only in KEY_EXCLUDED_FIELDS, verified not to affect vectors).
+        Returns {old_key: rows_moved}.
+        """
+        moved: dict[str, int] = {}
+        rows = self.db.query("SELECT key, json FROM index_profiles WHERE key != ?", (current.key,))
+        for r in rows:
+            try:
+                old = IndexProfile.from_dict(json.loads(r["json"]))
+            except (TypeError, ValueError):
+                continue
+            if old.key != current.key:
+                continue
+            with self.db.tx() as c:
+                n = c.execute("UPDATE OR IGNORE embeddings SET profile_key=? WHERE profile_key=?",
+                              (current.key, r["key"])).rowcount
+                c.execute("UPDATE libraries SET generation = generation + 1")
+            moved[r["key"]] = n
+        return moved
+
     def get_profile(self, key: str) -> IndexProfile | None:
         r = self.db.one("SELECT json FROM index_profiles WHERE key = ?", (key,))
         return IndexProfile.from_dict(json.loads(r["json"])) if r else None
@@ -213,6 +236,19 @@ class Store:
         rows = self.db.query("""SELECT dim, vector FROM embeddings WHERE asset_id=? AND profile_key=? AND modality=?
                                 ORDER BY segment_index""", (row["asset_id"], profile_key, modality))
         return np.vstack([blob_to_vec(r["vector"], r["dim"]) for r in rows])
+
+    def reusable_segments(self, source_hash: str, profile_key: str, modality: str,
+                          window: tuple[float, float] | None = None) -> tuple[np.ndarray, list] | None:
+        """Vectors + (start, end) of an asset with identical content under the same profile."""
+        row = self.db.one("""SELECT e.asset_id FROM embeddings e JOIN assets a ON a.id = e.asset_id
+                             WHERE e.source_hash=? AND e.profile_key=? AND e.modality=? AND a.status='indexed'
+                             LIMIT 1""", (source_hash, profile_key, modality))
+        if not row:
+            return None
+        rows = self.db.query("""SELECT dim, vector, start_s, end_s FROM embeddings WHERE asset_id=? AND profile_key=?
+                                AND modality=? ORDER BY segment_index""", (row["asset_id"], profile_key, modality))
+        return (np.vstack([blob_to_vec(r["vector"], r["dim"]) for r in rows]),
+                [(r["start_s"], r["end_s"]) for r in rows])
 
     def get_asset_vectors(self, asset_id: str, profile_key: str, modality: str | None = None) -> np.ndarray | None:
         sql = "SELECT dim, vector FROM embeddings WHERE asset_id=? AND profile_key=?"

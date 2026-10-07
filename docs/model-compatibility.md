@@ -60,3 +60,18 @@ Peak RSS for MPS bf16 without the audio encoder was about 1.0 GB, as measured by
 ## Offline
 After the first download, loading with `HF_HUB_OFFLINE=1` and `local_files_only=True` succeeds (`--offline` runs above).
 This verifies local-only loading. A test with outbound network blocked is deferred to Phase 16.
+
+## Audio (verified 2026-10-07, Phase 11)
+- Input: `model.encode([{"audio": {"array": float32_mono, "sampling_rate": 16000}}])` (sentence-transformers `AudioDict`). No prompt prefix.
+  MediaIndex decodes WAV, FLAC and MP3 with FFmpeg 7.1.1 (`-ac 1 -ar 16000 -f f32le`, argument lists only). libsndfile 1.2.2 also reports WAV, FLAC
+  and MP3 support, but FFmpeg is used for every format so that down-mixing and resampling are uniform.
+- `scripts/audio_smoke.py --n 12` on MPS bf16: 12 FSD50K CC0 clips → shape (12, 768), all finite, norms 0.9987–1.0029. Load took 13.2 s (full model)
+  and 12 clips took 19.8 s.
+  Text→audio top-3 (smoke check only): "a snare drum" ranked a snare clip first, "insects chirping at night" ranked the cricket clip first, and "a dog barking" ranked the bark clip 2nd
+  (a crying clip was 1st). "glass shattering" ranked the glass clip 2nd. "footsteps" missed (no footsteps clip in the top 3).
+- **Encoder-configuration compatibility:** the same 6 images and 5 text queries were embedded with the full model and with
+  `config_kwargs={"audio_config": None}`. **Max absolute difference was 0.0 for both image and text vectors (bit-identical).** The loaded encoder set is
+  therefore excluded from the index-profile key (`KEY_EXCLUDED_FIELDS`). Vectors stored under the earlier text+image profile are re-keyed
+  at startup instead of recomputed (`Store.rekey_compatible_profiles`).
+- Windowing: default 10 s windows with a 5 s stride (well under the 8,192-token limit of about 327 s at 25 tokens/s). Short clips get a single window.
+  A shorter final window is aligned to the end of the file.

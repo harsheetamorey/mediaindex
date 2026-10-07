@@ -15,7 +15,7 @@ from . import __version__
 from .config import Settings
 from .db import Database
 from . import api_search, api_selections
-from .indexer import make_image_embedder
+from .indexer import make_audio_embedder, make_image_embedder
 from .ingest import run_image_import, thumb_path
 from .search import MatrixCache
 from .uploads import cleanup_stale_uploads
@@ -42,6 +42,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     db = Database(settings.db_path)
     store = Store(db)
     store.register_profile(profile)
+    store.rekey_compatible_profiles(profile)
     store.recover_interrupted_jobs()
     cleanup_stale_uploads(settings.uploads_dir, max_age=0)
     def persist_job(job) -> None:
@@ -65,6 +66,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     app.state.profile = profile
     app.state.matrix_cache = MatrixCache(store)
     app.state.embed_batch = make_image_embedder(store, host)
+    app.state.embed_audio = make_audio_embedder(store, host)
 
     app.add_middleware(
         CORSMiddleware,
@@ -140,7 +142,8 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
                 return j.to_dict()
 
         def fn(ctx):
-            return run_image_import(ctx, store, settings.thumbs_dir, library_id, _embed_batch_factory())
+            return run_image_import(ctx, store, settings.thumbs_dir, library_id, _embed_batch_factory(),
+                                    embed_audio=app.state.embed_audio)
 
         try:
             job = runner.submit("import", fn, library_id=library_id)
@@ -199,7 +202,8 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     @app.get("/api/assets/{asset_id}/file")
     def asset_file(asset_id: str):
         a, p = _asset_path(asset_id)
-        media = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+        media = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
+                 ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg", ".mp4": "video/mp4"}
         return FileResponse(p, media_type=media.get(p.suffix.lower(), "application/octet-stream"))
 
     app.state.public_asset = _public_asset

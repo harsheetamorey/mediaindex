@@ -15,6 +15,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 8 Image plus text refinement | PASSED (quality caveats documented) |
 | 9 Creator interface: **Version 1** | PASSED |
 | 10 Selections and image exports | PASSED |
+| 11 Audio inference and segmentation | PASSED |
 
 ---
 
@@ -339,3 +340,34 @@ Video-segment items are skipped by the file exporter until Phase 15.
 **Gate:** PASSED.
 
 **Next:** Phase 11, audio inference and segmentation.
+
+---
+
+## Phase 11: Audio inference and segmentation (2026-10-07)
+
+**Changes:** `backend/mediaindex/media/audio.py` (ffprobe/ffmpeg probing and decoding to mono 16 kHz, window planning, waveform thumbnails),
+`GemmaBackend.embed_audio`, `indexer.make_audio_embedder` (windowed embedding, all windows written in one transaction, duplicate reuse with offsets),
+ingest support for `.wav/.flac/.mp3`, profile changes (`audio` encoder loaded by default, `audio_window_s=10`, `audio_stride_s=5`,
+`KEY_EXCLUDED_FIELDS`), startup re-key of compatible profiles, `scripts/{audio_smoke,audio_offsets_check,download_demo_audio}.py`,
+`manifests/fsd50k-cc0.json`, `backend/tests/test_audio.py`, and docs (model-compatibility, THIRD_PARTY_DATA).
+
+**Commands and observed results (REAL MODEL, MPS bf16)**
+- `uv run python scripts/audio_smoke.py --audio data/demo/fsd50k-cc0 --images data/samples/smoke --n 12`: audio embeddings were finite, 768-d, and unit-norm within bf16 rounding.
+  **Image and text vectors were bit-identical with and without the audio encoder** (max abs diff 0.0).
+- `uv run --extra demo python scripts/download_demo_audio.py`: 60 CC0 clips (1–28 s), about 16.9 MB transferred, matching the committed manifest on rerun.
+- Live app after restart: the old text+image vectors were re-keyed, and "snowy mountains" returned the same top results and scores as in Phase 6.
+- Live import: `fsd50k-cc0` gave 60 files, 60 embedded, **86 segments**, 0 failed. `medley.wav` (39.25 s; dog, glass, crickets and snare concatenated with 3 s gaps, stereo
+  44.1 kHz) gave 7 windows. Total 123 s.
+- `uv run python scripts/audio_offsets_check.py --rel-path medley.wav ...`: each stored window vector matches an **independent FFmpeg-seeked re-decode of the same span:
+  cos 0.9998–1.0000**. The control (same windows shifted by +2.5 s) gave mean cos 0.948. `OFFSETS OK`. Text over windows: "a snare drum" picked the last window (snare at 32.1–39.3 s),
+  and "glass shattering" picked 15–25 s (glass at 14.8–17.8 s). "a dog barking" picked 10–20 s (the dog is at 0–11.8 s, so the overlap is only partial), and "crickets" picked 15–25 s
+  (crickets at 20.8–29.1 s). Window-level localisation is coarse.
+- `uv run pytest -q`: `46 passed` (window planning; WAV/FLAC/MP3 stereo decode to 16 kHz mono with seeks; corrupt audio rejected; mixed import with exact offsets
+  `(0,10),(5,15),(10,20),(13,23)`; duplicate reuse; originals untouched; idempotent re-import; cancellation mid-file leaves it pending and unsearchable;
+  compatible-profile re-key; API mixed library with image search unaffected)
+
+**Limitations:** indexing takes about 2 s per short clip on MPS. Timestamps are only as precise as the 10 s / 5 s windows. Decoding needs FFmpeg on PATH.
+
+**Gate:** PASSED. Real audio segments have finite embeddings and verified source offsets, and image search still works.
+
+**Next:** Phase 12, audio search and playback.
