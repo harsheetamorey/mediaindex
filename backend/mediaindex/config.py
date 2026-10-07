@@ -22,7 +22,8 @@ class Settings:
     device: str = os.environ.get("MEDIAINDEX_DEVICE", "auto")  # auto | mps | cpu
     precision: str = os.environ.get("MEDIAINDEX_PRECISION", "auto")  # auto | bfloat16 | float32
     job_queue_size: int = 8
-    query_wait_seconds: float = 30.0
+    query_wait_seconds: float = float(os.environ.get("MEDIAINDEX_QUERY_WAIT", "30"))
+    max_request_bytes: int = 60 * 1024 * 1024  # largest accepted upload (50 MB audio) + multipart overhead
     allowed_origins: tuple[str, ...] = (
         "http://127.0.0.1:5173",
         "http://localhost:5173",

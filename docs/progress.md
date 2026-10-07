@@ -20,6 +20,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 13 Cross-modal workspace | PASSED (experimental modes labelled) |
 | 14 Video ingestion and indexing | PASSED |
 | 15 Video-moment search and clip export | PASSED |
+| 16 Offline operation and robustness | PASSED |
 
 ---
 
@@ -504,3 +505,28 @@ similarity candidates, not synchronized audio. Retrieval was verified only on a 
 **Gate:** PASSED. Users can search, watch the retrieved window, and export a playable clip with a provenance manifest.
 
 **Next:** Phase 16, offline operation and robustness.
+
+---
+
+## Phase 16: Offline operation and robustness (2026-10-07)
+
+**Changes:** offline-by-default environment in `__main__` (HF offline and telemetry off), upload spool redirected into the data dir, `BodySizeLimitMiddleware`
+(413 before parsing), `MEDIAINDEX_QUERY_WAIT`, memory stats in `/api/model/status`, `-protocol_whitelist file,pipe` on all FFmpeg/ffprobe calls,
+`scripts/{offline_flow_check,run_with_socket_audit,concurrency_check,scale_check}.py`, tests (body limit, CORS/null origin, protocol whitelist),
+the `ui_check.py` label update, and **`docs/offline-and-robustness.md`** (full results).
+
+**Observed (details in the doc above)**
+- With outbound network denied by `sandbox-exec`: **all 13 media flows passed** on a fresh data dir, the browser UI flow passed with **no external requests or console errors**,
+  and the Python socket audit hook recorded **0** connect or DNS events. The only socket was 127.0.0.1:8765 LISTEN.
+- 20 concurrent searches gave all 200s and a single model instance. With a short wait budget during indexing, `503 model is busy`. Disk-full export onto a 4 MB RAM disk failed the one file
+  cleanly with no partials. Footprint was about 3.4 GB on MPS.
+- Exact search reached 22 ms median at 200k vectors, so no ANN or quantization was added.
+- `uv run pytest -q`: `72 passed`
+
+**Limitations:** the network block used a macOS sandbox profile, not a full firewall test. FFmpeg subprocesses were covered by the sandbox but not by the Python audit hook.
+Memory headroom on 8 GB is modest. Only tested on this M1 laptop.
+
+**Gate:** PASSED. All implemented media flows work offline on cached assets. The stability and security issues found (concurrent instances, unbounded request bodies,
+FFmpeg protocols, upload spooling) are fixed.
+
+**Next:** Phase 17, product-quality evaluation.

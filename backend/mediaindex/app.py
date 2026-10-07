@@ -25,7 +25,7 @@ from .store import Store
 from .model.backend import make_backend
 from .model.host import ModelHost
 from .model.profiles import IndexProfile
-from .security import LocalGuardMiddleware
+from .security import BodySizeLimitMiddleware, LocalGuardMiddleware
 
 
 class LibraryCreate(BaseModel):
@@ -76,6 +76,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
         allow_headers=["content-type"],
     )
     app.add_middleware(LocalGuardMiddleware, allowed_origins=settings.allowed_origins)
+    app.add_middleware(BodySizeLimitMiddleware, max_bytes=settings.max_request_bytes)
 
     @app.get("/api/health")
     def health() -> dict:

@@ -10,6 +10,7 @@ Usage: python scripts/ui_check.py --folder /abs/path --shots OUT_DIR [--skip-imp
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -79,7 +80,7 @@ def main() -> int:
         page.get_by_role("button", name="Use as reference").click()
         expect(page.locator(".dropzone .ref img")).to_be_visible()
         page.locator("#q").fill("")
-        expect(page.locator("label.mode")).to_have_text("Similar to reference image")
+        expect(page.locator("label.mode")).to_have_text(re.compile(r"Reference image → images"))
         page.get_by_role("button", name="Search").click()
         page.wait_for_function("document.querySelector('.results-head') !== null")
         page.wait_for_timeout(500)
@@ -89,7 +90,7 @@ def main() -> int:
 
         # refinement
         page.locator("#q").fill(a.refine)
-        expect(page.locator("label.mode")).to_have_text("Reference image + refinement text")
+        expect(page.locator("label.mode")).to_have_text(re.compile(r"Reference image \+ text → images"))
         with page.expect_response(lambda r: "/api/search/image-text" in r.url, timeout=120_000) as resp:
             page.get_by_role("button", name="Search").click()
         print("refinement response:", resp.value.status)
@@ -103,7 +104,7 @@ def main() -> int:
         page.get_by_label("Show technical scores").uncheck()
 
         # upload a reference file through the drop-zone file input
-        page.get_by_role("button", name="Remove reference image").click()
+        page.get_by_role("button", name="Remove reference").click()
         if a.folder:
             broken = Path(a.folder) / "broken.jpg"
             if broken.exists():  # error state: invalid upload must show a readable message
@@ -112,7 +113,7 @@ def main() -> int:
                 expect(page.locator(".results .banner.error")).to_be_visible(timeout=60_000)
                 print("invalid upload shows:", page.locator(".results .banner.error").inner_text())
                 page.screenshot(path=str(a.shots / "7-invalid-upload.png"))
-                page.get_by_role("button", name="Remove reference image").click()
+                page.get_by_role("button", name="Remove reference").click()
                 console_errors.clear()  # the expected 422 is logged by the browser
             files = sorted(p for p in Path(a.folder).iterdir()
                            if p.suffix.lower() in (".jpg", ".png", ".webp") and p.name != "broken.jpg")

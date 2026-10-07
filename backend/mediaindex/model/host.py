@@ -62,8 +62,22 @@ class ModelHost:
     def capabilities(self) -> dict[str, bool] | None:
         return self._backend.capabilities() if self._backend else None
 
+    def memory(self) -> dict:
+        import resource
+        import sys
+
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        out = {"process_peak_rss_mb": round(peak / (1024 * 1024 if sys.platform == "darwin" else 1024), 1)}
+        if getattr(self._backend, "device", None) == "mps":
+            import torch
+
+            out["mps_current_allocated_mb"] = round(torch.mps.current_allocated_memory() / 2**20, 1)
+            out["mps_driver_allocated_mb"] = round(torch.mps.driver_allocated_memory() / 2**20, 1)
+        return out
+
     def status(self) -> dict:
         return {
+            "memory": self.memory(),
             "loaded": self.loaded,
             "load_count": self.load_count,
             "load_seconds": self.load_seconds,
