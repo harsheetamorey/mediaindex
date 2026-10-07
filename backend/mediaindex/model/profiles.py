@@ -21,7 +21,8 @@ DOCUMENT_PROMPT = "title: none | text: "
 # scripts/audio_smoke.py): image and text vectors are bit-identical (max abs diff 0.0) whether or
 # not the audio encoder is loaded, so the loaded encoder set is a capability, not part of the key.
 # Audio windowing only changes which segments exist, not the space they live in.
-KEY_EXCLUDED_FIELDS = ("encoders", "audio_window_s", "audio_stride_s")
+KEY_EXCLUDED_FIELDS = ("encoders", "audio_window_s", "audio_stride_s", "video_window_s", "video_stride_s",
+                       "video_modalities")
 
 
 class ProfileMismatch(Exception):
@@ -37,6 +38,13 @@ class IndexProfile:
     encoders: tuple[str, ...] = ("text", "image", "audio")
     audio_window_s: float = 10.0
     audio_stride_s: float = 5.0
+    # Video: frames sampled at video_fps inside each window are passed as ONE native video input
+    # (vision encoder, video_max_soft_tokens per frame). fps/tokens change video vectors -> in the key.
+    video_fps: float = 1.0
+    video_max_soft_tokens: int = 140
+    video_window_s: float = 8.0
+    video_stride_s: float = 4.0
+    video_modalities: tuple[str, ...] = ("video-visual", "video-audio")  # add "video-joint" to also index joint
     image_max_soft_tokens: int = 280
     audio_sample_rate: int = 16000
     query_prompt: str = QUERY_PROMPT
@@ -54,6 +62,7 @@ class IndexProfile:
     def to_dict(self) -> dict:
         d = asdict(self)
         d["encoders"] = sorted(self.encoders)
+        d["video_modalities"] = sorted(self.video_modalities)
         d["extra"] = sorted([list(x) for x in self.extra])
         return d
 
@@ -74,6 +83,8 @@ class IndexProfile:
     def from_dict(cls, d: dict) -> "IndexProfile":
         d = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         d["encoders"] = tuple(d.get("encoders", ()))
+        if "video_modalities" in d:
+            d["video_modalities"] = tuple(d["video_modalities"])
         d["extra"] = tuple(tuple(x) for x in d.get("extra", ()))
         return cls(**d)
 

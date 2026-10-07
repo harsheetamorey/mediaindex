@@ -100,3 +100,69 @@ def make_audio_embedder(store: Store, host: ModelHost, batch_size: int = 4):
     embed_audio.profile_key = profile_key
     embed_audio.modality = "audio"
     return embed_audio
+
+
+def make_video_embedder(store: Store, host: ModelHost, thumbs_dir):
+    """Index overlapping video windows: native video (frames at profile.video_fps), the window's
+    audio track via the audio encoder, and optionally a joint video+audio embedding.
+
+    Visual vectors come from the model's native video input over the sampled frames; they are NOT an
+    average of per-frame image vectors. All windows/modalities of a file are written in one transaction.
+    """
+    from PIL import Image
+
+    from .ingest import window_thumb_path
+    from .media.audio import AudioRejected, decode_audio, plan_windows
+    from .media.images import write_thumbnail
+    from .media.video import sample_frames
+
+    profile = host.profile
+    key = profile.key
+    mods = set(profile.video_modalities)
+
+    def embed_video(item, ctx) -> dict:
+        reused_any = False
+        cached = {m: store.reusable_segments(item.content_hash, key, m) for m in mods}
+        if cached.get("video-visual") is not None:
+            with store.db.tx() as c:
+                for m, r in cached.items():
+                    if r is not None:
+                        store.write_embeddings(item.asset_id, key, m, r[0], segments=r[1],
+                                               source_hash=item.content_hash, c=c)
+            return {"reused": 1, "windows": len(cached["video-visual"][1])}
+        windows = plan_windows(item.info.duration, profile.video_window_s, profile.video_stride_s)
+        out: dict[str, list] = {m: [] for m in mods}
+        for s0, e0 in windows:
+            ctx.check_cancelled()
+            frames, times = sample_frames(item.path, item.info, s0, e0 - s0, fps=profile.video_fps)
+            tp = window_thumb_path(thumbs_dir, item.content_hash, s0)
+            if not tp.exists():
+                write_thumbnail(Image.fromarray(frames[len(frames) // 2]), tp)
+            wav = None
+            if item.info.has_audio and ({"video-audio", "video-joint"} & mods):
+                try:
+                    wav = decode_audio(item.path, start=s0, duration=e0 - s0)
+                except AudioRejected:
+                    wav = None
+            with host.use() as backend:
+                if "video-visual" in mods:
+                    out["video-visual"].append(backend.embed_video([frames], profile.video_fps)[0])
+                if "video-audio" in mods and wav is not None:
+                    out["video-audio"].append((s0, e0, backend.embed_audio([wav])[0]))
+                if "video-joint" in mods and wav is not None:
+                    out["video-joint"].append((s0, e0, backend.embed_video_audio(frames, profile.video_fps, wav)[0]))
+        with store.db.tx() as c:
+            if out.get("video-visual"):
+                store.write_embeddings(item.asset_id, key, "video-visual", np.vstack(out["video-visual"]),
+                                       segments=windows, source_hash=item.content_hash, mark_indexed=False, c=c)
+            for m in ("video-audio", "video-joint"):
+                if out.get(m):
+                    segs = [(a, b) for a, b, _ in out[m]]
+                    store.write_embeddings(item.asset_id, key, m, np.vstack([v for *_, v in out[m]]),
+                                           segments=segs, source_hash=item.content_hash, mark_indexed=False, c=c)
+            store.set_asset_status(item.asset_id, "indexed", None, c=c)
+        return {"embedded": 1, "windows": len(windows), "reused": int(reused_any)}
+
+    embed_video.profile_key = key
+    embed_video.modality = "video-visual"
+    return embed_video

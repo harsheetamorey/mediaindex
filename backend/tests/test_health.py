@@ -22,3 +22,15 @@ def test_rejects_foreign_host(tmp_path):
 def test_rejects_foreign_origin_on_mutation(tmp_path):
     r = make_client(tmp_path).post("/api/health", headers={"origin": "https://evil.example.com"})
     assert r.status_code == 403
+
+
+def test_single_instance_lock(tmp_path):
+    import pytest
+
+    from mediaindex.instance import AlreadyRunning, acquire_instance_lock
+
+    first = acquire_instance_lock(tmp_path)
+    with pytest.raises(AlreadyRunning):
+        acquire_instance_lock(tmp_path)
+    first.close()
+    acquire_instance_lock(tmp_path).close()  # released -> can be re-acquired

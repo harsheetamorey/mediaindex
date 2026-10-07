@@ -75,3 +75,18 @@ This verifies local-only loading. A test with outbound network blocked is deferr
   at startup instead of recomputed (`Store.rekey_compatible_profiles`).
 - Windowing: default 10 s windows with a 5 s stride (well under the 8,192-token limit of about 327 s at 25 tokens/s). Short clips get a single window.
   A shorter final window is aligned to the end of the file.
+
+## Video (verified 2026-10-07, Phase 14)
+- `scripts/video_smoke.py` (MPS bf16) on `scenes.mp4`, a 40 s generated demo with H.264 video and AAC audio:
+  - **A video input does not include its soundtrack.** `encode({"video": "scenes.mp4"})` and the same file with the audio stream removed give
+    **max abs diff 0.0**. The soundtrack must be embedded separately (audio encoder) or jointly (`{"video": ..., "audio": ...}`).
+  - Frames are passed as a native video input: `{"video": {"array": (T,H,W,3) uint8, "video_metadata": {"fps": 1.0, "total_num_frames": T,
+    "duration": T}}}` with `processing_kwargs={"video": {"max_soft_tokens": 140, "fps": 1.0}}`. One window gives one embedding.
+    The **native video vector differs from an average of per-frame image vectors** (mean cos 0.922), and MediaIndex never labels a frame average as video.
+  - Joint video+audio (`{"video": frames, "audio": wav}`) runs as one forward pass. On average it sits close to the visual vector (cos 0.984) and further from
+    audio-only (0.742).
+- MediaIndex indexing defaults: **8 s windows with a 4 s stride**, frames sampled at the centre of each 1 s slot (8 frames per window, accurate FFmpeg seek,
+  longest side ≤ 768 px), and a vision budget of 140 soft tokens per frame (**1,120 tokens per window**, or +200 audio tokens for joint).
+  Stored modalities: `video-visual` (native video), `video-audio` (the window's soundtrack via the audio encoder, only when the file has audio), and optionally
+  `video-joint` (`video_modalities` profile setting, off by default because it costs a third forward pass and mostly duplicates the visual vector).
+- MP4 container only. Video codecs h264/hevc/mpeg4/av1/vp9 pass the probe, but only H.264 was exercised. Other containers or codecs are rejected with a message.

@@ -35,6 +35,8 @@ def test_plan_windows():
     assert plan_windows(3.2, 10, 5) == [(0.0, 3.2)]
     assert plan_windows(10, 10, 5) == [(0.0, 10)]
     assert plan_windows(23, 10, 5) == [(0.0, 10.0), (5.0, 15.0), (10.0, 20.0), (13.0, 23.0)]
+    assert plan_windows(40.023, 8, 4)[-2:] == [(28.0, 36.0), (32.0, 40.023)]  # tiny tail extends last window
+    assert plan_windows(39.25, 10, 5)[-1] == (29.25, 39.25)
     w = plan_windows(3600, 10, 10)
     assert w[0] == (0.0, 10.0) and w[-1][1] == 3600 and len(w) == 360
 
