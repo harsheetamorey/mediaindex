@@ -19,6 +19,10 @@ class Settings:
     data_dir: Path = field(default_factory=_default_data_dir)
     host: str = "127.0.0.1"
     port: int = int(os.environ.get("MEDIAINDEX_PORT", "8765"))
+    device: str = os.environ.get("MEDIAINDEX_DEVICE", "auto")  # auto | mps | cpu
+    precision: str = os.environ.get("MEDIAINDEX_PRECISION", "auto")  # auto | bfloat16 | float32
+    job_queue_size: int = 8
+    query_wait_seconds: float = 30.0
     allowed_origins: tuple[str, ...] = (
         "http://127.0.0.1:5173",
         "http://localhost:5173",
@@ -45,3 +49,18 @@ class Settings:
     def ensure_dirs(self) -> None:
         for p in (self.data_dir, self.vectors_dir, self.thumbs_dir, self.uploads_dir):
             p.mkdir(parents=True, exist_ok=True)
+
+    def resolved_device(self) -> str:
+        if self.device != "auto":
+            return self.device
+        try:
+            import torch
+
+            return "mps" if torch.backends.mps.is_available() else "cpu"
+        except ImportError:
+            return "cpu"
+
+    def resolved_precision(self) -> str:
+        if self.precision != "auto":
+            return self.precision
+        return "bfloat16" if self.resolved_device() == "mps" else "float32"

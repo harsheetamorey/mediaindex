@@ -6,6 +6,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 |---|---|
 | 0 Repository and machine setup | PASSED |
 | 1 Real model compatibility | PASSED |
+| 2 Model adapter and execution worker | PASSED |
 
 ---
 
@@ -52,3 +53,31 @@ Sample images are macOS built-in pictures converted to JPEG under `data/` (not c
 **Gate:** PASSED: text, image and native image+text run with real weights, both online and with local-only loading.
 
 **Next:** Phase 2, model adapter and execution worker.
+
+---
+
+## Phase 2: Model adapter and execution worker (2026-10-07)
+
+**Changes:** `backend/mediaindex/model/{profiles,backend,host}.py`, `backend/mediaindex/jobs.py`, `app.py` (model status and job endpoints,
+clean shutdown in lifespan), `config.py` (device/precision settings), `backend/tests/test_worker.py`, `backend/tests/real/test_real_model.py`.
+
+**Design**
+- `GemmaBackend` exposes `embed_query_texts`, `embed_images` and `embed_image_text`, plus `capabilities()`. It uses the verified prompts from Phase 1,
+  re-normalizes in float32, and converts OOM to `ResourceError`. Native image+text runs as one forward pass. An unloaded encoder raises `CapabilityUnavailable`.
+- `ModelHost` holds exactly one backend per process. It loads lazily under a load lock, and an inference lock serializes all model use.
+  `use(timeout)` raises `ModelBusy` when the lock is not acquired in time.
+- `JobRunner` is a single background thread with a bounded queue (`QueueFull`), progress, and cancellation checked between work units.
+- `IndexProfile` is frozen and pins model id, revision, dim, precision, encoders, image token budget, prompts and normalization.
+  Its `key` is a SHA-256 of canonical JSON, and `ensure_compatible` raises `ProfileMismatch`.
+- The default profile is text+image encoders, bf16 on MPS and fp32 on CPU. `FakeBackend` is for unit tests only and requires explicit `MEDIAINDEX_FAKE_MODEL=1` at runtime.
+
+**Commands and observed results**
+- `uv run pytest -q`: `10 passed, 1 deselected` (mocked worker tests: single load under 8 concurrent requests, ModelBusy on timeout,
+  profile mismatch for precision/revision/dim/token budget/prompt, float16 rejected, job progress/cancel/failure, bounded queue)
+- `uv run pytest -m real_model -q`: `1 passed`. **REAL MODEL**: text, image and mixed on MPS bf16 with load_count == 1 after repeated requests, and repeated text embeddings were identical.
+
+**Limitations:** jobs live in memory until Phase 3 persists them. Indexing and query inference share one lock, so a query waits for at most one indexing batch.
+
+**Gate:** PASSED.
+
+**Next:** Phase 3, SQLite library and persistence.

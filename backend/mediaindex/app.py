@@ -3,20 +3,38 @@
 from __future__ import annotations
 
 import platform
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import Settings
+from .jobs import JobRunner
+from .model.backend import make_backend
+from .model.host import ModelHost
+from .model.profiles import IndexProfile
 from .security import LocalGuardMiddleware
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, backend_factory=None) -> FastAPI:
     settings = settings or Settings()
     settings.ensure_dirs()
-    app = FastAPI(title="MediaIndex", version=__version__)
+    profile = IndexProfile(precision=settings.resolved_precision())
+    factory = backend_factory or (lambda p: make_backend(p, device=settings.resolved_device()))
+    host = ModelHost(profile, factory)
+    runner = JobRunner(maxsize=settings.job_queue_size)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        yield
+        runner.shutdown()
+        host.shutdown()
+
+    app = FastAPI(title="MediaIndex", version=__version__, lifespan=lifespan)
     app.state.settings = settings
+    app.state.host = host
+    app.state.runner = runner
 
     app.add_middleware(
         CORSMiddleware,
@@ -34,5 +52,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "python": platform.python_version(),
             "platform": platform.platform(),
         }
+
+    @app.get("/api/model/status")
+    def model_status() -> dict:
+        return host.status()
+
+    @app.get("/api/jobs")
+    def list_jobs() -> list[dict]:
+        return [j.to_dict() for j in runner.list()]
+
+    @app.get("/api/jobs/{job_id}")
+    def get_job(job_id: str) -> dict:
+        job = runner.get(job_id)
+        if job is None:
+            raise HTTPException(404, "job not found")
+        return job.to_dict()
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    def cancel_job(job_id: str) -> dict:
+        job = runner.cancel(job_id)
+        if job is None:
+            raise HTTPException(404, "job not found")
+        return job.to_dict()
 
     return app
