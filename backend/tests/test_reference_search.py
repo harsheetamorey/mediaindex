@@ -81,3 +81,23 @@ def test_stale_upload_cleanup(tmp_path):
     (d / "x.jpg").write_bytes(b"1")
     assert uploads.cleanup_stale_uploads(d, max_age=0) == 1
     assert not any(d.iterdir())
+
+
+def test_mixed_query_native_and_validated(client):
+    c, root, settings, assets, before = client
+    ref = assets["img1.jpg"]
+    r = c.post("/api/search/image-text", data={"asset_id": ref["id"], "text": "at night"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["mode"] == "image+text" and "native" in body["query"]["embedding"]
+    assert "not an average" in body["query"]["interface"]
+    assert ref["id"] not in [x["asset"]["id"] for x in body["results"]]
+    # differs from image-only query (FakeBackend hashes image+text jointly)
+    img_only = c.post("/api/search/image", data={"asset_id": ref["id"]}).json()
+    assert [x["similarity"] for x in body["results"]] != [x["similarity"] for x in img_only["results"]]
+    assert c.post("/api/search/image-text", data={"asset_id": ref["id"], "text": "   "}).status_code == 422
+    assert c.post("/api/search/image-text", data={"asset_id": ref["id"]}).status_code == 422
+    assert c.post("/api/search/image-text", data={"text": "x"}).status_code == 422
+    r = c.post("/api/search/image-text", data={"text": "red"}, files={"file": ("q.jpg", jpeg_bytes("red"), "image/jpeg")})
+    assert r.status_code == 200 and r.json()["query"]["reference"] == "upload"
+    assert list(settings.uploads_dir.iterdir()) == []
