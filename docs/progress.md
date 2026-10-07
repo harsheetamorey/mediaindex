@@ -7,6 +7,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 0 Repository and machine setup | PASSED |
 | 1 Real model compatibility | PASSED |
 | 2 Model adapter and execution worker | PASSED |
+| 3 SQLite library and persistence | PASSED |
 
 ---
 
@@ -81,3 +82,34 @@ clean shutdown in lifespan), `config.py` (device/precision settings), `backend/t
 **Gate:** PASSED.
 
 **Next:** Phase 3, SQLite library and persistence.
+
+---
+
+## Phase 3: SQLite library and persistence (2026-10-07)
+
+**Changes:** `backend/mediaindex/db.py` (WAL connection, `PRAGMA user_version` migrations, serialized write transactions with full rollback),
+`backend/mediaindex/store.py` (libraries, assets, profiles, embeddings, jobs), app wiring (job persistence, interrupted-job recovery on startup),
+`backend/tests/test_store.py`.
+
+**Design**
+- Tables: `libraries`, `index_profiles`, `assets` (immutable UUID per (library, root-relative path), media type, size, mtime, sha256,
+  width/height/duration, status pending|indexed|failed|missing, error), `embeddings`, and `jobs`.
+- Vectors are float32 BLOBs in `embeddings` with explicit `id`, `asset_id`, `profile_key`, `modality`, `segment_index` and start/end seconds.
+  A write replaces an asset's vectors and sets `status='indexed'` **in one transaction**. Non-finite vectors are refused.
+- `load_matrix` returns `(embedding_ids, asset_ids, matrix)` built row by row from one query, so SQLite row order is never relied on.
+  It only includes `status='indexed'` assets under the requested profile.
+- When content changes (hash differs), old vectors are dropped and the asset returns to pending under the same ID. Identical content in different paths
+  gets separate asset rows, and vectors can be reused through `source_hash` + profile.
+- Removing an asset or a library deletes index rows only, never files. Library `generation` counters invalidate caches.
+- Recovery: on startup, jobs left `queued`/`running` become `interrupted`, and their assets stay `pending` (not searchable) until a re-import finishes.
+
+**Commands and observed results**
+- `uv run pytest -q`: `19 passed, 1 deselected`. Covers migration idempotence, restart identity, ID/vector alignment after out-of-order writes and deletes,
+  rollback after a NaN segment and after an exception mid-transaction (asset stays pending with no vectors), profile filtering,
+  content-change invalidation, duplicate reuse, original-file preservation, and interrupted-job recovery.
+
+**Limitations:** search loads every vector into memory per profile. That is fine for tens of thousands of images, and Phase 16 measures it.
+
+**Gate:** PASSED.
+
+**Next:** Phase 4, image import and thumbnails.

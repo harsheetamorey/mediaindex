@@ -10,7 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import Settings
+from .db import Database
 from .jobs import JobRunner
+from .store import Store
 from .model.backend import make_backend
 from .model.host import ModelHost
 from .model.profiles import IndexProfile
@@ -23,18 +25,32 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     profile = IndexProfile(precision=settings.resolved_precision())
     factory = backend_factory or (lambda p: make_backend(p, device=settings.resolved_device()))
     host = ModelHost(profile, factory)
-    runner = JobRunner(maxsize=settings.job_queue_size)
+    db = Database(settings.db_path)
+    store = Store(db)
+    store.register_profile(profile)
+    store.recover_interrupted_jobs()
+    job_libraries: dict[str, str | None] = {}
+
+    def persist_job(job) -> None:
+        store.save_job(job.to_dict(), job_libraries.get(job.id))
+
+    runner = JobRunner(maxsize=settings.job_queue_size, on_update=persist_job)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         yield
         runner.shutdown()
         host.shutdown()
+        db.close()
 
     app = FastAPI(title="MediaIndex", version=__version__, lifespan=lifespan)
     app.state.settings = settings
     app.state.host = host
     app.state.runner = runner
+    app.state.db = db
+    app.state.store = store
+    app.state.profile = profile
+    app.state.job_libraries = job_libraries
 
     app.add_middleware(
         CORSMiddleware,
@@ -64,9 +80,12 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     @app.get("/api/jobs/{job_id}")
     def get_job(job_id: str) -> dict:
         job = runner.get(job_id)
-        if job is None:
+        if job is not None:
+            return job.to_dict()
+        stored = store.get_job(job_id)  # jobs from earlier processes (e.g. 'interrupted')
+        if stored is None:
             raise HTTPException(404, "job not found")
-        return job.to_dict()
+        return stored
 
     @app.post("/api/jobs/{job_id}/cancel")
     def cancel_job(job_id: str) -> dict:
