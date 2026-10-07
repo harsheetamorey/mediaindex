@@ -1,0 +1,295 @@
+{
+ "name": "mediaindex-image-eval",
+ "version": 1,
+ "frozen": "2026-10-07",
+ "library": {
+  "dataset": "KoalaAI/StockImages-CC0",
+  "revision": "206f3575579f1187548c6f47042ae9174c0a51fc",
+  "manifest": "manifests/stockimages-cc0-500.json",
+  "count": 500
+ },
+ "protocol": {
+  "references": "drawn with random.Random(17017) from the 500-image pack; the reference asset and any identical-hash copies are excluded from its results",
+  "pool_depth": 10,
+  "relevance_scale": "0 = not relevant, 1 = partially relevant, 2 = clearly relevant (human judgement only)",
+  "dev_queries_excluded": "queries used while building phases 6-9 are listed in dev_queries and never scored"
+ },
+ "dev_queries": [
+  "waves crashing on a rocky beach",
+  "a city skyline at night",
+  "snowy mountains",
+  "close-up of a flower",
+  "a car on a road",
+  "a laptop on a desk",
+  "a zebra",
+  "a musical instrument",
+  "a bright yellow flower"
+ ],
+ "queries": [
+  {
+   "id": "T01",
+   "mode": "text",
+   "text": "a bridge over a river"
+  },
+  {
+   "id": "T02",
+   "mode": "text",
+   "text": "autumn leaves"
+  },
+  {
+   "id": "T03",
+   "mode": "text",
+   "text": "a person walking on a street"
+  },
+  {
+   "id": "T04",
+   "mode": "text",
+   "text": "a lighthouse"
+  },
+  {
+   "id": "T05",
+   "mode": "text",
+   "text": "a cup of coffee"
+  },
+  {
+   "id": "T06",
+   "mode": "text",
+   "text": "sand dunes in a desert"
+  },
+  {
+   "id": "T07",
+   "mode": "text",
+   "text": "a path through a forest"
+  },
+  {
+   "id": "T08",
+   "mode": "text",
+   "text": "a bird"
+  },
+  {
+   "id": "T09",
+   "mode": "text",
+   "text": "a boat on calm water"
+  },
+  {
+   "id": "T10",
+   "mode": "text",
+   "text": "a waterfall"
+  },
+  {
+   "id": "T11",
+   "mode": "text",
+   "text": "a tall building with many windows"
+  },
+  {
+   "id": "T12",
+   "mode": "text",
+   "text": "fog over hills"
+  },
+  {
+   "id": "T13",
+   "mode": "text",
+   "text": "a field of grass"
+  },
+  {
+   "id": "T14",
+   "mode": "text",
+   "text": "a wooden table"
+  },
+  {
+   "id": "T15",
+   "mode": "text",
+   "text": "a bare tree in winter"
+  },
+  {
+   "id": "T16",
+   "mode": "text",
+   "text": "stars in the night sky"
+  },
+  {
+   "id": "T17",
+   "mode": "text",
+   "text": "a mobile phone"
+  },
+  {
+   "id": "T18",
+   "mode": "text",
+   "text": "a horse"
+  },
+  {
+   "id": "T19",
+   "mode": "text",
+   "text": "raindrops"
+  },
+  {
+   "id": "T20",
+   "mode": "text",
+   "text": "a mountain reflected in a lake"
+  },
+  {
+   "id": "I01",
+   "mode": "image",
+   "reference": "stock-00123.jpg"
+  },
+  {
+   "id": "I02",
+   "mode": "image",
+   "reference": "stock-03486.jpg"
+  },
+  {
+   "id": "I03",
+   "mode": "image",
+   "reference": "stock-01601.jpg"
+  },
+  {
+   "id": "I04",
+   "mode": "image",
+   "reference": "stock-00182.jpg"
+  },
+  {
+   "id": "I05",
+   "mode": "image",
+   "reference": "stock-02000.jpg"
+  },
+  {
+   "id": "I06",
+   "mode": "image",
+   "reference": "stock-00148.jpg"
+  },
+  {
+   "id": "I07",
+   "mode": "image",
+   "reference": "stock-00167.jpg"
+  },
+  {
+   "id": "I08",
+   "mode": "image",
+   "reference": "stock-01602.jpg"
+  },
+  {
+   "id": "I09",
+   "mode": "image",
+   "reference": "stock-00143.jpg"
+  },
+  {
+   "id": "I10",
+   "mode": "image",
+   "reference": "stock-02431.jpg"
+  },
+  {
+   "id": "I11",
+   "mode": "image",
+   "reference": "stock-01617.jpg"
+  },
+  {
+   "id": "I12",
+   "mode": "image",
+   "reference": "stock-02087.jpg"
+  },
+  {
+   "id": "I13",
+   "mode": "image",
+   "reference": "stock-02430.jpg"
+  },
+  {
+   "id": "I14",
+   "mode": "image",
+   "reference": "stock-02425.jpg"
+  },
+  {
+   "id": "I15",
+   "mode": "image",
+   "reference": "stock-02407.jpg"
+  },
+  {
+   "id": "M01",
+   "mode": "image+text",
+   "reference": "stock-02012.jpg",
+   "text": "at night"
+  },
+  {
+   "id": "M02",
+   "mode": "image+text",
+   "reference": "stock-02401.jpg",
+   "text": "in winter with snow"
+  },
+  {
+   "id": "M03",
+   "mode": "image+text",
+   "reference": "stock-01607.jpg",
+   "text": "as a black and white photo"
+  },
+  {
+   "id": "M04",
+   "mode": "image+text",
+   "reference": "stock-00129.jpg",
+   "text": "near water"
+  },
+  {
+   "id": "M05",
+   "mode": "image+text",
+   "reference": "stock-02402.jpg",
+   "text": "at sunset"
+  },
+  {
+   "id": "M06",
+   "mode": "image+text",
+   "reference": "stock-00121.jpg",
+   "text": "with people"
+  },
+  {
+   "id": "M07",
+   "mode": "image+text",
+   "reference": "stock-01648.jpg",
+   "text": "in a forest"
+  },
+  {
+   "id": "M08",
+   "mode": "image+text",
+   "reference": "stock-03481.jpg",
+   "text": "from above"
+  },
+  {
+   "id": "M09",
+   "mode": "image+text",
+   "reference": "stock-00187.jpg",
+   "text": "with a road"
+  },
+  {
+   "id": "M10",
+   "mode": "image+text",
+   "reference": "stock-00118.jpg",
+   "text": "in fog"
+  },
+  {
+   "id": "M11",
+   "mode": "image+text",
+   "reference": "stock-01621.jpg",
+   "text": "with flowers"
+  },
+  {
+   "id": "M12",
+   "mode": "image+text",
+   "reference": "stock-01659.jpg",
+   "text": "in a city"
+  },
+  {
+   "id": "M13",
+   "mode": "image+text",
+   "reference": "stock-02491.jpg",
+   "text": "with mountains in the background"
+  },
+  {
+   "id": "M14",
+   "mode": "image+text",
+   "reference": "stock-00119.jpg",
+   "text": "close up"
+  },
+  {
+   "id": "M15",
+   "mode": "image+text",
+   "reference": "stock-01625.jpg",
+   "text": "with the sea"
+  }
+ ]
+}
