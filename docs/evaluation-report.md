@@ -4,13 +4,13 @@ Run: `evaluation/runs/20261007T090550Z_3e76b03f5fdbe69e.json` · profile `3e76b0
 
 ## Relevance metrics (human labels only)
 
-Label coverage: **0/50 queries have any labels, 0/50 have a fully judged pool** (pool = union of top-10 results across runs; 500 candidates).
+Label coverage: **23/50 queries have any labels, 23/50 have a fully judged pool** (pool = union of top-10 results across runs; 500 candidates).
 
 | Mode | Queries | Hit@1 | Hit@5 | Recall@5 (pool-relative) | nDCG@10 |
 |---|---|---|---|---|---|
-| text | 20 | PENDING (no labelled queries) | PENDING (no labelled queries) | PENDING (no labelled queries) | PENDING (no labelled queries) |
+| text | 20 | 0.900 (n=20, excluded 0) | 0.950 (n=20, excluded 0) | 0.632 (n=19, excluded 1) | 0.916 (n=19, excluded 1) |
 | image | 15 | PENDING (no labelled queries) | PENDING (no labelled queries) | PENDING (no labelled queries) | PENDING (no labelled queries) |
-| image+text | 15 | PENDING (no labelled queries) | PENDING (no labelled queries) | PENDING (no labelled queries) | PENDING (no labelled queries) |
+| image+text | 15 | 0.667 (n=3, excluded 12) | 1.000 (n=3, excluded 12) | 0.447 (n=3, excluded 12) | 0.874 (n=3, excluded 12) |
 
 Rules: a candidate without a human label is *unknown*, not irrelevant. Hit@k is computed only when decidable (a labelled relevant item is in the top k, or the whole top k is labelled). Recall@5 and nDCG@10 are computed only for queries whose whole pool is judged, and recall is relative to that pool, so it overstates recall when relevant items exist outside the pool. Relevant means grade ≥ 1; nDCG uses graded gains 2^g − 1. Similarity scores are never used as relevance.
 
