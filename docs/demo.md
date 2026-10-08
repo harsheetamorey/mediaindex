@@ -2,7 +2,7 @@
 
 Everything shown uses the traceable demo packs only: 500 publisher-declared CC0 stock photos, 60 CC0 FSD50K sounds, and a 40 s
 video generated locally from both packs. Every result named below is an **actual output** of the walkthrough run on 2026-10-07
-(Apple M1, 8 GB, MPS bf16). These are single examples, not evidence of retrieval quality. Relevance metrics are still pending human labels.
+(Apple M1, 8 GB, MPS bf16). These are single examples, not evidence of retrieval quality. Measured text→image quality is in `docs/evaluation-report.md` (20 labelled queries).
 
 ## 1. Launch and reset (exact commands)
 ```bash

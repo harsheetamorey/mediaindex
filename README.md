@@ -8,7 +8,7 @@ Embeddings come from [google/embeddinggemma-2](https://huggingface.co/google/emb
 running locally. MediaIndex is an independent project. It is not a fork of Oxford's WISE.
 
 > **Status:** Version 1 (image search) plus audio, cross-media and video-moment search. Verification evidence for every phase is in
-> [`docs/progress.md`](docs/progress.md). Retrieval-quality metrics are **pending human relevance labels** (see [Evaluation](#evaluation)).
+> [`docs/progress.md`](docs/progress.md). Text→image search: Hit@1 0.90 and nDCG@10 0.92 on 20 human-labelled queries. Other image modes are only partly labelled (see [Evaluation](#evaluation)).
 
 ![MediaIndex searching the CC0 demo pack](docs/assets/screenshot-search.png)
 
@@ -89,7 +89,8 @@ Precision follows the model card: bfloat16 on MPS, float32 on CPU, **never float
 
 ## Evaluation
 A frozen 50-query image evaluation (20 text, 15 image, 15 image+text) with a local human-labelling page lives in `evaluation/`
-([`docs/evaluation.md`](docs/evaluation.md)). **No relevance metrics are reported yet**, because the labels must come from a person. On the Clotho
+([`docs/evaluation.md`](docs/evaluation.md)). With human labels (one labeller, demo pack): **text → images Hit@1 0.90, Hit@5 0.95, nDCG@10 0.92 (20 queries)**. Image+text has only 3 labelled queries,
+and image → image is unlabelled. Misses included "stars in the night sky", where none of the top 10 were relevant ([report](docs/evaluation-report.md)). On the Clotho
 text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-CLAP model: R@10 is 0.18 vs 0.50, and CLAP may benefit from training overlap
 ([`docs/model-comparison.md`](docs/model-comparison.md)).
 

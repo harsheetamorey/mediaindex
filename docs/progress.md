@@ -21,7 +21,7 @@ The phases follow `mediaindex-claude-build-guide.md`. A gate is marked passed on
 | 14 Video ingestion and indexing | PASSED |
 | 15 Video-moment search and clip export | PASSED |
 | 16 Offline operation and robustness | PASSED |
-| 17 Product-quality evaluation | PASSED (harness + performance); relevance metrics PENDING human labels |
+| 17 Product-quality evaluation | PASSED; text→image metrics measured (20 labelled queries), other modes partly pending |
 
 ---
 
@@ -557,6 +557,14 @@ FFmpeg protocols, upload spooling) are fixed.
 **Pending (needs a human):** label the pool with `evaluation/label_server.py`, then rerun `report.py`. Until then this phase reports **no retrieval quality numbers**.
 
 **Gate:** PASSED as specified. The evaluation tools are executable, the performance numbers are measured, and the report states its label coverage honestly with relevance metrics explicitly pending.
+
+**Update (2026-10-07, human labels):** one person (the maintainer) labelled all 20 text queries and 3 image+text queries (M13–M15) with
+`evaluation/label_server.py`. `uv run python evaluation/report.py` gives:
+- text → images: Hit@1 **0.900**, Hit@5 **0.950**, Recall@5 (pool-relative) 0.632, nDCG@10 **0.916**. n = 20; recall and nDCG use 19, because T16 has no relevant item in its pool.
+- image+text: Hit@1 0.667, nDCG@10 0.874, n = 3 only (too few to generalise). image → image: still pending (0/15).
+- Misses: T16 "stars in the night sky" (nothing relevant in the top 10) and T20 "a mountain reflected in a lake" (#1 not relevant).
+  For rare concepts ("a mobile phone", "a horse"), only #1 was relevant.
+- Caveats: one labeller, a small pool (top 10 per query), and the demo pack only. No inter-annotator agreement was measured.
 
 **Next:** Phase 18, optional specialist-model comparison.
 

@@ -29,5 +29,5 @@ This checklist prepares a release. **Publishing (tags, GitHub releases, announce
 
 ## Documentation accuracy
 - [x] README quick start, formats, query modes (verified vs experimental), hardware numbers, troubleshooting, limitations
-- [x] Retrieval-quality metrics are marked **pending human labels** and no numbers are claimed
+- [x] Retrieval metrics come from human labels only, with coverage stated: text 20/20 queries, image+text 3/15, image 0/15
 - [x] Untested platforms stated (Linux, Windows, Intel Macs, NVIDIA GPUs)

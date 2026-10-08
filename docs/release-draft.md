@@ -23,7 +23,8 @@ What works (verified on an Apple M1, 8 GB, macOS 14):
 Speed (8 GB M1): indexing is precomputed and slow (about 1.8 s per image, about 13 s per 8 s video window). Queries are fast: text embedding is about 40 ms, and exact ranking
 of 600 vectors is 0.1 ms. An image reference query takes about 1.8 s.
 
-Known limitations: image retrieval quality has **not** been measured yet (the human relevance labels are pending). On the Clotho text→audio benchmark,
+Measured quality (human labels, one labeller, 500-image demo pack): text → images Hit@1 0.90, Hit@5 0.95, nDCG@10 0.92 over 20 queries.
+Image → image and most image+text queries are not labelled yet. Known limitations: On the Clotho text→audio benchmark,
 EmbeddingGemma 2 scores well below the specialist CLAP model (R@10 0.18 vs 0.50). Refinement text is a soft steer, not
 a filter, and negation is not understood. Video moments are 8 s windows. Tested only on macOS 14 with Apple silicon.
 The model weights (about 1.5 GB) are downloaded once at setup and are not redistributed.
@@ -52,7 +53,7 @@ Demo: see `docs/demo.md` (`scripts/demo.sh reset|start|setup`, `scripts/demo_wal
 | Cross-media (image ↔ sound, sound + text, moment → sounds) | Experimental, labelled in the UI |
 | Video (MP4) windows, text → moment, moment → moment, clip export | Done, verified (H.264/AAC tested) |
 | Offline operation and robustness | Verified under a network-blocking sandbox |
-| Retrieval-quality metrics (Phase 17) | Tools done. **Metrics pending human labels** |
+| Retrieval-quality metrics (Phase 17) | Text → images measured (20 queries, Hit@1 0.90). Image+text 3/15 labelled, image → image 0/15 |
 | EmbeddingGemma vs CLAP benchmark (Phase 18) | Done (audio). EmbeddingGemma R@10 0.18 vs CLAP 0.50 on Clotho. Image comparison skipped |
 | Narrated demo video | **Not recorded.** Storyboard, scripts, stills and a silent 39 s rough cut are ready |
 | Native folder picker, Linux/Windows support, non-MP4 video | Planned / untested |
