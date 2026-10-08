@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 import platform
+import subprocess
+import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -26,11 +29,24 @@ from .model.backend import make_backend
 from .model.host import ModelHost
 from .model.profiles import IndexProfile
 from .security import BodySizeLimitMiddleware, LocalGuardMiddleware
+from .watch import FolderWatcher
 
 
 class LibraryCreate(BaseModel):
     path: str
     name: str | None = None
+
+
+class LibraryPatch(BaseModel):
+    watch: bool | None = None
+
+
+class AppSettingsPatch(BaseModel):
+    low_priority_indexing: bool | None = None
+
+
+PICK_FOLDER_SCRIPT = ['tell me to activate',
+                      'POSIX path of (choose folder with prompt "Choose a media folder for MediaIndex")']
 
 
 def create_app(settings: Settings | None = None, backend_factory=None) -> FastAPI:
@@ -48,11 +64,16 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     def persist_job(job) -> None:
         store.save_job(job.to_dict(), job.library_id)
 
-    runner = JobRunner(maxsize=settings.job_queue_size, on_update=persist_job)
+    runner = JobRunner(maxsize=settings.job_queue_size, on_update=persist_job,
+                       low_priority=store.get_setting("low_priority_indexing", "0") == "1")
+    watcher = FolderWatcher(store, lambda lid: submit_import(lid), interval=settings.watch_interval)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if settings.watch_interval > 0:
+            watcher.start()
         yield
+        watcher.stop()
         runner.shutdown()
         host.shutdown()
         db.close()
@@ -61,6 +82,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     app.state.settings = settings
     app.state.host = host
     app.state.runner = runner
+    app.state.watcher = watcher
     app.state.db = db
     app.state.store = store
     app.state.profile = profile
@@ -125,6 +147,40 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
             raise HTTPException(400, str(e))
         return store.create_library(body.name or root.name, root)
 
+    @app.patch("/api/libraries/{library_id}")
+    def patch_library(library_id: str, body: LibraryPatch) -> dict:
+        if not store.get_library(library_id):
+            raise HTTPException(404, "library not found")
+        if body.watch is not None:
+            store.set_library_watch(library_id, body.watch)
+        return store.get_library(library_id)
+
+    @app.post("/api/pick-folder")
+    def pick_folder() -> dict:
+        """Show the native macOS folder chooser on this computer and return the chosen absolute path."""
+        if sys.platform != "darwin":
+            raise HTTPException(501, "the folder chooser is only available on macOS; paste the folder path instead")
+        cmd = ["osascript"] + [a for line in PICK_FOLDER_SCRIPT for a in ("-e", line)]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        except subprocess.TimeoutExpired:
+            return {"cancelled": True}
+        if r.returncode != 0:  # -128 = user cancelled
+            return {"cancelled": True}
+        path = r.stdout.strip()
+        return {"cancelled": False, "path": path.rstrip("/") or path}
+
+    @app.get("/api/settings")
+    def get_settings() -> dict:
+        return {"low_priority_indexing": runner.low_priority, "watch_interval_s": settings.watch_interval}
+
+    @app.patch("/api/settings")
+    def patch_settings(body: AppSettingsPatch) -> dict:
+        if body.low_priority_indexing is not None:
+            store.set_setting("low_priority_indexing", "1" if body.low_priority_indexing else "0")
+            runner.low_priority = body.low_priority_indexing
+        return get_settings()
+
     @app.delete("/api/libraries/{library_id}")
     def delete_library(library_id: str) -> dict:
         if not store.get_library(library_id):
@@ -135,10 +191,8 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     def _embed_batch_factory():
         return app.state.embed_batch if hasattr(app.state, "embed_batch") else None
 
-    @app.post("/api/libraries/{library_id}/import")
-    def import_library(library_id: str) -> dict:
-        if not store.get_library(library_id):
-            raise HTTPException(404, "library not found")
+    def submit_import(library_id: str):
+        """Queue an import for a library unless one is already queued or running (shared by API and watcher)."""
         for j in runner.list():
             if j.kind == "import" and j.library_id == library_id and j.status in ("queued", "running"):
                 return j.to_dict()
@@ -147,11 +201,16 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
             return run_image_import(ctx, store, settings.thumbs_dir, library_id, _embed_batch_factory(),
                                     embed_audio=app.state.embed_audio, embed_video=app.state.embed_video)
 
+        return runner.submit("import", fn, library_id=library_id).to_dict()
+
+    @app.post("/api/libraries/{library_id}/import")
+    def import_library(library_id: str) -> dict:
+        if not store.get_library(library_id):
+            raise HTTPException(404, "library not found")
         try:
-            job = runner.submit("import", fn, library_id=library_id)
+            return submit_import(library_id)
         except QueueFull as e:
             raise HTTPException(503, str(e))
-        return job.to_dict()
 
     @app.get("/api/libraries/{library_id}/assets")
     def library_assets(library_id: str, status: str | None = None, media_type: str | None = None) -> list[dict]:
@@ -227,7 +286,7 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     return app
 
 
-FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+FRONTEND_DIST = Path(os.environ.get("MEDIAINDEX_UI_DIR") or Path(__file__).resolve().parents[2] / "frontend" / "dist")
 CSP = ("default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; "
        "script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; "
        "base-uri 'none'; form-action 'self'")

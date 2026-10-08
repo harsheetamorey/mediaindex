@@ -100,6 +100,14 @@ MIGRATIONS: list[str] = [
     CREATE UNIQUE INDEX sel_item_unique ON selection_items(selection_id, asset_id, IFNULL(start_s, -1), IFNULL(end_s, -1));
     CREATE INDEX sel_item_order ON selection_items(selection_id, position);
     """,
+    # v3: watched folders and app preferences
+    """
+    ALTER TABLE libraries ADD COLUMN watch INTEGER NOT NULL DEFAULT 0;
+    CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    """,
 ]
 
 

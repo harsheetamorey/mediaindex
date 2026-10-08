@@ -10,14 +10,40 @@ type Props = {
   onImport: (id: string) => void
   onCancel: (jobId: string) => void
   onRemove: (id: string) => void
+  onWatch: (id: string, watch: boolean) => void
+  onPickFolder: () => Promise<string | null>
+  lowPriority: boolean
+  onLowPriority: (on: boolean) => void
   footer?: React.ReactNode
 }
 
-export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, onImport, onCancel, onRemove, footer }: Props) {
+export function fmtEta(s: number | null | undefined): string {
+  if (s == null) return ''
+  if (s < 60) return ' · under a minute left'
+  const m = Math.round(s / 60)
+  return m < 60 ? ` · about ${m} min left` : ` · about ${Math.floor(m / 60)} h ${m % 60} min left`
+}
+
+export default function Sidebar(props: Props) {
+  const { libraries, selected, jobs, onToggle, onAdd, onImport, onCancel, onRemove, onWatch, footer } = props
   const [adding, setAdding] = useState(false)
   const [path, setPath] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
+
+  const choose = async () => {
+    setPicking(true)
+    setError(null)
+    try {
+      const p = await props.onPickFolder()
+      if (p) setPath(p)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPicking(false)
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,18 +71,20 @@ export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, on
 
       {adding && (
         <form className="add-form" onSubmit={submit}>
+          <button type="button" className="btn" onClick={choose} disabled={picking}>
+            {picking ? 'Waiting for the folder window…' : 'Choose folder…'}
+          </button>
           <label htmlFor="lib-path">Folder path</label>
           <input
             id="lib-path"
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="/Users/you/Pictures/project"
-            autoFocus
             spellCheck={false}
           />
           <p className="hint">
-            Browsers can't hand a folder to a local app, so paste the folder's full path. In Finder, select the folder and press
-            ⌥⌘C. MediaIndex only reads that folder. Your files are never moved, changed or uploaded.
+            Choose a folder, or paste its full path (in Finder: select it and press ⌥⌘C). MediaIndex only reads that folder.
+            Your files are never moved, changed or uploaded.
           </p>
           {error && <p className="error" role="alert">{error}</p>}
           <button className="btn primary" disabled={!path.trim() || busy}>
@@ -91,7 +119,7 @@ export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, on
                     <div className="fill" style={{ width: `${pct}%` }} />
                   </div>
                   <span>
-                    {job.status === 'queued' ? 'Queued' : `Indexing ${job.done}/${job.total}`}
+                    {job.status === 'queued' ? 'Queued' : `Indexing ${job.done}/${job.total}${fmtEta(job.eta_seconds)}`}
                   </span>
                   <button className="link" onClick={() => onCancel(job.id)}>Cancel</button>
                 </div>
@@ -104,6 +132,10 @@ export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, on
               {job && job.status === 'done' && job.result && (
                 <ImportSummary result={job.result} />
               )}
+              <label className="lib-watch small" title="Re-scan automatically when files are added, changed or removed">
+                <input type="checkbox" checked={!!lib.watch} onChange={(e) => onWatch(lib.id, e.target.checked)} />
+                Watch for changes
+              </label>
               <div className="lib-actions">
                 <button className="link" onClick={() => onImport(lib.id)} disabled={!!active}>
                   {lib.asset_count ? 'Re-scan' : 'Import'}
@@ -121,6 +153,12 @@ export default function Sidebar({ libraries, selected, jobs, onToggle, onAdd, on
           )
         })}
       </ul>
+      {libraries.length > 0 && (
+        <label className="lib-watch small pad" title="Indexing yields CPU and disk to other apps. It may take longer.">
+          <input type="checkbox" checked={props.lowPriority} onChange={(e) => props.onLowPriority(e.target.checked)} />
+          Index gently in the background (low priority)
+        </label>
+      )}
       {footer}
     </aside>
   )

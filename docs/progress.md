@@ -633,3 +633,37 @@ Nothing was posted or released.
 
 **Gate:** PASSED for the deliverables. A newcomer can reset, launch, index and replay the demo scenario with the documented commands, and
 every feature's status is stated truthfully in `docs/release-draft.md`.
+
+---
+
+## After Phase 20: Mac app and creator features (2026-10-08)
+
+**Changes:**
+- Desktop and packaging: `backend/mediaindex/desktop.py` (native window via pywebview, in-process server, first-run model download
+  page, free-port fallback, Homebrew `PATH` for FFmpeg, quits when the window closes); `packaging/macos/`, `scripts/build_mac_app.sh`,
+  and the optional `app` extra.
+- Folders and indexing: `watch.py` (watched folders), `POST /api/pick-folder` (native macOS chooser), `PATCH /api/libraries/{id}`
+  (watch), `GET/PATCH /api/settings` (low-priority indexing), job `eta_seconds`, and migration v3.
+- Exports: `finder_tags.py` adds Finder tags to exported copies and clips.
+- UI and tests: the sidebar gains **Choose folder…**, **Watch for changes**, the time estimate and the low-priority switch.
+  New tests are in `backend/tests/test_creator_features.py`. Docs: `docs/desktop-app.md`.
+
+**Observed (REAL MODEL, M1 8 GB):**
+- `dist-app/MediaIndex.app` (813 MB), launched with a Finder-style environment (`env -i`, minimal `PATH`): the window loaded the UI and
+  a search returned the expected top images.
+- It indexed an image, a FLAC sound and an MP4 video, so FFmpeg was found, and "a dog barking" returned the dog clip.
+- First launch with an empty model cache: "Download the model" fetched the pinned revision in 155 s, then the app opened and searched.
+- It quits within 10 s of the window closing, even with a browser connection held open. (Bug found and fixed: it previously stayed
+  running.)
+- Watched folder: 12 new images were detected within about 5 s and indexed automatically. The time estimate showed during indexing.
+- Low priority: 12 new images took 37 s instead of 22 s (two repeats each). Batch size 1, 2, 4 and 8 gave 0.52–0.57 images/s, so there
+  was no speed-up and the batch size was not changed.
+- Finder tags: `mdls` and `mdfind` see "MediaIndex" plus the selection name on exported copies. Originals are untagged.
+- Folder chooser: verified by the maintainer by hand (picked ~/Pictures, and the path filled in). It found 0 files because Pictures only
+  holds the macOS-protected Photos library.
+- `uv run pytest -q`: `83 passed, 1 deselected`
+
+**Removed:** dragging results out of the browser. It relies on browser downloads, and on the test Mac managed Chrome blocks downloads,
+which left empty files. It also can't work in the app window.
+
+**Limitations:** the app is unsigned and not notarized. Sound and video need FFmpeg. Premiere Pro, Final Cut Pro and Canva are untested.

@@ -21,8 +21,8 @@ class Ctx(JobContext):
         super().__init__(Job(id="t", kind="import"), None)
         self.cancel_after = cancel_after
 
-    def progress(self, done, total=None, message=None):
-        super().progress(done, total, message)
+    def progress(self, done, total=None, message=None, work=True):
+        super().progress(done, total, message, work)
         if self.cancel_after is not None and done >= self.cancel_after:
             self.job._cancel.set()
 
