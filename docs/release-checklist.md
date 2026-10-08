@@ -8,7 +8,7 @@ This checklist prepares a release. **Publishing (tags, GitHub releases, announce
 - [x] `cd frontend && npm run build && npx oxlint src`: builds, no lint errors
 - [x] Clean setup from a fresh clone (`uv sync --frozen`, `npm ci`, build, tests). See the Phase 19 notes in `docs/progress.md`
 - [x] CI workflow `.github/workflows/ci.yml`: unit tests plus UI build on macOS arm64, with an opt-in real-model job (manual dispatch)
-- [ ] CI run observed green on GitHub (requires the workflow to be pushed and run by the repository owner)
+- [x] CI run observed green on GitHub (unit tests + UI build on macOS arm64; real-model job runs only on manual dispatch)
 
 ## Privacy and safety
 - [x] Offline operation verified with outbound network blocked (`docs/offline-and-robustness.md`)

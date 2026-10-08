@@ -68,4 +68,4 @@ Tested: Apple M1, 8 GB, macOS 14.0, MPS bf16 (about 3.5 GB peak footprint). CPU 
 - Text→sound retrieval is weak on Clotho (R@10 0.18, CLAP 0.50; see docs/model-comparison.md).
 - Uneven retrieval: glass and door sounds are missed, "hub" images appear for many sound queries, style refinements ("black and white") can be ignored, and negation fails.
 - Indexing is slow on 8 GB machines (video at about 1.6× real time). Heavy indexing can make queries wait (503 after `MEDIAINDEX_QUERY_WAIT`).
-- Folders are added by pasting a path. CI has not yet been seen running on GitHub. Two oxlint warnings (`set-state-in-effect`) remain.
+- Folders are added by pasting a path. Two oxlint warnings (`set-state-in-effect`) remain.

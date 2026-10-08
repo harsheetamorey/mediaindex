@@ -598,7 +598,7 @@ FFmpeg protocols, upload spooling) are fixed.
 - Fresh-clone check (after the `.gitignore` fix): `uv sync --frozen`, `npm ci`, build and tests passed.
 - `git ls-files` audit: no media, databases, weights or `data/`, and no private absolute paths.
 
-**Not verified:** CI has not yet been seen running on GitHub.
+**CI:** green on GitHub for every push since Phase 19 (unit tests + UI build; the real-model job is manual-only).
 
 **Gate:** PASSED. Release files and docs are complete, and the checklist states what remains open. Nothing was published.
 
