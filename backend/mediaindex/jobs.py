@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import queue
 import threading
 import time
@@ -33,17 +34,38 @@ class Job:
     created: float = field(default_factory=time.time)
     finished: float | None = None
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
+    _work_started: float | None = field(default=None, repr=False)  # first unit of real work (skips excluded)
+    _work_units: int = field(default=0, repr=False)
+
+    def eta_seconds(self) -> float | None:
+        """Rough remaining time from the rate of real work so far (unchanged files are not counted as work)."""
+        if self.status != "running" or not self._work_started or self._work_units < 3 or not self.total:
+            return None
+        elapsed = time.time() - self._work_started
+        return max(0.0, elapsed / self._work_units * max(0, self.total - self.done))
 
     def to_dict(self) -> dict:
-        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        d = {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+        eta = self.eta_seconds()
+        d["eta_seconds"] = round(eta) if eta is not None else None
+        return d
 
 
 class JobContext:
-    def __init__(self, job: Job, on_update: Callable[[Job], None] | None):
+    def __init__(self, job: Job, on_update: Callable[[Job], None] | None, before_unit: Callable[[], None] | None = None):
         self.job = job
         self._on_update = on_update
+        self._before_unit = before_unit
 
-    def progress(self, done: int, total: int | None = None, message: str | None = None) -> None:
+    def progress(self, done: int, total: int | None = None, message: str | None = None, work: bool = True) -> None:
+        """Report progress. work=False marks a cheap step (e.g. an unchanged file) that the ETA should ignore."""
+        if self._before_unit:
+            self._before_unit()
+        if work and done > self.job.done:
+            if self.job._work_started is None:
+                self.job._work_started = time.time()
+            else:
+                self.job._work_units += done - self.job.done
         self.job.done = done
         if total is not None:
             self.job.total = total
@@ -64,11 +86,24 @@ class JobContext:
 JobFn = Callable[[JobContext], dict | None]
 
 
+def _set_thread_background(background: bool) -> bool:
+    """macOS: run the calling thread at background QoS (lower CPU and I/O priority). No-op elsewhere."""
+    if not hasattr(os, "PRIO_DARWIN_THREAD"):
+        return False
+    try:
+        os.setpriority(os.PRIO_DARWIN_THREAD, 0, os.PRIO_DARWIN_BG if background else 0)
+        return True
+    except OSError:
+        return False
+
+
 class JobRunner:
-    def __init__(self, maxsize: int = 8, on_update: Callable[[Job], None] | None = None):
+    def __init__(self, maxsize: int = 8, on_update: Callable[[Job], None] | None = None, low_priority: bool = False):
         self._q: queue.Queue[tuple[Job, JobFn] | None] = queue.Queue(maxsize=maxsize)
         self._jobs: dict[str, Job] = {}
         self._on_update = on_update
+        self.low_priority = low_priority  # read by the worker thread before each unit of work
+        self._applied_priority: bool | None = None
         self._lock = threading.Lock()
         self._thread = threading.Thread(target=self._loop, name="mediaindex-jobs", daemon=True)
         self._thread.start()
@@ -118,9 +153,10 @@ class JobRunner:
             if job._cancel.is_set():
                 continue
             job.status = "running"
+            self._sync_priority()
             self._notify(job)
             try:
-                job.result = fn(JobContext(job, self._on_update)) or {}
+                job.result = fn(JobContext(job, self._on_update, before_unit=self._sync_priority)) or {}
                 job.status = "cancelled" if job._cancel.is_set() else "done"
             except JobCancelled:
                 job.status = "cancelled"
@@ -129,6 +165,12 @@ class JobRunner:
                 job.error = f"{type(e).__name__}: {e}"
             job.finished = time.time()
             self._notify(job)
+
+    def _sync_priority(self) -> None:
+        """Called on the worker thread: apply a changed low-priority setting between work units."""
+        if self._applied_priority != self.low_priority:
+            _set_thread_background(self.low_priority)
+            self._applied_priority = self.low_priority
 
     def shutdown(self, timeout: float = 10.0) -> None:
         for job in self.list():

@@ -26,8 +26,13 @@ MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python scripts/model_smoke.py --images data/s
 uv run python -m mediaindex                     # open http://127.0.0.1:8765
 ```
 
-In the app, click **+ Add folder** and paste the folder's absolute path (in Finder, select the folder and press ⌥⌘C). Indexing runs in the
-background with progress and cancel. You can search as soon as items are indexed.
+In the app, click **+ Add folder** → **Choose folder…** (or paste a path). Indexing runs in the background with progress, a time
+estimate and cancel. You can search as soon as items are indexed. Tick **Watch for changes** to re-index a folder automatically.
+
+### Mac app (double-click)
+`scripts/build_mac_app.sh` builds `dist-app/MediaIndex.app` (about 813 MB, Apple silicon). Open it like any app: no Terminal needed
+afterwards. On first launch it asks before downloading the model once. It is unsigned, so on other Macs open it with right-click → Open.
+Details, including watched folders, low-priority indexing and Finder tags on exports: [`docs/desktop-app.md`](docs/desktop-app.md).
 
 ### Optional demo data (traceable, publisher-declared CC0)
 ```bash
@@ -111,13 +116,13 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 - Text refinement and cross-media results are similarity candidates. They are not logical filters, synchronized audio, or artistic judgements.
 - Indexing is slow on an 8 GB M1, and video indexing runs at about 1.6× real time.
 - Only tested on macOS 14 with Apple M1. Linux and Windows are untested (the reveal-in-folder command has untested Linux and Windows variants).
-- Folders are added by pasting a path, because browsers cannot hand folder paths to local servers.
+- The folder chooser and Finder tags are macOS only. On other systems, paste the folder path.
 
 ## Documentation
 [Architecture](docs/architecture.md) · [Environment](docs/environment.md) · [Model compatibility](docs/model-compatibility.md) ·
 [Progress & gates](docs/progress.md) · [Offline & robustness](docs/offline-and-robustness.md) · [Evaluation](docs/evaluation.md) ·
 [Release checklist](docs/release-checklist.md) · [Demo](docs/demo.md) · [Release draft & handoff](docs/release-draft.md) ·
-[Model comparison](docs/model-comparison.md) · [Contributing](CONTRIBUTING.md)
+[Model comparison](docs/model-comparison.md) · [Desktop app](docs/desktop-app.md) · [Contributing](CONTRIBUTING.md)
 
 ## Licence
 Original code: Apache-2.0 ([`LICENSE`](LICENSE)). The model, third-party software and data have their own terms: [`NOTICE.md`](NOTICE.md) and

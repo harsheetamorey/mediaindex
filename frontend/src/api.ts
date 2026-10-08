@@ -6,6 +6,7 @@ export type Library = {
   root_path: string
   asset_count: number
   indexed_count: number
+  watch: number
 }
 
 export type SourceRecord = {
@@ -100,7 +101,10 @@ export type Job = {
   error: string | null
   result: Record<string, unknown> | null
   created: number
+  eta_seconds?: number | null
 }
+
+export type AppSettings = { low_priority_indexing: boolean; watch_interval_s: number }
 
 export type Selection = { id: string; name: string; item_count?: number; created_at: number; updated_at: number }
 
@@ -168,6 +172,12 @@ const json = (body: unknown): RequestInit => ({
 export const api = {
   libraries: () => request<Library[]>('/api/libraries'),
   addLibrary: (path: string, name?: string) => request<Library>('/api/libraries', json({ path, name })),
+  setLibraryWatch: (id: string, watch: boolean) =>
+    request<Library>(`/api/libraries/${id}`, { ...json({ watch }), method: 'PATCH' }),
+  pickFolder: () => request<{ cancelled: boolean; path?: string }>('/api/pick-folder', { method: 'POST' }),
+  settings: () => request<AppSettings>('/api/settings'),
+  setLowPriority: (on: boolean) =>
+    request<AppSettings>('/api/settings', { ...json({ low_priority_indexing: on }), method: 'PATCH' }),
   removeLibrary: (id: string) => request<{ deleted: string }>(`/api/libraries/${id}`, { method: 'DELETE' }),
   importLibrary: (id: string) => request<Job>(`/api/libraries/${id}/import`, { method: 'POST' }),
   job: (id: string) => request<Job>(`/api/jobs/${id}`),

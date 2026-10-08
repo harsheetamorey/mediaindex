@@ -39,6 +39,7 @@ export default function App() {
   const [libraries, setLibraries] = useState<Library[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [jobs, setJobs] = useState<Record<string, Job>>({})
+  const [lowPriority, setLowPriority] = useState(false)
   const [backendError, setBackendError] = useState<string | null>(null)
 
   const [text, setText] = useState('')
@@ -138,10 +139,26 @@ export default function App() {
     api.capabilities().then((c) => setModes(c.modes)).catch(() => {})
   }, [])
 
+  const loadJobs = useCallback(() => {
+    api.jobs().then((js) => setJobs((prev) => ({ ...prev, ...Object.fromEntries(js.map((j) => [j.id, j])) }))).catch(() => {})
+  }, [])
+
   useEffect(() => {
     refreshLibraries()
-    api.jobs().then((js) => setJobs(Object.fromEntries(js.map((j) => [j.id, j])))).catch(() => {})
-  }, [refreshLibraries])
+    loadJobs()
+    api.settings().then((s) => setLowPriority(s.low_priority_indexing)).catch(() => {})
+  }, [refreshLibraries, loadJobs])
+
+  // Watched folders start imports on the server: pick those up while any library is watched.
+  const anyWatched = libraries.some((l) => l.watch)
+  useEffect(() => {
+    if (!anyWatched) return
+    const t = setInterval(() => {
+      loadJobs()
+      refreshLibraries()
+    }, 10000)
+    return () => clearInterval(t)
+  }, [anyWatched, loadJobs, refreshLibraries])
 
   // Poll active jobs.
   const activeIds = useMemo(
@@ -286,6 +303,22 @@ export default function App() {
           onCancel={async (jobId) => {
             const job = await api.cancelJob(jobId)
             setJobs((j) => ({ ...j, [job.id]: job }))
+          }}
+          onWatch={async (id, watch) => {
+            await api.setLibraryWatch(id, watch).catch((e) => setToast(e instanceof Error ? e.message : String(e)))
+            refreshLibraries()
+          }}
+          onPickFolder={async () => {
+            const r = await api.pickFolder()
+            return r.cancelled ? null : (r.path ?? null)
+          }}
+          lowPriority={lowPriority}
+          onLowPriority={async (on) => {
+            try {
+              setLowPriority((await api.setLowPriority(on)).low_priority_indexing)
+            } catch (e) {
+              setToast(e instanceof Error ? e.message : String(e))
+            }
           }}
           onRemove={async (id) => {
             await api.removeLibrary(id)

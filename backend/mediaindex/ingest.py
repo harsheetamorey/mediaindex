@@ -166,15 +166,15 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
             seen.add(rel)
             st = path.stat()
             ex = existing.get(rel)
-            if path.suffix.lower() in VIDEO_EXTENSIONS:
-                _import_video(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_video, has_vectors,
-                              provenance)
-                ctx.progress(i + 1, message=f"processed {rel}")
-                continue
-            if path.suffix.lower() in AUDIO_EXTENSIONS:
-                _import_audio(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_audio, has_vectors,
-                              provenance)
-                ctx.progress(i + 1, message=f"processed {rel}")
+            if path.suffix.lower() in VIDEO_EXTENSIONS | AUDIO_EXTENSIONS:
+                before = s.unchanged
+                if path.suffix.lower() in VIDEO_EXTENSIONS:
+                    _import_video(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_video, has_vectors,
+                                  provenance)
+                else:
+                    _import_audio(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_audio, has_vectors,
+                                  provenance)
+                ctx.progress(i + 1, message=f"processed {rel}", work=s.unchanged == before)
                 continue
             done_status = INDEXED if embed_batch else PENDING
             if (ex and ex["size"] == st.st_size and ex["mtime_ns"] == st.st_mtime_ns and ex["content_hash"]
@@ -182,7 +182,7 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
                     and (ex["status"] == FAILED or (thumb_path(thumbs_dir, ex["content_hash"]).exists()
                                                     and has_vectors(ex["id"])))):
                 s.unchanged += 1
-                ctx.progress(i + 1, message=f"unchanged {rel}")
+                ctx.progress(i + 1, message=f"unchanged {rel}", work=False)
                 continue
             h = None
             try:

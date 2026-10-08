@@ -28,6 +28,10 @@ demo = [
 bench = [
     "py7zr",
 ]
+app = [
+    "pyinstaller>=6",
+    "pywebview>=5",
+]
 
 [dependency-groups]
 dev = ["pytest", "httpx"]

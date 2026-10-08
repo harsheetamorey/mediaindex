@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .db import now
+from .finder_tags import set_finder_tags
 from .jobs import JobContext
 from .paths import PathRejected, is_within, resolve_in_root
 from .store import Store
@@ -300,6 +301,9 @@ def run_export(ctx: JobContext, store: Store, plan: ExportPlan) -> dict:
     failed: list[dict] = []
     taken = {e["dest_name"].lower() for e in plan.entries}
     total = len(plan.entries)
+    sel = get_selection(store, plan.selection_id)
+    tags = ["MediaIndex"] + ([sel["name"]] if sel and sel.get("name") else [])  # on the copies only
+    tagged = 0
     ctx.progress(0, total, "copying")
     tmp: Path | None = None
     try:
@@ -319,6 +323,8 @@ def run_export(ctx: JobContext, store: Store, plan: ExportPlan) -> dict:
                     raise OSError("copied file does not match the indexed content hash (source changed?)")
                 final = _place_exclusive(tmp, plan.destination, e["dest_name"], taken)
                 copied[e["item_id"]] = final
+                if set_finder_tags(plan.destination / final, tags):
+                    tagged += 1
             except OSError as err:
                 failed.append({"item_id": e["item_id"], "source": e["source"], "error": str(err)})
             finally:
@@ -340,5 +346,5 @@ def run_export(ctx: JobContext, store: Store, plan: ExportPlan) -> dict:
             manifest_written = _place_exclusive(mtmp, plan.destination, plan.manifest_name, taken)
         ctx.job.result = {"copied": len(copied), "failed": failed, "skipped": plan.skipped,
                           "manifest": manifest_written, "destination": str(plan.destination),
-                          "cancelled": cancelled}
+                          "cancelled": cancelled, "finder_tags": tags if tagged else [], "tagged": tagged}
     return ctx.job.result

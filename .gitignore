@@ -57,3 +57,7 @@ data/
 
 # README images (demo-pack only)
 !/docs/assets/*.jpg
+
+# macOS app build output
+/dist-app/
+/build-app/

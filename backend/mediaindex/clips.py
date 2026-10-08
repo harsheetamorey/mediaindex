@@ -16,6 +16,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .finder_tags import set_finder_tags
 from .jobs import JobCancelled, JobContext
 from .media.audio import SAFE_INPUT, ffmpeg_bin
 from .media.video import VideoRejected, probe_video
@@ -164,5 +165,7 @@ def run_clip_export(ctx: JobContext, plan: ClipPlan) -> dict:
     mtmp = plan.destination / f"{PARTIAL_PREFIX}{uuid.uuid4().hex}.json"
     mtmp.write_text(json.dumps(manifest, indent=2))
     mname = _place_exclusive(mtmp, plan.destination, final.rsplit(".", 1)[0] + ".mediaindex.json", set())
+    tagged = set_finder_tags(plan.destination / final, ["MediaIndex", "Clip"])
     ctx.progress(1, 1, "done")
-    return {"clip": final, "manifest": mname, "destination": str(plan.destination), **check}
+    return {"clip": final, "manifest": mname, "destination": str(plan.destination),
+            "finder_tags": ["MediaIndex", "Clip"] if tagged else [], **check}

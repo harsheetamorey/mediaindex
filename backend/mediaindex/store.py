@@ -82,6 +82,19 @@ class Store:
         with self.db.tx() as c:
             c.execute("DELETE FROM libraries WHERE id = ?", (library_id,))
 
+    def set_library_watch(self, library_id: str, watch: bool) -> None:
+        with self.db.tx() as c:
+            c.execute("UPDATE libraries SET watch = ? WHERE id = ?", (int(watch), library_id))
+
+    def get_setting(self, key: str, default: str | None = None) -> str | None:
+        r = self.db.one("SELECT value FROM app_settings WHERE key = ?", (key,))
+        return r["value"] if r else default
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self.db.tx() as c:
+            c.execute("INSERT INTO app_settings(key, value) VALUES (?, ?) "
+                      "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+
     def bump_generation(self, c, library_id: str) -> None:
         c.execute("UPDATE libraries SET generation = generation + 1 WHERE id = ?", (library_id,))
 
