@@ -74,8 +74,8 @@ def test_watched_folder_reindexes_new_files(client):
     make_image(root / "new" / "c.jpg", (0, 0, 200))
     w.poll()
     assert w.poll() == [lib["id"]]
-    job = next(j for j in c.get("/api/jobs").json() if j["status"] in ("queued", "running", "done")
-               and j["library_id"] == lib["id"] and j["created"] > time.time() - 30)
+    job = max((j for j in c.get("/api/jobs").json() if j["kind"] == "import" and j["library_id"] == lib["id"]),
+              key=lambda j: j["created"])  # the re-scan the watcher just queued, not the first import
     wait_job(c, job["id"])
     rels = {a["rel_path"]: a["status"] for a in c.get(f"/api/libraries/{lib['id']}/assets").json()}
     assert rels.get("new/c.jpg") == "indexed"
