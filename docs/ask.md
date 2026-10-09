@@ -41,12 +41,13 @@ Searching still uses EmbeddingGemma only. RT-DETR and Gemma 4 are helpers for As
 
 ## Setup
 
-1. **Object counts:** open **Ask** and press **Count objects**.
-   - RT-DETR (~170 MB) downloads once from Hugging Face.
+1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.
+   - `MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.detect --download` fetches RT-DETR (~170 MB, pinned
+     revision) and checks that it runs. The server itself never downloads; if the detector is missing, **Count objects**
+     fails with this command in the message.
+   - The Mac app downloads it together with EmbeddingGemma on first launch.
    - Counting is about 0.3 s per photo; 512 photos took **145–151 s** on an M1.
    - New photos are added by pressing the button again.
-   - In the Mac app, the detector has to be in the Hugging Face cache already, because the app runs offline once
-     EmbeddingGemma is cached. Run Ask once from source first, or start the app before EmbeddingGemma is downloaded.
 2. **Chat model (optional):**
    - Install [Ollama](https://ollama.com/download). The Mac app version starts by itself at login.
    - Run `ollama pull gemma4:e2b-it-qat` (4.3 GB, Apache-2.0).

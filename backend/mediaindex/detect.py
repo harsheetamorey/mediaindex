@@ -24,6 +24,8 @@ DETECTOR_REVISION = "282494075698cab9faa1096ae26856890030c817"
 SCORE_THRESHOLD = 0.5  # boxes kept at all (below: "maybe")
 SURE = 0.75  # boxes counted
 DETECTOR_KEY = f"rtdetr_v2_r50vd@{DETECTOR_REVISION[:12]}:t{SCORE_THRESHOLD}:boxes"
+# The server runs offline (model files from the local cache only), so the detector is downloaded in an explicit setup step.
+DOWNLOAD_HINT = "MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.detect --download"
 
 # The detector's own label names, as written in its config.
 LABELS = tuple(s.replace("_", " ") for s in (
@@ -111,15 +113,21 @@ def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids
     checked = failed = 0
     roots = {}
     try:
+        if todo:
+            try:
+                detector = host.get()
+            except Exception as e:  # not downloaded, or cannot load: a clear message instead of every photo "failing"
+                raise RuntimeError(f"the object detector could not be loaded ({type(e).__name__}). If it isn't "
+                                   f"downloaded yet, run this once in the MediaIndex folder: {DOWNLOAD_HINT}") from e
         for i, (h, r) in enumerate(todo.items(), 1):
             ctx.check_cancelled()
             root = roots.setdefault(r["library_id"], store.get_library(r["library_id"])["root_path"])
             try:
                 im = load_image(resolve_in_root(root, r["rel_path"]))
-                found = host.get().detect(im)
             except (ImageRejected, PathRejected, OSError):
                 failed += 1
             else:
+                found = detector.detect(im)
                 store.save_detections(h, key, {k: sorted(v, key=lambda b: -b[0]) for k, v in found.items()})
                 checked += 1
             ctx.progress(i, message=f"Counting objects: {i} of {len(todo)} photos")
@@ -143,7 +151,39 @@ def default_factory(device: str) -> Callable[[], Detector]:
 
 
 def detector_cached() -> bool:
+    """Filesystem-only check that the pinned detector's config and weights are in the local cache."""
     from huggingface_hub import try_to_load_from_cache
 
-    p = try_to_load_from_cache(DETECTOR_ID, "config.json", revision=DETECTOR_REVISION)
-    return isinstance(p, str) and Path(p).exists()
+    paths = [try_to_load_from_cache(DETECTOR_ID, f, revision=DETECTOR_REVISION) for f in ("config.json", "model.safetensors")]
+    return all(isinstance(p, str) and Path(p).exists() for p in paths)
+
+
+def download() -> str:
+    """Fetch the pinned detector revision into the Hugging Face cache (about 170 MB)."""
+    from huggingface_hub import snapshot_download
+
+    return snapshot_download(DETECTOR_ID, revision=DETECTOR_REVISION)
+
+
+def main() -> int:
+    import argparse
+    import os
+
+    ap = argparse.ArgumentParser(description="Download and check the object detector used by the Ask tab.")
+    ap.add_argument("--download", action="store_true", help="download it (needs MEDIAINDEX_ALLOW_DOWNLOAD=1)")
+    a = ap.parse_args()
+    if a.download:
+        if os.environ.get("MEDIAINDEX_ALLOW_DOWNLOAD") != "1":
+            raise SystemExit("downloads are off by default; run with MEDIAINDEX_ALLOW_DOWNLOAD=1")
+        print("downloaded to", download())
+    if not detector_cached():
+        raise SystemExit(f"the detector is not in the local cache; run: {DOWNLOAD_HINT}")
+    from PIL import Image
+
+    RTDetrDetector("cpu").detect(Image.new("RGB", (64, 64), "white"))
+    print(f"ok: {DETECTOR_ID} @ {DETECTOR_REVISION[:12]} loads and runs")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

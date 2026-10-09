@@ -732,3 +732,25 @@ which left empty files. It also can't work in the app window.
 - Demo library: dogs 3 and cats 4, all correct. The wrong ones (a cliff, a street, people on steps) are now "maybe".
   Umbrellas are still mostly wrong: confident mistakes on artistic close-ups (a petunia scored 0.94).
 - `uv run pytest -q`: `96 passed, 1 deselected`.
+
+**Share-ready check (fresh install from GitHub, REAL MODEL, M1 8 GB):**
+- Clone, `uv sync`, then the UI build. Then the README's model step with an **empty, logged-out** Hugging Face cache: the
+  download and check passed in 223 s. Both models download without a Hugging Face login.
+- **Bug found:** "Count objects" failed on every photo, without saying why.
+  - Cause: the server runs offline by design, and the detector wasn't part of any download step. On the development Mac it
+    was already cached, which hid the problem.
+  - Fixes:
+    - `python -m mediaindex.detect --download` (now in the README quick start).
+    - A clear job error with that command, shown in the Ask tab.
+    - The Mac app's first-run download now includes the detector.
+  - Re-run: missing detector → clear error; run the command → 8/8 photos counted. Dogs 3, cats 2, birds 1 photo, cars 2,
+    all correct.
+- **Mac app** rebuilt with Ask, plus the instant "Starting MediaIndex…" window (814 MB). Tests used a Finder-style
+  environment and a separate data folder:
+  - UI loaded in 2.1–2.7 s.
+  - Search, Count objects and "how many dogs?" → 3 of 8, correct.
+  - First launch with an empty model cache: both models (1.6 GB) downloaded in 226 s, then the same checks passed.
+  - The app loaded the detector offline from that cache (8 photos recounted).
+- README: the limits section is now "Known limits", with platform, speed (~5–6 h to index 10,000 photos on an 8 GB M1),
+  search and Ask limits.
+- `uv run pytest -q`: `97 passed, 1 deselected`.

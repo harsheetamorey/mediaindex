@@ -126,6 +126,11 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
         )}
       </div>
 
+      {status?.detector.error && !job && (
+        <div className="banner error" role="alert">
+          Counting objects failed: {status.detector.error}
+        </div>
+      )}
       <div className="ask-log" aria-live="polite">
         {messages.length === 0 && (
           <div className="empty">
