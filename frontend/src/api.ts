@@ -144,13 +144,17 @@ export type AskTurn = { role: 'user' | 'assistant'; text: string; asset_ids?: st
 
 export type AskResponse = {
   answer: string
-  action: 'count' | 'search' | 'refine' | 'describe' | 'chat'
+  action: 'count' | 'search' | 'refine' | 'describe' | 'explain' | 'chat'
   routed_by: string
   described_by?: string
   asset_ids: string[]
   results: Asset[]
+  boxes: Record<string, DetectedBox[]>
   chat_model: { available: boolean; model?: string; reason?: string }
 }
+
+/** Where the detector found an object; box = [x0, y0, x1, y1] as fractions of the photo's width and height. */
+export type DetectedBox = { label: string; score: number; box: [number, number, number, number] }
 
 export type AskStatus = {
   detector: { model: string; coverage: { photos: number; checked: number }; job: Job | null }

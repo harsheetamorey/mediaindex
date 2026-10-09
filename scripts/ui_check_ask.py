@@ -43,6 +43,16 @@ def main() -> int:
         expect(answers).to_have_count(5, timeout=180_000)
         print(f"clicked photo 2 ({time.time() - t:.1f}s)\n  A: {answers.nth(4).locator('.bubble').inner_text()}")
         page.screenshot(path=str(a.shots / "ask-5-clicked.png"), full_page=True)
+        # Doubting an answer: the evidence (boxes) is shown instead of a guess.
+        page.get_by_role("button", name="New chat").click()
+        answers = page.locator(".msg.assistant:not(:has-text('Thinking…'))")
+        for i, q in enumerate(["How many dogs do I have?", "describe the third one", "then why did you say it's a dog?"]):
+            page.get_by_label("Ask about your photos").fill(q)
+            page.get_by_role("button", name="Ask", exact=True).last.click()
+            expect(answers).to_have_count(i + 1, timeout=180_000)
+            last = answers.nth(i)
+            print(f"Q: {q}\n  A: {last.locator('.bubble').inner_text()}\n  boxes drawn: {last.locator('.det-box').count()}")
+        page.screenshot(path=str(a.shots / "ask-6-evidence.png"), full_page=True)
         b.close()
     return 0
 

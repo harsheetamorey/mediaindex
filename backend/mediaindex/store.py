@@ -301,11 +301,12 @@ class Store:
                             [r["modality"] for r in rows], gen)
 
     # ---- object counts (Ask assistant) ---------------------------------------------
-    def save_detections(self, content_hash: str, detector: str, counts: dict[str, int]) -> None:
+    def save_detections(self, content_hash: str, detector: str, boxes: dict[str, list]) -> None:
+        """boxes: label -> [(score, [x0, y0, x1, y1]), ...]; the count is the number of boxes."""
         with self.db.tx() as c:
             c.execute("DELETE FROM detections WHERE content_hash=? AND detector=?", (content_hash, detector))
-            c.executemany("INSERT INTO detections(content_hash, detector, label, count) VALUES (?,?,?,?)",
-                          [(content_hash, detector, k, int(v)) for k, v in counts.items() if v > 0])
+            c.executemany("INSERT INTO detections(content_hash, detector, label, count, boxes_json) VALUES (?,?,?,?,?)",
+                          [(content_hash, detector, k, len(v), json.dumps(v)) for k, v in boxes.items() if v])
             c.execute("INSERT OR REPLACE INTO detection_runs(content_hash, detector, created_at) VALUES (?,?,?)",
                       (content_hash, detector, now()))
 
@@ -338,6 +339,15 @@ class Store:
         rows = self.db.query("SELECT label, count FROM detections WHERE content_hash=? AND detector=? ORDER BY count DESC",
                              (content_hash, detector))
         return {r["label"]: r["count"] for r in rows}
+
+    def boxes_for(self, content_hash: str, detector: str, labels: list[str] | None = None) -> list[dict]:
+        rows = self.db.query("SELECT label, boxes_json FROM detections WHERE content_hash=? AND detector=?",
+                             (content_hash, detector))
+        out = []
+        for r in rows:
+            if (labels is None or r["label"] in labels) and r["boxes_json"]:
+                out += [{"label": r["label"], "score": s, "box": b} for s, b in json.loads(r["boxes_json"])]
+        return out
 
     def object_summary(self, detector: str, library_ids: list[str] | None = None) -> list[dict]:
         where, params = self._scope(library_ids)

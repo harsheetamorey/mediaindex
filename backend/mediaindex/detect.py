@@ -23,7 +23,7 @@ DETECTOR_REVISION = "282494075698cab9faa1096ae26856890030c817"
 SCORE_THRESHOLD = 0.5  # 0.3 added many false objects in the 20-image check (docs/ask.md)
 ANIMAL_SURE = 0.75
 ANIMALS = {"dog", "cat", "cow", "sheep", "horse", "bear", "elephant", "zebra", "giraffe"}  # not birds: flocks are counted as is
-DETECTOR_KEY = f"rtdetr_v2_r50vd@{DETECTOR_REVISION[:12]}:t{SCORE_THRESHOLD}:a{ANIMAL_SURE}"
+DETECTOR_KEY = f"rtdetr_v2_r50vd@{DETECTOR_REVISION[:12]}:t{SCORE_THRESHOLD}:a{ANIMAL_SURE}:boxes"
 
 # The detector's own label names, as written in its config.
 LABELS = tuple(s.replace("_", " ") for s in (
@@ -35,8 +35,11 @@ LABELS = tuple(s.replace("_", " ") for s in (
     "toothbrush traffic_light train truck tvmonitor umbrella vase wine_glass zebra").split())
 
 
+Box = tuple[float, list[float]]  # (score, [x0, y0, x1, y1] as fractions of the image width and height)
+
+
 class Detector(Protocol):
-    def detect(self, image) -> dict[str, list[float]]: ...  # label -> box scores >= SCORE_THRESHOLD
+    def detect(self, image) -> dict[str, list[Box]]: ...  # label -> boxes with score >= SCORE_THRESHOLD
     def close(self) -> None: ...
 
 
@@ -51,7 +54,7 @@ class RTDetrDetector:
         self.model = AutoModelForObjectDetection.from_pretrained(DETECTOR_ID, revision=DETECTOR_REVISION)
         self.model.to(device).eval()
 
-    def detect(self, image) -> dict[str, list[float]]:
+    def detect(self, image) -> dict[str, list[Box]]:
         torch = self._torch
         inputs = self.processor(images=image, return_tensors="pt").to(self.device)
         with torch.inference_mode():
@@ -59,9 +62,12 @@ class RTDetrDetector:
         r = self.processor.post_process_object_detection(out, target_sizes=torch.tensor([image.size[::-1]]),
                                                          threshold=SCORE_THRESHOLD)[0]
         names = self.model.config.id2label
-        out: dict[str, list[float]] = {}
-        for i, sc in zip(r["labels"], r["scores"]):
-            out.setdefault(names[int(i)], []).append(round(float(sc), 3))
+        w, h = image.size
+        out: dict[str, list[Box]] = {}
+        for i, sc, b in zip(r["labels"], r["scores"], r["boxes"]):
+            x0, y0, x1, y1 = (float(v) for v in b)
+            box = [round(max(0.0, min(1.0, v)), 4) for v in (x0 / w, y0 / h, x1 / w, y1 / h)]
+            out.setdefault(names[int(i)], []).append((round(float(sc), 3), box))
         return out
 
     def close(self) -> None:
@@ -94,22 +100,22 @@ class DetectorHost:
 Confirm = Callable[[object, str], bool]  # (image, label) -> is that thing in the photo?
 
 
-def decide_counts(scores: dict[str, list[float]], image=None, confirm: Confirm | None = None) -> tuple[dict, list]:
-    """Turn box scores into counts. Returns (counts, labels the chat model was asked about)."""
-    counts, asked = {}, []
-    for label, ss in scores.items():
+def decide_counts(found: dict[str, list[Box]], image=None, confirm: Confirm | None = None) -> tuple[dict, list]:
+    """Keep the boxes that count. Returns ({label: kept boxes}, labels the chat model was asked about)."""
+    kept, asked = {}, []
+    for label, boxes in found.items():
         if label not in ANIMALS:
-            n = sum(s >= SCORE_THRESHOLD for s in ss)
+            keep = [b for b in boxes if b[0] >= SCORE_THRESHOLD]
         else:
-            n = sum(s >= ANIMAL_SURE for s in ss)
-            unsure = sum(SCORE_THRESHOLD <= s < ANIMAL_SURE for s in ss)
+            keep = [b for b in boxes if b[0] >= ANIMAL_SURE]
+            unsure = [b for b in boxes if SCORE_THRESHOLD <= b[0] < ANIMAL_SURE]
             if unsure and confirm is not None:
                 asked.append(label)
                 if confirm(image, label):
-                    n += unsure
-        if n:
-            counts[label] = n
-    return counts, asked
+                    keep += unsure
+        if keep:
+            kept[label] = sorted(keep, key=lambda b: -b[0])
+    return kept, asked
 
 
 def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids: list[str] | None,
@@ -131,12 +137,12 @@ def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids
             root = roots.setdefault(r["library_id"], store.get_library(r["library_id"])["root_path"])
             try:
                 im = load_image(resolve_in_root(root, r["rel_path"]))
-                counts, asked = decide_counts(host.get().detect(im), im, confirm)
+                kept, asked = decide_counts(host.get().detect(im), im, confirm)
                 confirmed_asks += len(asked)
             except (ImageRejected, PathRejected, OSError):
                 failed += 1
             else:
-                store.save_detections(h, key, counts)
+                store.save_detections(h, key, kept)
                 checked += 1
             ctx.progress(i, message=f"Counting objects: {i} of {len(todo)} photos")
     finally:
