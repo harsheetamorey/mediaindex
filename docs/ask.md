@@ -27,11 +27,17 @@ object and how sure the detector was. Ask doesn't guess.
   that answer from then on. They are stored in the local database.
 - **Descriptions get the detector's findings as a hint**, so they agree with the counts. Before this, Gemma 4 described
   a Yorkshire terrier the detector had counted as a dog as a "cat", and left out a small dog on a beach.
-- **Numbers always come from the database, never from the chat model.** Counts, searches and follow-ups are answered with fixed
-  sentences. If a free chat reply mentions a number that isn't in the facts the model was given, MediaIndex replaces it with a
-  fixed summary.
-- **Clear questions skip the chat model.** "How many…", "show me…", "which of those…" and "describe the second one" are routed
-  by simple rules, so they answer instantly. Gemma 4 is only used for everything else.
+- **Numbers always come from the database, never from the chat model.**
+  - Counts, overviews ("what's in my library?"), searches and follow-ups are answered with sentences the code fills in.
+  - The chat model only decides *what kind* of question it is (count, search, overview, describe…). It is never given
+    counts.
+  - A small-talk reply that states any number is replaced by a fixed one. Before this, it answered "what's in my
+    library?" with "5 photos": it picked a number from a list of counts it was given.
+- **Routing:**
+  - A few unambiguous patterns ("how many…", "show / find…", "which of those…", "describe the second one") skip the chat
+    model, so they answer instantly.
+  - Every other wording goes to Gemma 4. It routed 6/6 differently worded overview questions and 3/3 search questions
+    ("any photos of food?", "get me pictures of the sea") correctly in a check on this Mac.
 - **Follow-ups:**
   - "Which of those have *cars*?" **filters** the previous photos by the object counts, when the subject is one of the 80 types.
   - Otherwise ("which ones are at sunset?"), it **re-orders** them by similarity and says that it can't be sure which ones match.

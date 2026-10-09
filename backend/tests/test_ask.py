@@ -167,18 +167,31 @@ def test_chat_model_routes_and_describes(tmp_path):
         c.__exit__(None, None, None)
 
 
-def test_chat_reply_with_invented_numbers_is_replaced(tmp_path):
-    chat = FakeChat([json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 7 dogs and 99 cats!",
-                     json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 4 photos."])
+def test_chat_replies_never_state_numbers(tmp_path):
+    route = json.dumps({"action": "chat", "subject": "", "item": 0})
+    chat = FakeChat([route, "You have 7 dogs and 99 cats!", route, "Hi! Try asking how many dogs you have."])
     c, *_ = make_client(tmp_path, chat)
     try:
         wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
-        r = ask(c, "tell me about my library")
-        assert "99" not in r["answer"] and "numbers not in the facts" in r["note"]
-        assert ask(c, "tell me about my library again")["answer"] == "You have 4 photos."
+        r = ask(c, "tell me something nice")
+        assert "99" not in r["answer"] and "7 dogs" not in r["answer"] and r["note"] == "chat reply replaced: it mentioned numbers"
+        assert "facts" in r and "objects_found" not in json.dumps(chat.requests[1]["messages"])  # no counts given to it
+        assert ask(c, "tell me something else")["answer"] == "Hi! Try asking how many dogs you have."
     finally:
         c.__exit__(None, None, None)
 
+
+def test_summary_numbers_come_from_the_database(tmp_path):
+    chat = FakeChat([json.dumps({"action": "summary", "subject": "", "item": 0})])
+    c, *_ = make_client(tmp_path, chat)
+    try:
+        wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+        r = ask(c, "so what have I got in here?")  # any wording: the chat model only picks the kind of question
+        assert r["action"] == "summary" and r["routed_by"] == "chat model"
+        assert r["answer"] == "You have 4 photos. Most common in them: cups (2 photos), dogs (2 photos), cats (1 photo), people (1 photo)."
+        assert len(r["asset_ids"]) == 3 and r["boxes"]  # an example photo per thing, outlined (red has both cups and dogs)
+    finally:
+        c.__exit__(None, None, None)
 
 def test_bad_router_output_falls_back_to_search(tmp_path):
     chat = FakeChat(["not json at all"])

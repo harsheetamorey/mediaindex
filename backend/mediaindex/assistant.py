@@ -21,7 +21,7 @@ from .detect import LABELS, SURE
 from .llm import ChatUnavailable, OllamaChat
 from .store import Store
 
-ACTIONS = ("count", "search", "refine", "describe", "explain", "chat")
+ACTIONS = ("count", "search", "refine", "describe", "explain", "summary", "chat")
 
 DISPLAY = {"diningtable": "dining table", "pottedplant": "potted plant", "tvmonitor": "TV", "aeroplane": "airplane",
            "motorbike": "motorbike", "sports ball": "ball"}
@@ -165,19 +165,21 @@ def rule_plan(message: str, has_previous: bool, has_focus: bool | None = None) -
         return Plan("refine", _strip(REFINE_RE.sub(" ", m)))
     if CHAT_RE.search(m):
         return Plan("chat")
-    if re.match(r"^\s*(show|find|search|look for|get|give me|any|photos? of|pictures? of|images? of)\b", m, re.I):
+    if re.match(r"^\s*(show|find|search|look for)\b", m, re.I):  # unambiguous only; other wordings go to the chat model
         return Plan("search", _strip(m) or m)
     return None
 
 
 ROUTER_PROMPT = """You turn a question about the user's photo library into JSON:
-{"action": "count" | "search" | "refine" | "describe" | "chat", "subject": "<thing or scene>", "item": <number or 0>}
+{"action": "count" | "search" | "refine" | "describe" | "explain" | "summary" | "chat",
+ "subject": "<thing or scene>", "item": <number or 0>}
 - count: how many of something ("how many dogs", "are there lots of cars?")
 - search: find or show photos of something ("sunsets", "my dog at the beach")
 - refine: narrow down the photos from the previous answer ("which are outdoors?", "only the night ones");
   subject = what to keep, e.g. "umbrellas" for "only keep the ones with umbrellas"
 - describe: describe one photo from the previous answer; item = its position (1 = first, -1 = last)
 - explain: the user doubts or asks about an earlier answer ("why do you say that's a dog?", "where is it?")
+- summary: what is in the library as a whole ("what's in my photos?", "give me an overview", "what do I have?")
 - chat: greetings, thanks, questions about what you can do, or anything else
 Reply with JSON only."""
 
@@ -442,31 +444,50 @@ class Assistant:
                 "asset_ids": rest, "facts": {"removed": [focus[n - 1] for n in picks], "label": label},
                 "box_labels": [label]}
 
+    def _summary(self, plan, message, history, library_ids, use_chat, asset_id):
+        """What's in the library: every number comes from the database, never from the chat model."""
+        cov = self._coverage(library_ids)
+        if cov["photos"] == 0:
+            return {"answer": "There are no indexed photos yet. Add a folder on the left first.", "facts": {"coverage": cov}}
+        if cov["checked"] == 0:
+            return {"answer": f"You have {cov['photos']} photos. Press “Count objects” above to see what's in them.",
+                    "facts": {"coverage": cov}}
+        top = self.store.object_summary(self.key, library_ids, sure=SURE)[:8]
+        text = f"You have {cov['photos']} photos."
+        if top:
+            text += " Most common in them: " + ", ".join(
+                f"{display(t['label'])} ({t['photos']} {'photo' if t['photos'] == 1 else 'photos'})" for t in top) + "."
+        else:
+            text += " I didn't find any of the common objects I can count."
+        if cov["checked"] < cov["photos"]:
+            text += f" {cov['photos'] - cov['checked']} newer photos haven't been checked yet."
+        examples = []  # one example photo for each of the most common things
+        for t in top[:6]:
+            ids = self._without_corrections(t["label"],
+                                             self.store.count_objects(self.key, t["label"], library_ids, sure=SURE)["asset_ids"])
+            if (pick := next((a for a in ids if a not in examples), None)) is not None:
+                examples.append(pick)
+        return {"answer": text, "asset_ids": examples, "facts": {"coverage": cov, "top": top},
+                "box_labels": [t["label"] for t in top[:6]]}
+
     def _chat(self, plan, message, history, library_ids, use_chat, asset_id):
         cov = self._coverage(library_ids)
-        summary = self.store.object_summary(self.key, library_ids, sure=SURE)  # all 80 types at most: small enough
+        summary = self.store.object_summary(self.key, library_ids, sure=SURE)
         fixed = ("I can count things in your photos (“how many dogs?”), find photos (“beach at sunset”), narrow "
                  "down the last answer (“which of those have people?”) and describe a photo (“describe the "
                  "second one”).")
         if summary:
             fixed += " Most common in your photos: " + ", ".join(
-                f"{display(s['label'])} ({s['photos']} photos)" for s in summary[:5]) + "."
+                f"{display(s['label'])} ({s['photos']} {'photo' if s['photos'] == 1 else 'photos'})"
+                for s in summary[:5]) + "."
         if not use_chat:
             return {"answer": fixed, "facts": {"coverage": cov}}
-        facts = {"photos": cov["photos"], "photos_checked_for_objects": cov["checked"],
-                 "objects_found": [{"thing": display(s["label"]), "photos": s["photos"], "count": s["objects"]}
-                                   for s in summary]}
-        recent = []
-        for n, aid in enumerate(self._focus(history)[:6], 1):
-            if (a := self.store.get_asset(aid)) is not None:
-                objs = self.store.detections_for(a["content_hash"], self.key, sure=SURE) or {}
-                recent.append({"photo": n, "objects": {display(k, v): v for k, v in objs.items()}})
-        if recent:
-            facts["photos_in_last_answer"] = recent
+        facts = {"photos": cov["photos"]}
         system = ("You are the assistant inside MediaIndex, a private photo search app that runs on this computer. "
-                  "You can: count common objects in photos, find photos by description, narrow down the last "
-                  "results, and describe a photo. Answer in 1-3 short sentences. Use only these facts and never "
-                  "invent numbers or photos: " + json.dumps(facts))
+                  "You can: count common objects in photos (\"how many dogs?\"), give an overview (\"what's in my "
+                  "library?\"), find photos by description, narrow down the last results, and describe a photo. "
+                  "Answer in 1-3 short sentences. Don't state any numbers or say what is in the photos: for that, "
+                  "suggest one of those questions instead.")
         msgs = [{"role": "system", "content": system}]
         msgs += [{"role": t.role, "content": t.text} for t in history[-4:] if t.role in ("user", "assistant")]
         msgs.append({"role": "user", "content": message})
@@ -474,7 +495,7 @@ class Assistant:
             text = self.chat.chat(msgs, max_tokens=160)
         except ChatUnavailable:
             return {"answer": fixed, "facts": facts}
-        allowed = {str(v) for v in re.findall(r"\d+", json.dumps(facts) + " " + message)}
+        allowed = set(re.findall(r"\d+", message))  # the chat model gets no numbers, so it may not state any
         if any(n not in allowed for n in re.findall(r"\d+", text)):
-            return {"answer": fixed, "facts": facts, "note": "chat reply replaced: it mentioned numbers not in the facts"}
+            return {"answer": fixed, "facts": facts, "note": "chat reply replaced: it mentioned numbers"}
         return {"answer": text, "facts": facts}
