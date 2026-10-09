@@ -754,3 +754,14 @@ which left empty files. It also can't work in the app window.
 - README: the limits section is now "Known limits", with platform, speed (~5–6 h to index 10,000 photos on an 8 GB M1),
   search and Ask limits.
 - `uv run pytest -q`: `97 passed, 1 deselected`.
+
+**"What's in my library?" answered "5 photos" (found by the maintainer):**
+- Cause: the 2B chat model was given every object count (51 types) and stated a number from the list as the photo total.
+  The number guard only checked that the number appeared somewhere in the facts.
+- Fix:
+  - A new "summary" kind of question, chosen by the chat model for any wording. The code fills in the numbers from the
+    database.
+  - The chat model is never given counts, and small-talk replies may not state numbers.
+  - An old phrase rule ("give me…/any…" means search) was trimmed, so ambiguous wordings reach the chat model.
+- REAL MODEL routing check: 6/6 overview wordings → summary (512 photos; people 111, cars 30…); 3/3 search wordings → search.
+- `uv run pytest -q`: `98 passed, 1 deselected`.
