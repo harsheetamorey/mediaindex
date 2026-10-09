@@ -300,6 +300,52 @@ class Store:
                             [r["start_s"] for r in rows], [r["end_s"] for r in rows],
                             [r["modality"] for r in rows], gen)
 
+    # ---- object counts (Ask assistant) ---------------------------------------------
+    def save_detections(self, content_hash: str, detector: str, counts: dict[str, int]) -> None:
+        with self.db.tx() as c:
+            c.execute("DELETE FROM detections WHERE content_hash=? AND detector=?", (content_hash, detector))
+            c.executemany("INSERT INTO detections(content_hash, detector, label, count) VALUES (?,?,?,?)",
+                          [(content_hash, detector, k, int(v)) for k, v in counts.items() if v > 0])
+            c.execute("INSERT OR REPLACE INTO detection_runs(content_hash, detector, created_at) VALUES (?,?,?)",
+                      (content_hash, detector, now()))
+
+    @staticmethod
+    def _scope(library_ids: list[str] | None) -> tuple[str, list]:
+        sql = "a.media_type='image' AND a.status='indexed'"
+        if library_ids:
+            return sql + f" AND a.library_id IN ({','.join('?' * len(library_ids))})", list(library_ids)
+        return sql, []
+
+    def detection_coverage(self, detector: str, library_ids: list[str] | None = None) -> dict:
+        where, params = self._scope(library_ids)
+        r = self.db.one(f"""SELECT COUNT(*) AS photos, COUNT(dr.content_hash) AS checked FROM assets a
+                            LEFT JOIN detection_runs dr ON dr.content_hash=a.content_hash AND dr.detector=?
+                            WHERE {where}""", [detector, *params])
+        return {"photos": r["photos"], "checked": r["checked"]}
+
+    def count_objects(self, detector: str, label: str, library_ids: list[str] | None = None) -> dict:
+        """Photos (files) where the detector found `label`, most instances first, with the instance total."""
+        where, params = self._scope(library_ids)
+        rows = self.db.query(f"""SELECT a.id, d.count FROM assets a
+                                 JOIN detections d ON d.content_hash=a.content_hash AND d.detector=? AND d.label=?
+                                 WHERE {where} ORDER BY d.count DESC, a.rel_path""", [detector, label, *params])
+        return {"photos": len(rows), "objects": sum(r["count"] for r in rows),
+                "asset_ids": [r["id"] for r in rows]}
+
+    def detections_for(self, content_hash: str, detector: str) -> dict[str, int] | None:
+        if not self.db.one("SELECT 1 FROM detection_runs WHERE content_hash=? AND detector=?", (content_hash, detector)):
+            return None
+        rows = self.db.query("SELECT label, count FROM detections WHERE content_hash=? AND detector=? ORDER BY count DESC",
+                             (content_hash, detector))
+        return {r["label"]: r["count"] for r in rows}
+
+    def object_summary(self, detector: str, library_ids: list[str] | None = None) -> list[dict]:
+        where, params = self._scope(library_ids)
+        rows = self.db.query(f"""SELECT d.label, COUNT(*) AS photos, SUM(d.count) AS objects FROM assets a
+                                 JOIN detections d ON d.content_hash=a.content_hash AND d.detector=?
+                                 WHERE {where} GROUP BY d.label ORDER BY photos DESC, d.label""", [detector, *params])
+        return [dict(r) for r in rows]
+
     # ---- jobs ------------------------------------------------------------------
     def save_job(self, job: dict, library_id: str | None = None) -> None:
         with self.db.tx() as c:

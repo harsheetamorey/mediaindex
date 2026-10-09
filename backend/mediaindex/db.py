@@ -108,6 +108,23 @@ MIGRATIONS: list[str] = [
         value TEXT NOT NULL
     );
     """,
+    # v4: object counts for the Ask assistant (keyed by content hash, so duplicates share one detection run)
+    """
+    CREATE TABLE detection_runs (
+        content_hash TEXT NOT NULL,
+        detector TEXT NOT NULL,
+        created_at REAL NOT NULL,
+        PRIMARY KEY (content_hash, detector)
+    );
+    CREATE TABLE detections (
+        content_hash TEXT NOT NULL,
+        detector TEXT NOT NULL,
+        label TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        PRIMARY KEY (content_hash, detector, label)
+    );
+    CREATE INDEX detections_label ON detections(detector, label);
+    """,
 ]
 
 

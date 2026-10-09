@@ -16,6 +16,7 @@ import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
 import ResultsGrid, { resultKey } from './components/ResultsGrid'
 import SearchBar, { type Reference } from './components/SearchBar'
+import AskView from './components/AskView'
 import SelectionView from './components/SelectionView'
 import Sidebar from './components/Sidebar'
 
@@ -65,7 +66,7 @@ export default function App() {
       return null
     }
   })
-  const [view, setView] = useState<'search' | 'selection'>('search')
+  const [view, setView] = useState<'search' | 'selection' | 'ask'>('search')
   const [addedKeys, setAddedKeys] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<string | null>(null)
 
@@ -247,6 +248,14 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <h1>MediaIndex</h1>
+        <nav className="tabs" aria-label="Mode">
+          <button className={view !== 'ask' ? 'tab active' : 'tab'} onClick={() => setView('search')} aria-pressed={view !== 'ask'}>
+            Search
+          </button>
+          <button className={view === 'ask' ? 'tab active' : 'tab'} onClick={() => setView('ask')} aria-pressed={view === 'ask'}>
+            Ask
+          </button>
+        </nav>
         <span className="muted small">Local media search · nothing leaves this computer</span>
         <label className="check small push">
           <input
@@ -383,7 +392,9 @@ export default function App() {
         />
 
         <main className="main">
-          {view === 'selection' && activeSel ? (
+          {view === 'ask' ? (
+            <AskView libraryIds={libraryIds} />
+          ) : view === 'selection' && activeSel ? (
             <section className="results">
               <SelectionView
                 key={activeSel}
