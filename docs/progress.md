@@ -692,12 +692,16 @@ which left empty files. It also can't work in the app window.
 **Observed (REAL MODEL, M1 8 GB):**
 - Counting all 512 demo photos took 145 s.
 - "How many dogs" → 5 photos; "people" → 138 photos (456 counted); "birds" → 33 photos.
+- The maintainer spotted wrong answers: 2 of the 5 "dogs" and 1 of the 5 "cats" had no such animal (detector scores 0.52–0.61).
+  - Fix: animals now need a score of 0.75, or Gemma 4 has to confirm unsure boxes.
+  - Recount: 244 s, with 13 confirmation questions.
+  - Result: dogs → 3 photos and cats → 4 photos, all correct. The dog in a field is still missed (detected as a cow).
 - "Show me a city street at night" → 12 photos, then "which of those have cars?" → 9.
 - Gemma 4 described the first and a clicked photo correctly (night street; black and white snowy street with cars).
 - Free-form questions routed by Gemma 4: "got any pups?" → search for dogs; "the third photo – what's going on there?" → describe;
   "what's in my library?" → an answer using only the stored counts.
 - `scripts/ui_check_ask.py` passed in Chrome.
-- `uv run pytest -q`: `91 passed, 1 deselected`.
+- `uv run pytest -q`: `93 passed, 1 deselected`.
 
 **Limits:**
 - Only 80 object types can be counted, and counts miss small or crowded objects.
