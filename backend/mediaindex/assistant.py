@@ -21,7 +21,7 @@ from .detect import LABELS
 from .llm import ChatUnavailable, OllamaChat
 from .store import Store
 
-ACTIONS = ("count", "search", "refine", "describe", "chat")
+ACTIONS = ("count", "search", "refine", "describe", "explain", "chat")
 
 DISPLAY = {"diningtable": "dining table", "pottedplant": "potted plant", "tvmonitor": "TV", "aeroplane": "airplane",
            "motorbike": "motorbike", "sports ball": "ball"}
@@ -111,6 +111,8 @@ DESCRIBE_RE = re.compile(r"\b(describe|tell me (more )?about|what'?s (in|happeni
 REFINE_RE = re.compile(r"\b(which of|of those|of these|among (them|those|these)|the ones|which ones|only keep|keep only|"
                        r"just keep|those|these|them)\b", re.I)
 REFERENCE_RE = re.compile(r"\b(this|that|it|one|photo|picture|image)\b", re.I)
+EXPLAIN_RE = re.compile(r"\b(why|where('?s| is| are)?|not an?|isn'?t|is not|aren'?t|wrong|are you sure|really|"
+                        r"(don'?t|do not|can'?t|cannot) see|no (dog|cat|one)s?)\b", re.I)
 CHAT_RE = re.compile(r"^\s*(hi|hello|hey|thanks|thank you|help|who are you|what can you do)\b", re.I)
 
 
@@ -136,9 +138,14 @@ def _strip(text: str) -> str:
     return " ".join(kept).strip()
 
 
-def rule_plan(message: str, has_previous: bool) -> Plan | None:
-    """Deterministic routing for clear phrasings. Returns None when the question needs the chat model."""
+def rule_plan(message: str, has_previous: bool, has_focus: bool | None = None) -> Plan | None:
+    """Deterministic routing for clear phrasings. Returns None when the question needs the chat model.
+
+    has_previous: the conversation has a list of photos; has_focus: it has any photos (a list or one described photo).
+    """
     m = message.strip()
+    if (has_previous if has_focus is None else has_focus) and EXPLAIN_RE.search(m) and not COUNT_RE.search(m):
+        return Plan("explain", _strip(m))  # "why did you say it's a dog?", "that's not a cat", "where is the dog?"
     if COUNT_RE.search(m):
         return Plan("count", _strip(COUNT_RE.split(m, 1)[-1]))
     if COMPARE_RE.search(m) and len(resolve_labels(m)) >= 2:  # "more cats or dogs?"
@@ -161,6 +168,7 @@ ROUTER_PROMPT = """You turn a question about the user's photo library into JSON:
 - refine: narrow down the photos from the previous answer ("which are outdoors?", "only the night ones");
   subject = what to keep, e.g. "umbrellas" for "only keep the ones with umbrellas"
 - describe: describe one photo from the previous answer; item = its position (1 = first, -1 = last)
+- explain: the user doubts or asks about an earlier answer ("why do you say that's a dog?", "where is it?")
 - chat: greetings, thanks, questions about what you can do, or anything else
 Reply with JSON only."""
 
@@ -195,7 +203,7 @@ class Assistant:
     # ---- routing --------------------------------------------------------------------
     def plan(self, message: str, history: list[Turn], use_chat: bool) -> Plan:
         previous = self._previous(history)
-        p = rule_plan(message, bool(previous))
+        p = rule_plan(message, bool(previous), bool(self._focus(history)))
         if p is not None or not use_chat:
             return p or Plan("search", _strip(message) or message)
         context = [f"{t.role}: {t.text}" for t in history[-4:]]
@@ -207,7 +215,8 @@ class Assistant:
                                  schema=ROUTER_SCHEMA, max_tokens=60)
             d = json.loads(raw)
             action = d.get("action")
-            if action not in ACTIONS or (action in ("refine", "describe") and not previous):
+            if action not in ACTIONS or (action in ("refine", "describe") and not previous) or \
+                    (action == "explain" and not self._focus(history)):
                 raise ValueError(action)
             return Plan(action, str(d.get("subject") or "").strip() or _strip(message), int(d.get("item") or 1),
                         routed_by="chat model")
@@ -220,6 +229,25 @@ class Assistant:
             if t.role == "assistant" and t.asset_ids and t.action != "describe":  # the last list, not one photo
                 return t.asset_ids
         return []
+
+    @staticmethod
+    def _focus(history: list[Turn]) -> list[str]:
+        """The photos the conversation is about now: the last answer that showed any (a list or one photo)."""
+        for t in reversed(history):
+            if t.role == "assistant" and t.asset_ids:
+                return t.asset_ids
+        return []
+
+    @staticmethod
+    def _topic_label(message: str, history: list[Turn]) -> str | None:
+        """The object being discussed: named in this message, or in the latest earlier question that named one."""
+        label = resolve_label(message)
+        if label:
+            return label
+        for t in reversed(history):
+            if t.role == "user" and (label := resolve_label(t.text)):
+                return label
+        return None
 
     # ---- answering ------------------------------------------------------------------
     def ask(self, message: str, history: list[Turn], library_ids: list[str] | None = None,
@@ -234,6 +262,13 @@ class Assistant:
         out = handler(plan, message, history, library_ids, use_chat, asset_id)
         out.update(action=plan.action, routed_by=plan.routed_by, chat_model=status)
         out.setdefault("asset_ids", [])
+        box_labels = out.pop("box_labels", False)  # False: no boxes; None: every object; list: these labels
+        out["boxes"] = {}
+        if box_labels is not False:
+            for aid in out["asset_ids"][:48]:
+                a = self.store.get_asset(aid)
+                if a is not None and (b := self.store.boxes_for(a["content_hash"], self.key, box_labels)):
+                    out["boxes"][aid] = b
         return out
 
     def _coverage(self, library_ids):
@@ -266,7 +301,7 @@ class Assistant:
         if unchecked:
             text += f" {unchecked} newer photos haven't been checked yet."
         text += " Counts come from automatic detection and can miss small or crowded objects."
-        return {"answer": text, "asset_ids": ids[:48], "facts": facts}
+        return {"answer": text, "asset_ids": ids[:48], "facts": facts, "box_labels": labels[:4]}
 
     def _search(self, plan, message, history, library_ids, use_chat, asset_id):
         q = plan.subject or message
@@ -285,7 +320,7 @@ class Assistant:
             ids = [a for a in prev if a in keep]
             return {"answer": f"{len(ids)} of those {len(prev)} photos {'has' if len(ids) == 1 else 'have'} "
                               f"{display(label)}.",
-                    "asset_ids": ids, "facts": {"label": label, "of": len(prev), "kept": len(ids)}}
+                    "asset_ids": ids, "facts": {"label": label, "of": len(prev), "kept": len(ids)}, "box_labels": [label]}
         ids = self.rank_within(q, prev)
         return {"answer": f"Here {'is that photo' if len(prev) == 1 else f'are those {len(prev)} photos'} again, closest to “{q}” first. I can't be sure which "
                           f"ones truly match, so have a look.", "asset_ids": ids, "facts": {"query": q, "of": len(prev)}}
@@ -309,12 +344,18 @@ class Assistant:
         facts = {"asset_id": asset_id, "file": asset["rel_path"], "objects": objects}
         if use_chat:
             q = message.strip() or "Describe this photo."
+            system = "Describe the photo truthfully in 1-3 sentences. Only mention what you can see."
+            if objects:  # the counts the user was shown; keeps the description consistent with them
+                found = ", ".join(f"{n} {display(k, n)}" for k, n in objects.items())
+                system += (f" Hint (from an object detector): the photo contains {found}. Mention them if you can see "
+                           "them, small ones too, using the same names. Write as if you simply see the photo: never "
+                           "mention the hint, a detector or exact counts.")
             try:
-                text = self.chat.chat([{"role": "system", "content": "Describe the photo truthfully in 1-3 sentences. "
-                                        "Only mention what you can see."},
+                text = self.chat.chat([{"role": "system", "content": system},
                                        {"role": "user", "content": q, "images": [self.image_b64(asset_id)]}],
                                       max_tokens=160)
-                return {"answer": text, "asset_ids": [asset_id], "facts": facts, "described_by": "chat model"}
+                return {"answer": text, "asset_ids": [asset_id], "facts": facts, "described_by": "chat model",
+                        "box_labels": None}
             except ChatUnavailable:
                 pass
         found = ", ".join(f"{n} {display(k, n)}" for k, n in (objects or {}).items())
@@ -322,7 +363,36 @@ class Assistant:
                 f"I didn't detect any common objects in {asset['rel_path']}." if objects is not None else
                 f"{asset['rel_path']} hasn't been checked for objects yet.")
         return {"answer": text + " (Turn on the local chat model to get a written description.)",
-                "asset_ids": [asset_id], "facts": facts}
+                "asset_ids": [asset_id], "facts": facts, "box_labels": None}
+
+    def _explain(self, plan, message, history, library_ids, use_chat, asset_id):
+        """Show the evidence for an earlier answer: where the detector found the object, and how sure it was."""
+        focus = self._focus(history)
+        label = self._topic_label(message, history)
+        if len(focus) > 1:
+            if label is None:
+                return {"answer": "Those photos came from similarity search, which ranks photos without checking "
+                                  "what is in them, so some may not match.", "asset_ids": focus, "facts": {}}
+            return {"answer": f"I've outlined each {display(label, 1)} the detector found in these photos. If a box "
+                              f"isn't really a {display(label, 1)}, the detector made a mistake.",
+                    "asset_ids": focus, "facts": {"label": label}, "box_labels": [label]}
+        asset = self.store.get_asset(focus[0])
+        boxes = self.store.boxes_for(asset["content_hash"], self.key, [label] if label else None)
+        if label is None:
+            text = ("Here's everything the detector found in this photo, outlined." if boxes else
+                    "The detector found no common objects in this photo.")
+        elif not boxes:
+            text = (f"The detector didn't find a {display(label, 1)} in this photo. If my description said "
+                    f"otherwise, that came from the chat model, and it can be wrong.")
+        else:
+            best = max(b["score"] for b in boxes)
+            size = max((b["box"][2] - b["box"][0]) * (b["box"][3] - b["box"][1]) for b in boxes)
+            text = (f"The detector found {len(boxes)} {display(label, len(boxes))} here, outlined in the photo "
+                    f"(confidence {best:.2f}{', very sure' if best >= 0.75 else ', confirmed by the chat model'}).")
+            if size < 0.02:
+                text += f" {'It is' if len(boxes) == 1 else 'They are'} small, so look closely. Detection can still be wrong."
+        return {"answer": text, "asset_ids": [asset["id"]], "facts": {"label": label, "boxes": boxes},
+                "box_labels": [label] if label else None}
 
     def _chat(self, plan, message, history, library_ids, use_chat, asset_id):
         cov = self._coverage(library_ids)
@@ -338,6 +408,13 @@ class Assistant:
         facts = {"photos": cov["photos"], "photos_checked_for_objects": cov["checked"],
                  "objects_found": [{"thing": display(s["label"]), "photos": s["photos"], "count": s["objects"]}
                                    for s in summary]}
+        recent = []
+        for n, aid in enumerate(self._focus(history)[:6], 1):
+            if (a := self.store.get_asset(aid)) is not None:
+                objs = self.store.detections_for(a["content_hash"], self.key) or {}
+                recent.append({"photo": n, "objects": {display(k, v): v for k, v in objs.items()}})
+        if recent:
+            facts["photos_in_last_answer"] = recent
         system = ("You are the assistant inside MediaIndex, a private photo search app that runs on this computer. "
                   "You can: count common objects in photos, find photos by description, narrow down the last "
                   "results, and describe a photo. Answer in 1-3 short sentences. Use only these facts and never "

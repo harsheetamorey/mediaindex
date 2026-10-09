@@ -8,7 +8,9 @@ The **Ask** tab answers questions about your photos in plain words. Everything r
 > **You:** Which of those have cars? → 9 of those 12 photos have cars.
 > **You:** Describe the first one. → "A nighttime photograph of a city street with numerous blurred lights…"
 
-Click any photo in an answer to ask about that photo.
+Click any photo in an answer to ask about that photo. Counted objects are **outlined** in the photos, so you can check every
+answer. Doubting an answer ("why did you say it's a dog?", "where is it?", "that's not a cat") shows the evidence: the outlined
+object and how sure the detector was. Ask doesn't guess.
 
 ## How it works: three local models, one job each
 
@@ -26,6 +28,8 @@ Click any photo in an answer to ask about that photo.
     street) and 5 "cats" (1 wrong: people on stone steps). All the wrong boxes scored 0.52–0.61, and every real one
     scored 0.76 or higher.
   - Now it finds 3 dogs and 4 cats, all real. One dog in a field is still missed, because the detector calls it a cow.
+- **Descriptions get the detector's findings as a hint**, so they agree with the counts. Before this, Gemma 4 described
+  a Yorkshire terrier the detector had counted as a dog as a "cat", and left out a small dog on a beach.
 - **Numbers always come from the database, never from the chat model.** Counts, searches and follow-ups are answered with fixed
   sentences. If a free chat reply mentions a number that isn't in the facts the model was given, MediaIndex replaces it with a
   fixed summary.

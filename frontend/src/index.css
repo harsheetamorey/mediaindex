@@ -221,13 +221,16 @@ button { font: inherit; }
 .msg.assistant .bubble { background: var(--panel); border: 1px solid var(--border); }
 .msg.error .bubble { background: var(--err-bg); color: var(--danger); border-color: transparent; }
 .msg-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.msg-photo { position: relative; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--thumb-bg); cursor: pointer; width: 96px; height: 72px; }
+.msg-photo { position: relative; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--thumb-bg); cursor: pointer; height: 72px; aspect-ratio: 4 / 3; max-width: 160px; }
+.msg-photos.single .msg-photo { height: auto; width: min(420px, 100%); max-width: none; }
+.det-box { position: absolute; border: 2px solid #ffd60a; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); pointer-events: none; min-width: 6px; min-height: 6px; }
+.det-box[data-label]::after { content: attr(data-label); position: absolute; left: -2px; bottom: 100%; margin-bottom: 2px; background: #ffd60a; color: #111; font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 3px; white-space: nowrap; }
 .msg-photo:disabled { cursor: default; }
-.msg-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.msg-photo img { width: 100%; height: 100%; object-fit: fill; display: block; }
 .msg-num { position: absolute; left: 4px; top: 4px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 11px; padding: 0 5px; border-radius: 8px; }
 .ask-input { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--panel); }
 .ask-input input { flex: 1; min-width: 0; font: inherit; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
 @media (max-width: 640px) {
   .ask-log, .ask-status, .ask-input { padding-left: 16px; padding-right: 16px; }
-  .msg-photo { width: 72px; height: 54px; }
+  .msg-photo { height: 54px; }
 }

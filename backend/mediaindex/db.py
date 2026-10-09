@@ -125,6 +125,10 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX detections_label ON detections(detector, label);
     """,
+    # v5: where each counted object is, so answers can show it
+    """
+    ALTER TABLE detections ADD COLUMN boxes_json TEXT;
+    """,
 ]
 
 

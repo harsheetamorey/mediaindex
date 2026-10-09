@@ -696,12 +696,19 @@ which left empty files. It also can't work in the app window.
   - Fix: animals now need a score of 0.75, or Gemma 4 has to confirm unsure boxes.
   - Recount: 244 s, with 13 confirmation questions.
   - Result: dogs → 3 photos and cats → 4 photos, all correct. The dog in a field is still missed (detected as a cow).
+- The maintainer then asked "what's in photo 2?" (a Yorkie), and Gemma 4 said "cat". After "then why did you say it's a dog?",
+  the chat model had no evidence to give.
+  - Fix part 1: object boxes are stored (migration v5), and answers outline the counted objects.
+  - Fix part 2: a new "explain" answer shows the evidence (the box and the detector's confidence).
+  - Fix part 3: descriptions get the detector's findings as a hint. They now say "dog" for that photo and mention the small
+    beach dog.
+  - Checked with `scripts/ui_check_ask.py`: the beach dog is outlined, with "confidence 0.76, very sure… it is small".
 - "Show me a city street at night" → 12 photos, then "which of those have cars?" → 9.
 - Gemma 4 described the first and a clicked photo correctly (night street; black and white snowy street with cars).
 - Free-form questions routed by Gemma 4: "got any pups?" → search for dogs; "the third photo – what's going on there?" → describe;
   "what's in my library?" → an answer using only the stored counts.
 - `scripts/ui_check_ask.py` passed in Chrome.
-- `uv run pytest -q`: `93 passed, 1 deselected`.
+- `uv run pytest -q`: `95 passed, 1 deselected`.
 
 **Limits:**
 - Only 80 object types can be counted, and counts miss small or crowded objects.

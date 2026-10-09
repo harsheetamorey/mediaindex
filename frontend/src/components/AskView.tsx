@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ApiError, type Asset, type AskStatus, type AskTurn } from '../api'
+import { api, ApiError, type Asset, type AskStatus, type AskTurn, type DetectedBox } from '../api'
 
 type Message = {
   role: 'user' | 'assistant'
   text: string
   results?: Asset[]
+  boxes?: Record<string, DetectedBox[]>
   action?: string
   via?: string
   error?: boolean
@@ -60,7 +61,14 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
       const via = r.described_by === 'chat model' || r.routed_by === 'chat model' || (r.action === 'chat' && r.chat_model.available)
       setMessages((ms) => [
         ...ms,
-        { role: 'assistant', text: r.answer, results: r.results, action: r.action, via: via ? r.chat_model.model : undefined },
+        {
+          role: 'assistant',
+          text: r.answer,
+          results: r.results,
+          boxes: r.boxes,
+          action: r.action,
+          via: via ? r.chat_model.model : undefined,
+        },
       ])
     } catch (e) {
       setMessages((ms) => [...ms, { role: 'assistant', text: e instanceof ApiError ? e.message : String(e), error: true }])
@@ -139,16 +147,31 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
                 {m.via && <div className="muted small">answered with {m.via}</div>}
               </div>
               {all.length > 0 && (
-                <div className="msg-photos">
+                <div className={all.length === 1 && m.role === 'assistant' ? 'msg-photos single' : 'msg-photos'}>
                   {shown.map((a, n) => (
                     <button
                       key={a.id}
                       className="msg-photo"
+                      style={{ aspectRatio: a.width && a.height ? `${a.width} / ${a.height}` : undefined }}
                       title={`${n + 1}. ${a.rel_path}${m.role === 'assistant' ? ' (click to ask about this photo)' : ''}`}
                       onClick={() => m.role === 'assistant' && send(`What's in photo ${n + 1}?`, a)}
                       disabled={busy || m.role !== 'assistant'}
                     >
                       <img src={a.thumbnail_url} alt={a.rel_path} loading="lazy" />
+                      {m.boxes?.[a.id]?.map((b, k) => (
+                        <span
+                          key={k}
+                          className="det-box"
+                          title={`${b.label} (${b.score.toFixed(2)})`}
+                          data-label={all.length === 1 ? b.label : undefined}
+                          style={{
+                            left: `${b.box[0] * 100}%`,
+                            top: `${b.box[1] * 100}%`,
+                            width: `${(b.box[2] - b.box[0]) * 100}%`,
+                            height: `${(b.box[3] - b.box[1]) * 100}%`,
+                          }}
+                        />
+                      ))}
                       {m.role === 'assistant' && all.length > 1 && <span className="msg-num">{n + 1}</span>}
                     </button>
                   ))}
