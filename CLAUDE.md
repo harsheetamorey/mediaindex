@@ -6,7 +6,9 @@ Build spec: `mediaindex-claude-build-guide.md`. Progress and gate status: `docs/
 ## Stack
 - Backend: Python 3.12 (uv-managed `.venv`), FastAPI, SQLite metadata, normalized NumPy vectors, exact cosine search.
 - Frontend: React + TypeScript + Vite in `frontend/`. Bundle all assets locally; no runtime CDNs or external fonts.
-- Model: `google/embeddinggemma-2` only. Never substitute another model, fake embeddings, or caption-based search.
+- Model: `google/embeddinggemma-2` only for search. Never substitute another model, fake embeddings, or caption-based search.
+- Ask tab only (approved by the maintainer, 2026-10-08): RT-DETR v2 counts objects, and an optional Gemma 4 E2B served by a local
+  Ollama (loopback only) routes and phrases answers. Numbers always come from the database, never from the chat model.
 
 ## Commands
 - Install: `uv sync` and `cd frontend && npm install`

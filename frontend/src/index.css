@@ -200,3 +200,34 @@ button { font: inherit; }
   .detail { flex-direction: column; }
   .detail-info { width: 100%; }
 }
+
+/* Search / Ask tabs */
+.tabs { display: flex; gap: 2px; background: var(--thumb-bg); border-radius: 8px; padding: 2px; align-self: center; }
+.tab { border: 0; background: none; color: var(--muted); padding: 4px 14px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; }
+.tab.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+
+/* Ask (chat over the library) */
+.ask { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ask-status { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.ask-status .btn { margin-left: 8px; }
+.ask-status .link { margin-left: auto; }
+.ask-log { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.ask-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+.msg { display: flex; flex-direction: column; gap: 6px; max-width: 760px; }
+.msg.user { align-self: flex-end; align-items: flex-end; }
+.msg.assistant { align-self: flex-start; }
+.bubble { padding: 9px 13px; border-radius: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.user .bubble { background: var(--accent); color: var(--accent-text); }
+.msg.assistant .bubble { background: var(--panel); border: 1px solid var(--border); }
+.msg.error .bubble { background: var(--err-bg); color: var(--danger); border-color: transparent; }
+.msg-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.msg-photo { position: relative; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--thumb-bg); cursor: pointer; width: 96px; height: 72px; }
+.msg-photo:disabled { cursor: default; }
+.msg-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.msg-num { position: absolute; left: 4px; top: 4px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 11px; padding: 0 5px; border-radius: 8px; }
+.ask-input { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--panel); }
+.ask-input input { flex: 1; min-width: 0; font: inherit; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+@media (max-width: 640px) {
+  .ask-log, .ask-status, .ask-input { padding-left: 16px; padding-right: 16px; }
+  .msg-photo { width: 72px; height: 54px; }
+}

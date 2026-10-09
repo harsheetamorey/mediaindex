@@ -34,6 +34,15 @@ estimate and cancel. You can search as soon as items are indexed. Tick **Watch f
 afterwards. On first launch it asks before downloading the model once. It is unsigned, so on other Macs open it with right-click → Open.
 Details, including watched folders, low-priority indexing and Finder tags on exports: [`docs/desktop-app.md`](docs/desktop-app.md).
 
+### Ask: chat with your photos
+The **Ask** tab answers questions like "how many dogs do I have?", "show me a city street at night", "which of those have cars?" and
+"describe the first one", with the photos each answer is based on.
+- Counts come from a local object detector (RT-DETR, 80 common object types).
+- Photos are found with EmbeddingGemma.
+- An optional local chat model (Gemma 4 E2B through Ollama) understands free-form questions and describes photos.
+
+Nothing is uploaded. Setup, measured accuracy and limits: [`docs/ask.md`](docs/ask.md).
+
 ### Optional demo data (traceable, publisher-declared CC0)
 ```bash
 uv run --extra demo python scripts/download_demo.py         # 500 stock photos, ~115 MB  -> data/demo/stockimages-cc0
@@ -117,12 +126,13 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 - Indexing is slow on an 8 GB M1, and video indexing runs at about 1.6× real time.
 - Only tested on macOS 14 with Apple M1. Linux and Windows are untested (the reveal-in-folder command has untested Linux and Windows variants).
 - The folder chooser and Finder tags are macOS only. On other systems, paste the folder path.
+- Ask only counts 80 common object types in photos, and counts can miss small or crowded objects. Gemma 4 descriptions can be wrong.
 
 ## Documentation
 [Architecture](docs/architecture.md) · [Environment](docs/environment.md) · [Model compatibility](docs/model-compatibility.md) ·
 [Progress & gates](docs/progress.md) · [Offline & robustness](docs/offline-and-robustness.md) · [Evaluation](docs/evaluation.md) ·
 [Release checklist](docs/release-checklist.md) · [Demo](docs/demo.md) · [Release draft & handoff](docs/release-draft.md) ·
-[Model comparison](docs/model-comparison.md) · [Desktop app](docs/desktop-app.md) · [Contributing](CONTRIBUTING.md)
+[Model comparison](docs/model-comparison.md) · [Desktop app](docs/desktop-app.md) · [Ask](docs/ask.md) · [Contributing](CONTRIBUTING.md)
 
 ## Licence
 Original code: Apache-2.0 ([`LICENSE`](LICENSE)). The model, third-party software and data have their own terms: [`NOTICE.md`](NOTICE.md) and

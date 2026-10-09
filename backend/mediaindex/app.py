@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from . import __version__
 from .config import Settings
 from .db import Database
-from . import api_search, api_selections
+from . import api_ask, api_search, api_selections
 from .indexer import make_audio_embedder, make_image_embedder, make_video_embedder
 from .ingest import run_image_import, thumb_path, window_thumb_path
 from .search import MatrixCache
@@ -30,6 +30,8 @@ from .model.host import ModelHost
 from .model.profiles import IndexProfile
 from .security import BodySizeLimitMiddleware, LocalGuardMiddleware
 from .watch import FolderWatcher
+from .detect import DetectorHost, default_factory as default_detector_factory
+from .llm import OllamaChat
 
 
 class LibraryCreate(BaseModel):
@@ -49,7 +51,7 @@ PICK_FOLDER_SCRIPT = ['tell me to activate',
                       'POSIX path of (choose folder with prompt "Choose a media folder for MediaIndex")']
 
 
-def create_app(settings: Settings | None = None, backend_factory=None) -> FastAPI:
+def create_app(settings: Settings | None = None, backend_factory=None, detector_factory=None, chat=...) -> FastAPI:
     settings = settings or Settings()
     settings.ensure_dirs()
     profile = IndexProfile(precision=settings.resolved_precision())
@@ -282,6 +284,9 @@ def create_app(settings: Settings | None = None, backend_factory=None) -> FastAP
     api_search.register(app)
     api_selections.register(app)
     api_selections.register_clips(app)
+    if chat is ...:
+        chat = OllamaChat(settings.ollama_url, settings.chat_model) if settings.chat_model else None
+    api_ask.register(app, DetectorHost(detector_factory or default_detector_factory(settings.resolved_device())), chat)
     mount_frontend(app)
     return app
 

@@ -667,3 +667,39 @@ every feature's status is stated truthfully in `docs/release-draft.md`.
 which left empty files. It also can't work in the app window.
 
 **Limitations:** the app is unsigned and not notarized. Sound and video need FFmpeg. Premiere Pro, Final Cut Pro and Canva are untested.
+
+
+## After Phase 20: Ask (chat with the photo library)
+
+**Changes:**
+- Backend:
+  - `detect.py`: RT-DETR v2 object counts, run once per photo hash, with migration v4.
+  - `assistant.py`: routing (rules first, then the chat model), count, search, follow-up filter or re-rank, describe, and chat with a
+    numbers guard.
+  - `llm.py`: Ollama client, loopback only.
+  - `api_ask.py`: `GET /api/ask/status`, `POST /api/ask/prepare`, `POST /api/ask`.
+- UI: a **Search | Ask** switch, plus the Ask tab with the count button, chat log, numbered photo strips, click-to-ask and suggestions.
+- Tests: `backend/tests/test_ask.py`, 8 mocked tests with a fake detector, fake embeddings and a fake chat model. The browser check is
+  `scripts/ui_check_ask.py`. Docs: `docs/ask.md`. `CLAUDE.md` now allows the two helper models for Ask only.
+
+**Model choice (REAL MODEL, M1 8 GB, 20 demo photos; counts checked by looking, not human labels):**
+- RT-DETR v2: 0.27 s per photo; best on crowds and cars.
+- Florence-2 base: 2.0–2.3 s per photo; missed most people in crowds.
+- Gemma 3 1B: routing 9/10 correct; it garbled numbers in one reply.
+- Gemma 4 E2B 4-bit: 10/11 photo descriptions correct; 0/3 sound descriptions correct, so Ask doesn't describe sounds.
+- Details are in `docs/ask.md`.
+
+**Observed (REAL MODEL, M1 8 GB):**
+- Counting all 512 demo photos took 145 s.
+- "How many dogs" → 5 photos; "people" → 138 photos (456 counted); "birds" → 33 photos.
+- "Show me a city street at night" → 12 photos, then "which of those have cars?" → 9.
+- Gemma 4 described the first and a clicked photo correctly (night street; black and white snowy street with cars).
+- Free-form questions routed by Gemma 4: "got any pups?" → search for dogs; "the third photo – what's going on there?" → describe;
+  "what's in my library?" → an answer using only the stored counts.
+- `scripts/ui_check_ask.py` passed in Chrome.
+- `uv run pytest -q`: `91 passed, 1 deselected`.
+
+**Limits:**
+- Only 80 object types can be counted, and counts miss small or crowded objects.
+- Photos only.
+- In the Mac app, the detector must already be in the Hugging Face cache.

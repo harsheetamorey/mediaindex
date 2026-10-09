@@ -24,6 +24,8 @@ class Settings:
     job_queue_size: int = 8
     query_wait_seconds: float = float(os.environ.get("MEDIAINDEX_QUERY_WAIT", "30"))
     watch_interval: float = float(os.environ.get("MEDIAINDEX_WATCH_INTERVAL", "20"))  # seconds; 0 disables watching
+    ollama_url: str = os.environ.get("MEDIAINDEX_OLLAMA_URL", "http://127.0.0.1:11434")  # loopback only
+    chat_model: str = os.environ.get("MEDIAINDEX_CHAT_MODEL", "gemma4:e2b-it-qat")  # "" turns the chat model off
     max_request_bytes: int = 60 * 1024 * 1024  # largest accepted upload (50 MB audio) + multipart overhead
     allowed_origins: tuple[str, ...] = ()
 

@@ -140,6 +140,23 @@ export type ExportPlan = {
   overwrites: number
 }
 
+export type AskTurn = { role: 'user' | 'assistant'; text: string; asset_ids?: string[]; action?: string }
+
+export type AskResponse = {
+  answer: string
+  action: 'count' | 'search' | 'refine' | 'describe' | 'chat'
+  routed_by: string
+  described_by?: string
+  asset_ids: string[]
+  results: Asset[]
+  chat_model: { available: boolean; model?: string; reason?: string }
+}
+
+export type AskStatus = {
+  detector: { model: string; coverage: { photos: number; checked: number }; job: Job | null }
+  chat_model: { available: boolean; model?: string; reason?: string }
+}
+
 export class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -170,6 +187,14 @@ const json = (body: unknown): RequestInit => ({
 })
 
 export const api = {
+  askStatus: (libraryIds?: string[]) =>
+    request<AskStatus>('/api/ask/status' + (libraryIds?.length ? `?library_ids=${libraryIds.join(',')}` : '')),
+  askPrepare: (libraryIds?: string[]) => request<Job>('/api/ask/prepare', json({ library_ids: libraryIds?.length ? libraryIds : null })),
+  ask: (message: string, history: AskTurn[], libraryIds?: string[], assetId?: string) =>
+    request<AskResponse>(
+      '/api/ask',
+      json({ message, history, library_ids: libraryIds?.length ? libraryIds : null, asset_id: assetId ?? null }),
+    ),
   libraries: () => request<Library[]>('/api/libraries'),
   addLibrary: (path: string, name?: string) => request<Library>('/api/libraries', json({ path, name })),
   setLibraryWatch: (id: string, watch: boolean) =>
