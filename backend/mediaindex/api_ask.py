@@ -81,10 +81,12 @@ def register(app: FastAPI, detector_host: DetectorHost, chat) -> None:
     def ask_status(library_ids: str | None = None) -> dict:
         libs = [x for x in (library_ids or "").split(",") if x] or None
         _check_libs(libs)
-        job = next((j.to_dict() for j in app.state.runner.list()
-                    if j.kind == "count-objects" and j.status in ("queued", "running")), None)
+        jobs = [j for j in app.state.runner.list() if j.kind == "count-objects"]
+        job = next((j.to_dict() for j in jobs if j.status in ("queued", "running")), None)
+        last = max(jobs, key=lambda j: j.created, default=None)
+        error = last.error if last is not None and last.status == "failed" else None
         return {"detector": {"model": DETECTOR_ID, "key": DETECTOR_KEY,
-                             "coverage": store.detection_coverage(DETECTOR_KEY, libs), "job": job},
+                             "coverage": store.detection_coverage(DETECTOR_KEY, libs), "job": job, "error": error},
                 "chat_model": chat.status() if chat else {"available": False, "reason": "disabled"}}
 
     @app.post("/api/ask/prepare")

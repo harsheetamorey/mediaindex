@@ -15,7 +15,7 @@ running locally. MediaIndex is an independent project. It is not a fork of Oxfor
 ## Quick start (macOS on Apple silicon; Linux expected to work but untested)
 
 Requirements: Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+ (to build the UI once), and FFmpeg (`brew install ffmpeg`).
-The first setup downloads about 1.5 GB of model weights.
+The first setup downloads about 1.6 GB of model weights. After that, MediaIndex runs offline.
 
 ```bash
 git clone https://github.com/harsheetamorey/mediaindex.git && cd mediaindex
@@ -23,6 +23,7 @@ uv sync                                         # Python deps, pinned in uv.lock
 (cd frontend && npm ci && npm run build)        # UI, served by the backend
 mkdir -p data/samples/smoke                     # put 3+ of your own JPEGs here, then:
 MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python scripts/model_smoke.py --images data/samples/smoke   # downloads + verifies the model
+MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.detect --download   # object detector for Ask (~170 MB)
 uv run python -m mediaindex                     # open http://127.0.0.1:8765
 ```
 
@@ -119,14 +120,32 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 | Port 8765 in use | `MEDIAINDEX_PORT=8800 uv run python -m mediaindex`. The UI is served from the same port. |
 | Out-of-memory on 8 GB | Close other heavy apps, or run on CPU with `MEDIAINDEX_DEVICE=cpu` (slower). |
 
-## Limitations
-- Text→sound search is a rough candidate finder. On Clotho it scores far below a specialist audio model (see Evaluation).
-- Retrieval quality is uneven. See the documented misses (glass and door sounds, sound→image "hub" images, ignored style refinements, no negation).
-- Text refinement and cross-media results are similarity candidates. They are not logical filters, synchronized audio, or artistic judgements.
-- Indexing is slow on an 8 GB M1, and video indexing runs at about 1.6× real time.
-- Only tested on macOS 14 with Apple M1. Linux and Windows are untested (the reveal-in-folder command has untested Linux and Windows variants).
-- The folder chooser and Finder tags are macOS only. On other systems, paste the folder path.
-- Ask only counts 80 common object types in photos, and counts can miss small or crowded objects. Gemma 4 descriptions can be wrong.
+## Known limits
+**Where it runs**
+- **Tested only on macOS 14 with an Apple M1 (8 GB).** Linux, Windows and Intel Macs are untested. The reveal-in-folder
+  command has untested Linux and Windows variants.
+- **The folder chooser and Finder tags are macOS only.** On other systems, paste the folder path.
+- **The Mac app is unsigned and not notarized.** On another Mac, open it with right-click → Open.
+
+**Speed**
+- **Indexing is slow on an 8 GB M1:** about 0.5 photos per second, so 10,000 photos take about 5–6 hours the first time.
+  Video indexes at about 1.6× real time.
+- **Counting objects for Ask** is about 0.3 s per photo. Ask's chat model needs Ollama and about 4 GB more disk.
+
+**Search quality**
+- **Text→sound search is a rough candidate finder.** On Clotho it scores far below a specialist audio model (see Evaluation).
+- **Retrieval quality is uneven.** See the documented misses: glass and door sounds, sound→image "hub" images, ignored
+  style refinements, and no negation.
+- **Text refinement and cross-media results are similarity candidates.** They are not logical filters, synchronized audio,
+  or artistic judgements.
+
+**Ask**
+- **Only 80 common object types can be counted,** and only in photos (not sounds or videos).
+- **On everyday photos,** 96% of counted photos were right, and 29% of photos containing the thing were missed (COCO,
+  300 photos).
+- **Unusual or artistic photos cause confident mistakes,** such as a flower counted as an umbrella. Answers show the photos
+  and boxes, and you can correct them.
+- **Gemma 4 descriptions can be wrong.**
 
 ## Documentation
 [Architecture](docs/architecture.md) · [Environment](docs/environment.md) · [Model compatibility](docs/model-compatibility.md) ·

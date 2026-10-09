@@ -268,3 +268,19 @@ def test_correcting_several_photos_at_once(client):
     assert "photos 1, 2 and 3 have no dog" in r2["answer"] and r2["asset_ids"] == []
     assert "didn't find any dogs" in ask(c, "how many dogs?")["answer"]
 
+
+def test_missing_detector_fails_clearly(tmp_path):
+    def broken():
+        raise OSError("not in the local cache")
+
+    root = tmp_path / "P"
+    make_image(root / "a.jpg")
+    app = create_app(Settings(data_dir=tmp_path / "data", precision="float32", watch_interval=0),
+                     backend_factory=FakeBackend, detector_factory=broken, chat=None)
+    with TestClient(app) as c:
+        lib = c.post("/api/libraries", json={"path": str(root)}).json()
+        wait_job(c, c.post(f"/api/libraries/{lib['id']}/import").json()["id"])
+        job = wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+        assert job["status"] == "failed" and "python -m mediaindex.detect --download" in job["error"]
+        assert "mediaindex.detect --download" in c.get("/api/ask/status").json()["detector"]["error"]
+

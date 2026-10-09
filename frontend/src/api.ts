@@ -158,7 +158,7 @@ export type AskResponse = {
 export type DetectedBox = { label: string; score: number; box: [number, number, number, number] }
 
 export type AskStatus = {
-  detector: { model: string; coverage: { photos: number; checked: number }; job: Job | null }
+  detector: { model: string; coverage: { photos: number; checked: number }; job: Job | null; error?: string | null }
   chat_model: { available: boolean; model?: string; reason?: string }
 }
 
