@@ -714,3 +714,21 @@ which left empty files. It also can't work in the app window.
 - Only 80 object types can be counted, and counts miss small or crowded objects.
 - Photos only.
 - In the Mac app, the detector must already be in the Hugging Face cache.
+
+**Counting rule measured on COCO (after the maintainer found wrong umbrella counts):**
+- My earlier fixes were rules picked by eye from about 25 demo photos (for animals, and a Gemma 4 double-check), so they
+  wouldn't generalize. They were replaced by a rule measured on human-labelled data.
+- `scripts/coco_check.py` used 300 COCO val2017 photos.
+
+| Rule | Precision | Recall |
+|---|---|---|
+| Score ≥ 0.5 | 0.865 | 0.874 |
+| **Score ≥ 0.75** | **0.962** | 0.714 |
+| Plus Gemma 4 confirming the 0.5–0.75 band | 0.923 | 0.795 |
+
+- Gemma 4's "no" answers were right only 36–73% of the time, so it isn't used for counting.
+- Chosen: one rule for all 80 types. Score ≥ 0.75 is counted, and 0.5–0.75 is shown as "maybe".
+- Users can correct several photos at once ("1, 2 and 4 aren't umbrellas"), and corrections are kept.
+- Demo library: dogs 3 and cats 4, all correct. The wrong ones (a cliff, a street, people on steps) are now "maybe".
+  Umbrellas are still mostly wrong: confident mistakes on artistic close-ups (a petunia scored 0.94).
+- `uv run pytest -q`: `96 passed, 1 deselected`.

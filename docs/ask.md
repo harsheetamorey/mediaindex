@@ -20,14 +20,11 @@ object and how sure the detector was. Ask doesn't guess.
 | Count objects ("how many dogs?") | **RT-DETR v2** (`PekingU/rtdetr_v2_r50vd`, pinned revision), 80 common object types | Apache-2.0 | Once per photo, when you press **Count objects** |
 | Understand oddly phrased questions, describe a photo, small talk | **Gemma 4 E2B** (`gemma4:e2b-it-qat`, 4-bit) through **Ollama** | Apache-2.0 | Each question that needs it (optional) |
 
-- **Counting rule:**
-  - Most objects count when the detector's score is at least 0.5.
-  - Animals need 0.75, or 0.5–0.75 if Gemma 4 confirms that animal is in the photo (a yes/no question; without Ollama
-    these unsure boxes are dropped).
-  - The first version counted animals from 0.5. On the demo photos that gave 5 "dogs" (2 wrong: a sunset cliff and a
-    street) and 5 "cats" (1 wrong: people on stone steps). All the wrong boxes scored 0.52–0.61, and every real one
-    scored 0.76 or higher.
-  - Now it finds 3 dogs and 4 cats, all real. One dog in a field is still missed, because the detector calls it a cow.
+- **Counting rule:** the same for all 80 types, chosen by measurement (see [below](#how-the-counting-rule-was-chosen)).
+  - A photo counts when the detector scores the object at least **0.75**.
+  - Photos where it only scores 0.5–0.75 are shown last, with a dashed border and a **maybe** tag, and aren't counted.
+- **Your corrections win.** Say "photo 3 isn't a dog" or "1, 2 and 4 aren't umbrellas", and those photos are left out of
+  that answer from then on. They are stored in the local database.
 - **Descriptions get the detector's findings as a hint**, so they agree with the counts. Before this, Gemma 4 described
   a Yorkshire terrier the detector had counted as a dog as a "cat", and left out a small dog on a beach.
 - **Numbers always come from the database, never from the chat model.** Counts, searches and follow-ups are answered with fixed
@@ -46,7 +43,7 @@ Searching still uses EmbeddingGemma only. RT-DETR and Gemma 4 are helpers for As
 
 1. **Object counts:** open **Ask** and press **Count objects**.
    - RT-DETR (~170 MB) downloads once from Hugging Face.
-   - Counting is about 0.3 s per photo; 512 photos took **145 s** on an M1.
+   - Counting is about 0.3 s per photo; 512 photos took **145–151 s** on an M1.
    - New photos are added by pressing the button again.
    - In the Mac app, the detector has to be in the Hugging Face cache already, because the app runs offline once
      EmbeddingGemma is cached. Run Ask once from source first, or start the app before EmbeddingGemma is downloaded.
@@ -71,17 +68,51 @@ checked by looking at the photos; these are **not** human evaluation labels.
 | Gemma 3 1B (text only) | 1.4 s per routing, 1.9 s per reply | n/a | Routed 9/10 test questions correctly; one reply garbled the numbers. Gated licence |
 | **Gemma 4 E2B** 4-bit (chosen) | 1–10 s per description | Not used for counting | 10 of 11 photos described correctly (called a Yorkshire terrier a "calico cat"). **Sounds: 0 of 3 right** (crickets and footsteps came out as "dog barking"), so Ask doesn't describe sounds |
 
+## How the counting rule was chosen (REAL MODEL, M1 8 GB)
+
+`scripts/coco_check.py` ran the detector on **300 photos from COCO val2017**, sampled with seed 0.
+- COCO val2017 is a public set where people drew a box around every object of these 80 types.
+- The detector was trained on COCO *train*2017, so these photos are new to it.
+
+Scores are at photo level, which is what Ask answers.
+- **Precision:** of the photos reported to contain the thing, the share that really do.
+- **Recall:** of the photos that contain it, the share that were found.
+
+| Rule (all 80 types together) | Precision | Recall |
+|---|---|---|
+| score ≥ 0.5 | 0.865 | 0.874 |
+| **score ≥ 0.75 (chosen)** | **0.962** | 0.714 |
+| ≥ 0.75, or 0.5–0.75 when Gemma 4 says yes (whole-photo yes/no) | 0.923 | 0.795 |
+
+- **Within the 0.5–0.75 band, only about 60% of photos were right** (140 of 235). That's why they're shown as "maybe"
+  instead of counted.
+- **Gemma 4 as a double-checker helped little.** Its "no" answers were right 36% of the time for boxes under 0.5% of the
+  photo, and 73% for boxes over 5%. It isn't used for counting.
+- **Per type, at 0.75,** precision was 0.75–1.00 for every type with at least 5 photos, except potted plants (0.60). Examples: people 0.98, cars 1.00,
+  dogs 1.00, cats 1.00, umbrellas 1.00, bottles 0.79, potted plants 0.60. The full list is printed by
+  `python scripts/coco_check.py report`.
+- **Unusual photos are harder.** On the artistic demo photos, the detector still scored a petunia 0.94 and a sunflower 0.79
+  as "umbrella". No score rule catches confident mistakes like these, which is why answers show their photos with the
+  boxes, and why corrections are kept.
+
+Earlier, before this measurement, I tried rules picked by eye from about 25 demo photos: separate rules for animals, and
+Gemma 4 double-checking "other objects". They fixed the photos I looked at, but broke others: Gemma 4 rejected a real
+Yorkshire terrier and small real cars. They were replaced by the measured rule above.
+
 **End-to-end (real models, this Mac):**
-- 512 photos counted in 145 s, or 244 s with Gemma 4 confirming the 13 unsure animal boxes.
-- Count questions answer in under 0.1 s and searches in about 0.5 s. EmbeddingGemma's first load adds ~15 s.
-- Describing a photo takes about 7–15 s. The chat model's first load adds ~20 s.
-- `scripts/ui_check_ask.py` drives the Ask tab in Chrome: a count, a search, a follow-up filter, "describe the first one", and
-  clicking a photo.
+- 512 photos counted in 151 s.
+- **Dogs:** 3 photos, all real dogs; the 2 "maybe" photos have no dog.
+- **Cats:** 4 photos, all real cats; the 1 "maybe" photo has none.
+- **Umbrellas:** 8 photos, mostly wrong, from the confident mistakes above.
+- **Timing:** count questions answer in under 0.1 s, searches in about 0.5 s (EmbeddingGemma's first load adds ~15 s), and
+  describing a photo takes 7–15 s.
+- `scripts/ui_check_ask.py` drives the Ask tab in Chrome.
 
 ## Limits
 - **Only 80 common object types can be counted:** people, animals, vehicles and household things. Anything else ("sunsets",
   "lizards") gets the closest photos instead, and the answer says so.
-- **Counts can be wrong.** Small, far-away or overlapping objects are missed, and look-alikes are confused. That's why every
-  answer shows its photos.
+- **Counts can be wrong.** On everyday photos (COCO), 96% of counted photos were right, and 29% of photos with the thing were
+  missed. Unusual or artistic photos produce confident mistakes. Every answer shows its photos and boxes, and corrections are
+  kept.
 - **Photos only.** Sounds and videos aren't counted or described.
 - **Gemma 4 can describe things that aren't there.** Treat descriptions as a quick look, not a record.

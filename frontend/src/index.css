@@ -223,6 +223,9 @@ button { font: inherit; }
 .msg-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .msg-photo { position: relative; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--thumb-bg); cursor: pointer; height: 72px; aspect-ratio: 4 / 3; max-width: 160px; }
 .msg-photos.single .msg-photo { height: auto; width: min(420px, 100%); max-width: none; }
+.msg-photo.maybe { border-style: dashed; border-color: var(--muted); opacity: 0.85; }
+.msg-maybe { position: absolute; right: 4px; bottom: 4px; background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; }
+.msg-photo.maybe .det-box { border-style: dashed; }
 .det-box { position: absolute; border: 2px solid #ffd60a; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); pointer-events: none; min-width: 6px; min-height: 6px; }
 .det-box[data-label]::after { content: attr(data-label); position: absolute; left: -2px; bottom: 100%; margin-bottom: 2px; background: #ffd60a; color: #111; font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 3px; white-space: nowrap; }
 .msg-photo:disabled { cursor: default; }

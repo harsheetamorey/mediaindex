@@ -129,6 +129,17 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE detections ADD COLUMN boxes_json TEXT;
     """,
+    # v6: the chat model's yes/no double-check of a detected object, per photo (cached so it runs once)
+    """
+    CREATE TABLE verifications (
+        content_hash TEXT NOT NULL,
+        label TEXT NOT NULL,
+        verifier TEXT NOT NULL,
+        present INTEGER NOT NULL,
+        created_at REAL NOT NULL,
+        PRIMARY KEY (content_hash, label, verifier)
+    );
+    """,
 ]
 
 

@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .detect import LABELS
+from .detect import LABELS, SURE
 from .llm import ChatUnavailable, OllamaChat
 from .store import Store
 
@@ -111,8 +111,9 @@ DESCRIBE_RE = re.compile(r"\b(describe|tell me (more )?about|what'?s (in|happeni
 REFINE_RE = re.compile(r"\b(which of|of those|of these|among (them|those|these)|the ones|which ones|only keep|keep only|"
                        r"just keep|those|these|them)\b", re.I)
 REFERENCE_RE = re.compile(r"\b(this|that|it|one|photo|picture|image)\b", re.I)
-EXPLAIN_RE = re.compile(r"\b(why|where('?s| is| are)?|not an?|isn'?t|is not|aren'?t|wrong|are you sure|really|"
+EXPLAIN_RE = re.compile(r"\b(why|where('?s| is| are)?|not an?|isn'?t|is not|are not|aren'?t|none of|wrong|are you sure|really|"
                         r"(don'?t|do not|can'?t|cannot) see|no (dog|cat|one)s?)\b", re.I)
+NEGATION_RE = re.compile(r"\b(not|isn'?t|aren'?t|no|wrong|none)\b", re.I)
 CHAT_RE = re.compile(r"^\s*(hi|hello|hey|thanks|thank you|help|who are you|what can you do)\b", re.I)
 
 
@@ -122,6 +123,14 @@ class Plan:
     subject: str = ""
     item: int | None = None
     routed_by: str = "rules"
+
+
+def _items(text: str) -> list[int]:
+    """All photo numbers in a correction: "photos 1, 2 and 4", "the first and the last", "#3"."""
+    t = text.lower()
+    found = [n for w, n in ORDINALS.items() if re.search(rf"\b{w}\b", t)]
+    found += [int(x) for x in re.findall(r"\b(\d{1,3})\b", t)]
+    return list(dict.fromkeys(found))
 
 
 def _item(text: str) -> int | None:
@@ -185,6 +194,8 @@ class Turn:
     action: str | None = None  # for assistant turns: which kind of answer it was
 
 
+USER = "user"  # corrections typed by the user ("photo 3 isn't a dog") always win
+
 SearchFn = Callable[[str, list[str] | None, int], list[str]]  # text, library_ids, limit -> asset ids by similarity
 RankFn = Callable[[str, list[str]], list[str]]  # text, candidate asset ids -> the same ids, most similar first
 
@@ -203,7 +214,8 @@ class Assistant:
     # ---- routing --------------------------------------------------------------------
     def plan(self, message: str, history: list[Turn], use_chat: bool) -> Plan:
         previous = self._previous(history)
-        p = rule_plan(message, bool(previous), bool(self._focus(history)))
+        answered = bool(self._focus(history)) or any(t.role == "assistant" for t in history)
+        p = rule_plan(message, bool(previous), answered)
         if p is not None or not use_chat:
             return p or Plan("search", _strip(message) or message)
         context = [f"{t.role}: {t.text}" for t in history[-4:]]
@@ -249,6 +261,12 @@ class Assistant:
                 return label
         return None
 
+    def _without_corrections(self, label: str, ids: list[str]) -> list[str]:
+        """Drop photos the user said don't contain `label`."""
+        hashes = {aid: a["content_hash"] for aid in ids if (a := self.store.get_asset(aid)) is not None}
+        user = self.store.verifications(list(set(hashes.values())), label, USER)
+        return [aid for aid in ids if user.get(hashes.get(aid), True)]
+
     # ---- answering ------------------------------------------------------------------
     def ask(self, message: str, history: list[Turn], library_ids: list[str] | None = None,
             asset_id: str | None = None) -> dict:
@@ -286,22 +304,30 @@ class Assistant:
         if cov["checked"] == 0:
             return {"answer": ("Your photos haven't been checked for objects yet. Press “Count objects” above, "
                                "then ask again."), "facts": facts}
-        parts, ids = [], []
+        parts, ids, maybe = [], [], []
         for label in labels[:4]:
-            c = self.store.count_objects(self.key, label, library_ids)
-            facts[label] = {"photos": c["photos"], "objects": c["objects"]}
-            ids += [a for a in c["asset_ids"] if a not in ids]
-            if c["photos"] == 0:
+            c = self.store.count_objects(self.key, label, library_ids, sure=SURE)
+            kept = self._without_corrections(label, c["asset_ids"])
+            unsure = [a for a in self._without_corrections(label, c["maybe_ids"]) if a not in ids and a not in kept]
+            objects = sum(c["counts"][a] for a in kept)
+            facts[label] = {"photos": len(kept), "objects": objects, "maybe_photos": len(unsure)}
+            ids += [a for a in kept if a not in ids]
+            maybe += [a for a in unsure if a not in maybe]
+            if not kept:
                 parts.append(f"I didn't find any {display(label)} in the {cov['checked']} photos I checked.")
             else:
-                parts.append(f"{display(label).capitalize()} appear in {c['photos']} of {cov['checked']} photos "
-                             f"({c['objects']} {display(label, c['objects'])} counted).")
+                parts.append(f"{display(label).capitalize()} appear in {len(kept)} of {cov['checked']} photos "
+                             f"({objects} {display(label, objects)} counted).")
+            if unsure:
+                parts.append(f"{len(unsure)} more {'photo' if len(unsure) == 1 else 'photos'} might have {display(label)}, "
+                             f"but the detector isn't sure (shown last, marked “maybe”).")
         text = " ".join(parts)
         unchecked = cov["photos"] - cov["checked"]
         if unchecked:
             text += f" {unchecked} newer photos haven't been checked yet."
-        text += " Counts come from automatic detection and can miss small or crowded objects."
-        return {"answer": text, "asset_ids": ids[:48], "facts": facts, "box_labels": labels[:4]}
+        text += " Counts come from automatic detection and can be wrong; tell me if one is (“photo 3 isn't a dog”)."
+        ids, maybe = ids[:48], maybe[:24]
+        return {"answer": text, "asset_ids": ids + maybe, "maybe_ids": maybe, "facts": facts, "box_labels": labels[:4]}
 
     def _search(self, plan, message, history, library_ids, use_chat, asset_id):
         q = plan.subject or message
@@ -316,8 +342,8 @@ class Assistant:
         q = plan.subject or message
         label = resolve_label(q)
         if label is not None and self._coverage(library_ids)["checked"]:
-            keep = set(self.store.count_objects(self.key, label, library_ids)["asset_ids"])
-            ids = [a for a in prev if a in keep]
+            keep = set(self.store.count_objects(self.key, label, library_ids, sure=SURE)["asset_ids"])
+            ids = self._without_corrections(label, [a for a in prev if a in keep])
             return {"answer": f"{len(ids)} of those {len(prev)} photos {'has' if len(ids) == 1 else 'have'} "
                               f"{display(label)}.",
                     "asset_ids": ids, "facts": {"label": label, "of": len(prev), "kept": len(ids)}, "box_labels": [label]}
@@ -340,7 +366,7 @@ class Assistant:
         asset = self.store.get_asset(asset_id)
         if asset is None or asset["media_type"] != "image":
             return {"answer": "I can only describe photos.", "facts": {}}
-        objects = self.store.detections_for(asset["content_hash"], self.key)
+        objects = self.store.detections_for(asset["content_hash"], self.key, sure=SURE)
         facts = {"asset_id": asset_id, "file": asset["rel_path"], "objects": objects}
         if use_chat:
             q = message.strip() or "Describe this photo."
@@ -369,12 +395,18 @@ class Assistant:
         """Show the evidence for an earlier answer: where the detector found the object, and how sure it was."""
         focus = self._focus(history)
         label = self._topic_label(message, history)
+        if not focus:
+            return {"answer": "The last answer didn't show any photos, so there's nothing to check.", "facts": {}}
+        nums = _items(message)
+        if nums and label is not None and len(focus) > 1 and NEGATION_RE.search(message):
+            return self._correct(focus, nums, label)
         if len(focus) > 1:
             if label is None:
                 return {"answer": "Those photos came from similarity search, which ranks photos without checking "
                                   "what is in them, so some may not match.", "asset_ids": focus, "facts": {}}
-            return {"answer": f"I've outlined each {display(label, 1)} the detector found in these photos. If a box "
-                              f"isn't really a {display(label, 1)}, the detector made a mistake.",
+            return {"answer": f"I've outlined each {display(label, 1)} the detector found in these photos, with how sure "
+                              f"it was. If one is wrong, tell me its number (“photo 3 isn't a {display(label, 1)}”) and "
+                              f"I'll leave it out from now on.",
                     "asset_ids": focus, "facts": {"label": label}, "box_labels": [label]}
         asset = self.store.get_asset(focus[0])
         boxes = self.store.boxes_for(asset["content_hash"], self.key, [label] if label else None)
@@ -388,15 +420,31 @@ class Assistant:
             best = max(b["score"] for b in boxes)
             size = max((b["box"][2] - b["box"][0]) * (b["box"][3] - b["box"][1]) for b in boxes)
             text = (f"The detector found {len(boxes)} {display(label, len(boxes))} here, outlined in the photo "
-                    f"(confidence {best:.2f}{', very sure' if best >= 0.75 else ', confirmed by the chat model'}).")
+                    f"(confidence {best:.2f}{', sure' if best >= SURE else ', not sure: a “maybe”'}).")
             if size < 0.02:
                 text += f" {'It is' if len(boxes) == 1 else 'They are'} small, so look closely. Detection can still be wrong."
         return {"answer": text, "asset_ids": [asset["id"]], "facts": {"label": label, "boxes": boxes},
                 "box_labels": [label] if label else None}
 
+    def _correct(self, focus: list[str], nums: list[int], label: str) -> dict:
+        """The user says photos `nums` of the last answer don't contain `label`: remember that, for good."""
+        picks = sorted({len(focus) if n == -1 else n for n in nums})
+        bad = [n for n in picks if not 1 <= n <= len(focus)]
+        if bad:
+            return {"answer": f"The last answer had {len(focus)} photos; pick numbers from 1 to {len(focus)}.", "facts": {}}
+        for n in picks:
+            self.store.save_verification(self.store.get_asset(focus[n - 1])["content_hash"], label, USER, False)
+        rest = [a for i, a in enumerate(focus, 1) if i not in picks]
+        which = ", ".join(map(str, picks[:-1])) + (" and " if len(picks) > 1 else "") + str(picks[-1])
+        return {"answer": f"Thanks, I've noted that photo{'s' if len(picks) > 1 else ''} {which} "
+                          f"{'have' if len(picks) > 1 else 'has'} no {display(label, 1)}. "
+                          f"{'They are' if len(picks) > 1 else 'It is'} left out of {display(label)} answers from now on.",
+                "asset_ids": rest, "facts": {"removed": [focus[n - 1] for n in picks], "label": label},
+                "box_labels": [label]}
+
     def _chat(self, plan, message, history, library_ids, use_chat, asset_id):
         cov = self._coverage(library_ids)
-        summary = self.store.object_summary(self.key, library_ids)  # all 80 types at most: small enough
+        summary = self.store.object_summary(self.key, library_ids, sure=SURE)  # all 80 types at most: small enough
         fixed = ("I can count things in your photos (“how many dogs?”), find photos (“beach at sunset”), narrow "
                  "down the last answer (“which of those have people?”) and describe a photo (“describe the "
                  "second one”).")
@@ -411,7 +459,7 @@ class Assistant:
         recent = []
         for n, aid in enumerate(self._focus(history)[:6], 1):
             if (a := self.store.get_asset(aid)) is not None:
-                objs = self.store.detections_for(a["content_hash"], self.key) or {}
+                objs = self.store.detections_for(a["content_hash"], self.key, sure=SURE) or {}
                 recent.append({"photo": n, "objects": {display(k, v): v for k, v in objs.items()}})
         if recent:
             facts["photos_in_last_answer"] = recent
