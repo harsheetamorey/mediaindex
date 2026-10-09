@@ -9,7 +9,6 @@ from conftest import make_image, tree_digest
 from mediaindex.app import create_app
 from mediaindex.assistant import resolve_labels, rule_plan
 from mediaindex.config import Settings
-from mediaindex.detect import decide_counts
 from mediaindex.llm import ChatUnavailable, OllamaChat, require_loopback
 from mediaindex.model.backend import FakeBackend
 from test_search import wait_job
@@ -17,8 +16,8 @@ from test_search import wait_job
 # The fake detector "sees" objects by colour (box scores): red = 2 dogs, green = 1 cat + 1 person,
 # blue = only an unsure dog box (dropped unless the chat model confirms it).
 B = [0.1, 0.1, 0.5, 0.5]
-COLOURS = {(200, 0, 0): {"dog": [(0.95, B), (0.9, [0.6, 0.6, 0.9, 0.9])]},
-           (0, 200, 0): {"cat": [(0.9, B)], "person": [(0.8, B), (0.4, B)]},
+COLOURS = {(200, 0, 0): {"dog": [(0.95, B), (0.9, [0.6, 0.6, 0.9, 0.9])], "cup": [(0.8, B)]},
+           (0, 200, 0): {"cat": [(0.9, B)], "person": [(0.8, B), (0.4, B)], "cup": [(0.7, B)]},
            (0, 0, 200): {"dog": [(0.6, [0.9, 0.9, 0.95, 0.95])]}}
 
 
@@ -111,7 +110,8 @@ def test_count_before_and_after_checking(client):
     assert c.get("/api/ask/status").json()["detector"]["coverage"] == {"photos": 4, "checked": 4}
     r = ask(c, "How many puppies do I have?")
     assert r["answer"].startswith("Dogs appear in 2 of 4 photos (4 dogs counted).")
-    assert sorted(a["rel_path"] for a in r["results"]) == ["red1.jpg", "red2.jpg"]
+    sure = [a["rel_path"] for a in r["results"] if a["id"] not in r["maybe_ids"]]
+    assert sorted(sure) == ["red1.jpg", "red2.jpg"] and len(r["maybe_ids"]) == 1  # blue's unsure box: a "maybe"
     r = ask(c, "do I have more cats or dogs?")
     assert "Cats appear in 1 of 4 photos (1 cat counted)." in r["answer"] and "Dogs appear in 2" in r["answer"]
     assert "didn't find any cars" in ask(c, "how many cars")["answer"]
@@ -168,8 +168,7 @@ def test_chat_model_routes_and_describes(tmp_path):
 
 
 def test_chat_reply_with_invented_numbers_is_replaced(tmp_path):
-    chat = FakeChat([json.dumps({"present": False}),  # counting: the unsure dog box is not confirmed
-                     json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 7 dogs and 99 cats!",
+    chat = FakeChat([json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 7 dogs and 99 cats!",
                      json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 4 photos."])
     c, *_ = make_client(tmp_path, chat)
     try:
@@ -201,57 +200,71 @@ def test_chat_model_must_be_local():
     assert st["available"] is False and "not running" in st["reason"]
 
 
-def test_counting_rule_for_animals():
-    def n(kept):
-        return {k: len(v) for k, v in kept[0].items()}, kept[1]
-    found = {"dog": [(0.9, B), (0.6, B), (0.55, B)], "person": [(0.6, B), (0.45, B)], "bird": [(0.55, B)]}
-    assert n(decide_counts(found)) == ({"dog": 1, "person": 1, "bird": 1}, [])  # unsure dogs dropped, people/birds kept
-    assert n(decide_counts(found, None, lambda im, label: True)) == ({"dog": 3, "person": 1, "bird": 1}, ["dog"])
-    assert n(decide_counts({"cat": [(0.52, B)]}, None, lambda im, label: False)) == ({}, ["cat"])
-
-
-def test_unsure_animal_confirmed_by_chat_model(tmp_path):
-    chat = FakeChat([json.dumps({"present": True})])
-    c, *_ = make_client(tmp_path, chat)
-    try:
-        job = wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
-        assert job["result"]["chat_model_checks"] == 1  # only the blue photo's unsure dog was asked about
-        assert "Is there a dog in this photo?" in chat.requests[0]["messages"][0]["content"]
-        assert chat.requests[0]["messages"][0]["images"]
-        assert ask(c, "how many dogs")["answer"].startswith("Dogs appear in 3 of 4 photos (5 dogs counted).")
-    finally:
-        c.__exit__(None, None, None)
-
-
 def test_boxes_and_explaining_an_answer(client):
     c, *_ = client
     wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
     hist = [{"role": "user", "text": "how many dogs?"}]
     r = ask(c, "how many dogs?")
-    assert {len(v) for v in r["boxes"].values()} == {2} and set(r["boxes"]) == set(r["asset_ids"])
+    assert set(r["boxes"]) == set(r["asset_ids"])
+    assert sorted(len(v) for v in r["boxes"].values()) == [1, 2, 2]  # two sure photos, one maybe
     assert all(b["label"] == "dog" and len(b["box"]) == 4 for v in r["boxes"].values() for b in v)
     hist.append(turn(r))
     r2 = ask(c, "describe the first one", hist)  # no chat model: lists objects, all boxes shown
-    assert r2["boxes"][r2["asset_ids"][0]][0]["label"] == "dog"
+    assert {b["label"] for b in r2["boxes"][r2["asset_ids"][0]]} == {"dog", "cup"}  # every object in that photo
     hist += [{"role": "user", "text": "describe the first one"}, turn(r2)]
     r3 = ask(c, "but that's not a dog, right?", hist)
-    assert r3["action"] == "explain" and "found 2 dogs here, outlined" in r3["answer"] and "very sure" in r3["answer"]
+    assert r3["action"] == "explain" and "found 2 dogs here, outlined" in r3["answer"] and "(confidence 0.95, sure)" in r3["answer"]
     assert r3["asset_ids"] == r2["asset_ids"] and len(r3["boxes"][r3["asset_ids"][0]]) == 2
     r4 = ask(c, "where is the cat?", hist)  # no cat in that photo
     assert "didn't find a cat in this photo" in r4["answer"] and r4["boxes"] == {}
     hist2 = [{"role": "user", "text": "how many dogs?"}, turn(r)]
     r5 = ask(c, "why do you say those are dogs?", hist2)
-    assert r5["action"] == "explain" and "outlined each dog" in r5["answer"] and len(r5["asset_ids"]) == 2
+    assert r5["action"] == "explain" and "outlined each dog" in r5["answer"] and len(r5["asset_ids"]) == 3
 
 
 def test_describe_gets_the_detector_findings(tmp_path):
-    chat = FakeChat([json.dumps({"present": False}), "A red picture with two dogs."])
+    chat = FakeChat(["A red picture with two dogs."])
     c, *_ = make_client(tmp_path, chat)
     try:
         wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
         dog_photo = ask(c, "how many dogs")["asset_ids"][0]
         r = ask(c, "what is this?", asset_id=dog_photo)
-        assert "the photo contains 2 dogs." in chat.requests[-1]["messages"][0]["content"]
-        assert r["answer"] == "A red picture with two dogs." and len(r["boxes"][dog_photo]) == 2
+        assert "the photo contains 2 dogs, 1 cup." in chat.requests[-1]["messages"][0]["content"]
+        assert r["answer"] == "A red picture with two dogs." and len(r["boxes"][dog_photo]) == 3  # 2 dogs, 1 cup
     finally:
         c.__exit__(None, None, None)
+
+
+def test_user_corrections_win(client):
+    c, *_ = client
+    wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+    r = ask(c, "how many dogs?")
+    assert r["answer"].startswith("Dogs appear in 2 of 4")
+    hist = [{"role": "user", "text": "how many dogs?"}, turn(r)]
+    r2 = ask(c, "photo 2 isn't a dog", hist)
+    assert r2["action"] == "explain" and "photo 2 has no dog" in r2["answer"]
+    assert r2["asset_ids"] == [r["asset_ids"][0], r["asset_ids"][2]]
+    assert ask(c, "how many dogs?")["answer"].startswith("Dogs appear in 1 of 4")
+    assert "nothing to check" in ask(c, "why?", [{"role": "assistant", "text": "x", "asset_ids": []}])["answer"]
+
+
+def test_sure_and_maybe(client):
+    c, *_ = client
+    wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+    r = ask(c, "how many cups?")  # red photos: 0.8 (sure); green: 0.7 (maybe)
+    assert r["answer"].startswith("Cups appear in 2 of 4 photos (2 cups counted). 1 more photo might have cups")
+    assert len(r["asset_ids"]) == 3 and len(r["maybe_ids"]) == 1 and r["asset_ids"][-1] == r["maybe_ids"][0]
+    assert [a["rel_path"] for a in r["results"]][-1] == "green.jpg"
+    d = ask(c, "how many dogs?")  # blue's 0.6 dog box is only a maybe
+    assert d["answer"].startswith("Dogs appear in 2 of 4 photos (4 dogs counted). 1 more photo might have dogs")
+
+
+def test_correcting_several_photos_at_once(client):
+    c, *_ = client
+    wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+    r = ask(c, "how many dogs?")
+    hist = [{"role": "user", "text": "how many dogs?"}, turn(r)]
+    r2 = ask(c, "1, 2 and 3 are not dogs", hist)
+    assert "photos 1, 2 and 3 have no dog" in r2["answer"] and r2["asset_ids"] == []
+    assert "didn't find any dogs" in ask(c, "how many dogs?")["answer"]
+

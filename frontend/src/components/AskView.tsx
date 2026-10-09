@@ -6,6 +6,7 @@ type Message = {
   text: string
   results?: Asset[]
   boxes?: Record<string, DetectedBox[]>
+  maybe?: string[]
   action?: string
   via?: string
   error?: boolean
@@ -66,6 +67,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
           text: r.answer,
           results: r.results,
           boxes: r.boxes,
+          maybe: r.maybe_ids,
           action: r.action,
           via: via ? r.chat_model.model : undefined,
         },
@@ -151,7 +153,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
                   {shown.map((a, n) => (
                     <button
                       key={a.id}
-                      className="msg-photo"
+                      className={m.maybe?.includes(a.id) ? 'msg-photo maybe' : 'msg-photo'}
                       style={{ aspectRatio: a.width && a.height ? `${a.width} / ${a.height}` : undefined }}
                       title={`${n + 1}. ${a.rel_path}${m.role === 'assistant' ? ' (click to ask about this photo)' : ''}`}
                       onClick={() => m.role === 'assistant' && send(`What's in photo ${n + 1}?`, a)}
@@ -173,6 +175,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
                         />
                       ))}
                       {m.role === 'assistant' && all.length > 1 && <span className="msg-num">{n + 1}</span>}
+                      {m.maybe?.includes(a.id) && <span className="msg-maybe">maybe</span>}
                     </button>
                   ))}
                   {all.length > shown.length && (

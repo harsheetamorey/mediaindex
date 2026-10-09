@@ -324,21 +324,37 @@ class Store:
                             WHERE {where}""", [detector, *params])
         return {"photos": r["photos"], "checked": r["checked"]}
 
-    def count_objects(self, detector: str, label: str, library_ids: list[str] | None = None) -> dict:
-        """Photos (files) where the detector found `label`, most instances first, with the instance total."""
+    def count_objects(self, detector: str, label: str, library_ids: list[str] | None = None,
+                      sure: float = 0.0) -> dict:
+        """Photos (files) where the detector found `label`. A photo counts if it has a box scoring >= `sure`;
+        photos with only lower-scoring boxes are returned separately as `maybe_ids`."""
         where, params = self._scope(library_ids)
-        rows = self.db.query(f"""SELECT a.id, d.count FROM assets a
+        rows = self.db.query(f"""SELECT a.id, a.rel_path, d.boxes_json FROM assets a
                                  JOIN detections d ON d.content_hash=a.content_hash AND d.detector=? AND d.label=?
-                                 WHERE {where} ORDER BY d.count DESC, a.rel_path""", [detector, label, *params])
-        return {"photos": len(rows), "objects": sum(r["count"] for r in rows),
-                "asset_ids": [r["id"] for r in rows]}
+                                 WHERE {where}""", [detector, label, *params])
+        counts, maybe = {}, {}
+        for r in rows:
+            scores = [b[0] for b in json.loads(r["boxes_json"] or "[]")]
+            n = sum(sc >= sure for sc in scores)
+            if n:
+                counts[r["id"]] = n
+            elif scores:
+                maybe[r["id"]] = max(scores)
+        ids = sorted(counts, key=lambda a: -counts[a])
+        return {"photos": len(ids), "objects": sum(counts.values()), "asset_ids": ids, "counts": counts,
+                "maybe_ids": sorted(maybe, key=lambda a: -maybe[a])}
 
-    def detections_for(self, content_hash: str, detector: str) -> dict[str, int] | None:
+    def detections_for(self, content_hash: str, detector: str, sure: float = 0.0) -> dict[str, int] | None:
+        """Objects counted in one photo (boxes scoring >= `sure`), or None if it hasn't been checked."""
         if not self.db.one("SELECT 1 FROM detection_runs WHERE content_hash=? AND detector=?", (content_hash, detector)):
             return None
-        rows = self.db.query("SELECT label, count FROM detections WHERE content_hash=? AND detector=? ORDER BY count DESC",
-                             (content_hash, detector))
-        return {r["label"]: r["count"] for r in rows}
+        out = {}
+        for r in self.db.query("SELECT label, boxes_json FROM detections WHERE content_hash=? AND detector=?",
+                               (content_hash, detector)):
+            n = sum(b[0] >= sure for b in json.loads(r["boxes_json"] or "[]"))
+            if n:
+                out[r["label"]] = n
+        return dict(sorted(out.items(), key=lambda kv: -kv[1]))
 
     def boxes_for(self, content_hash: str, detector: str, labels: list[str] | None = None) -> list[dict]:
         rows = self.db.query("SELECT label, boxes_json FROM detections WHERE content_hash=? AND detector=?",
@@ -349,12 +365,35 @@ class Store:
                 out += [{"label": r["label"], "score": s, "box": b} for s, b in json.loads(r["boxes_json"])]
         return out
 
-    def object_summary(self, detector: str, library_ids: list[str] | None = None) -> list[dict]:
+    def verifications(self, hashes: list[str], label: str, verifier: str) -> dict[str, bool]:
+        out: dict[str, bool] = {}
+        for i in range(0, len(hashes), 500):
+            part = hashes[i:i + 500]
+            rows = self.db.query(f"""SELECT content_hash, present FROM verifications WHERE label=? AND verifier=?
+                                     AND content_hash IN ({','.join('?' * len(part))})""", [label, verifier, *part])
+            out.update({r["content_hash"]: bool(r["present"]) for r in rows})
+        return out
+
+    def save_verification(self, content_hash: str, label: str, verifier: str, present: bool) -> None:
+        with self.db.tx() as c:
+            c.execute("INSERT OR REPLACE INTO verifications(content_hash, label, verifier, present, created_at) "
+                      "VALUES (?,?,?,?,?)", (content_hash, label, verifier, int(present), now()))
+
+    def object_summary(self, detector: str, library_ids: list[str] | None = None, sure: float = 0.0) -> list[dict]:
+        """Per label: photos with a box scoring >= `sure`, and how many such boxes in total."""
         where, params = self._scope(library_ids)
-        rows = self.db.query(f"""SELECT d.label, COUNT(*) AS photos, SUM(d.count) AS objects FROM assets a
+        rows = self.db.query(f"""SELECT d.label, d.boxes_json FROM assets a
                                  JOIN detections d ON d.content_hash=a.content_hash AND d.detector=?
-                                 WHERE {where} GROUP BY d.label ORDER BY photos DESC, d.label""", [detector, *params])
-        return [dict(r) for r in rows]
+                                 WHERE {where}""", [detector, *params])
+        agg: dict[str, list[int]] = {}
+        for r in rows:
+            n = sum(b[0] >= sure for b in json.loads(r["boxes_json"] or "[]"))
+            if n:
+                a = agg.setdefault(r["label"], [0, 0])
+                a[0] += 1
+                a[1] += n
+        return [{"label": k, "photos": v[0], "objects": v[1]}
+                for k, v in sorted(agg.items(), key=lambda kv: (-kv[1][0], kv[0]))]
 
     # ---- jobs ------------------------------------------------------------------
     def save_job(self, job: dict, library_id: str | None = None) -> None:

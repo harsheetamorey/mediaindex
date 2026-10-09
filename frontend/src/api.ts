@@ -148,6 +148,7 @@ export type AskResponse = {
   routed_by: string
   described_by?: string
   asset_ids: string[]
+  maybe_ids?: string[]
   results: Asset[]
   boxes: Record<string, DetectedBox[]>
   chat_model: { available: boolean; model?: string; reason?: string }
