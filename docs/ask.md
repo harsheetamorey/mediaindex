@@ -3,7 +3,7 @@
 The **Ask** tab answers questions about your photos in plain words. Everything runs on this computer, and nothing is uploaded.
 
 > **You:** How many dogs do I have?
-> **MediaIndex:** Dogs appear in 5 of 512 photos (5 dogs counted). *[the 5 photos]*
+> **MediaIndex:** Dogs appear in 3 of 512 photos (3 dogs counted). *[the 3 photos]*
 > **You:** Show me a city street at night. → *[12 photos]*
 > **You:** Which of those have cars? → 9 of those 12 photos have cars.
 > **You:** Describe the first one. → "A nighttime photograph of a city street with numerous blurred lights…"
@@ -18,6 +18,14 @@ Click any photo in an answer to ask about that photo.
 | Count objects ("how many dogs?") | **RT-DETR v2** (`PekingU/rtdetr_v2_r50vd`, pinned revision), 80 common object types | Apache-2.0 | Once per photo, when you press **Count objects** |
 | Understand oddly phrased questions, describe a photo, small talk | **Gemma 4 E2B** (`gemma4:e2b-it-qat`, 4-bit) through **Ollama** | Apache-2.0 | Each question that needs it (optional) |
 
+- **Counting rule:**
+  - Most objects count when the detector's score is at least 0.5.
+  - Animals need 0.75, or 0.5–0.75 if Gemma 4 confirms that animal is in the photo (a yes/no question; without Ollama
+    these unsure boxes are dropped).
+  - The first version counted animals from 0.5. On the demo photos that gave 5 "dogs" (2 wrong: a sunset cliff and a
+    street) and 5 "cats" (1 wrong: people on stone steps). All the wrong boxes scored 0.52–0.61, and every real one
+    scored 0.76 or higher.
+  - Now it finds 3 dogs and 4 cats, all real. One dog in a field is still missed, because the detector calls it a cow.
 - **Numbers always come from the database, never from the chat model.** Counts, searches and follow-ups are answered with fixed
   sentences. If a free chat reply mentions a number that isn't in the facts the model was given, MediaIndex replaces it with a
   fixed summary.
@@ -60,7 +68,7 @@ checked by looking at the photos; these are **not** human evaluation labels.
 | **Gemma 4 E2B** 4-bit (chosen) | 1–10 s per description | Not used for counting | 10 of 11 photos described correctly (called a Yorkshire terrier a "calico cat"). **Sounds: 0 of 3 right** (crickets and footsteps came out as "dog barking"), so Ask doesn't describe sounds |
 
 **End-to-end (real models, this Mac):**
-- 512 photos counted in 145 s.
+- 512 photos counted in 145 s, or 244 s with Gemma 4 confirming the 13 unsure animal boxes.
 - Count questions answer in under 0.1 s and searches in about 0.5 s. EmbeddingGemma's first load adds ~15 s.
 - Describing a photo takes about 7–15 s. The chat model's first load adds ~20 s.
 - `scripts/ui_check_ask.py` drives the Ask tab in Chrome: a count, a search, a follow-up filter, "describe the first one", and

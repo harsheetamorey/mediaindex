@@ -9,12 +9,15 @@ from conftest import make_image, tree_digest
 from mediaindex.app import create_app
 from mediaindex.assistant import resolve_labels, rule_plan
 from mediaindex.config import Settings
+from mediaindex.detect import decide_counts
 from mediaindex.llm import ChatUnavailable, OllamaChat, require_loopback
 from mediaindex.model.backend import FakeBackend
 from test_search import wait_job
 
-# The fake detector "sees" objects by colour: red = 2 dogs, green = 1 cat + 1 person, blue = nothing.
-COLOURS = {(200, 0, 0): {"dog": 2}, (0, 200, 0): {"cat": 1, "person": 1}, (0, 0, 200): {}}
+# The fake detector "sees" objects by colour (box scores): red = 2 dogs, green = 1 cat + 1 person,
+# blue = only an unsure dog box (dropped unless the chat model confirms it).
+COLOURS = {(200, 0, 0): {"dog": [0.95, 0.9]}, (0, 200, 0): {"cat": [0.9], "person": [0.8, 0.4]},
+           (0, 0, 200): {"dog": [0.6]}}
 
 
 class FakeDetector:
@@ -163,7 +166,8 @@ def test_chat_model_routes_and_describes(tmp_path):
 
 
 def test_chat_reply_with_invented_numbers_is_replaced(tmp_path):
-    chat = FakeChat([json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 7 dogs and 99 cats!",
+    chat = FakeChat([json.dumps({"present": False}),  # counting: the unsure dog box is not confirmed
+                     json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 7 dogs and 99 cats!",
                      json.dumps({"action": "chat", "subject": "", "item": 0}), "You have 4 photos."])
     c, *_ = make_client(tmp_path, chat)
     try:
@@ -193,3 +197,23 @@ def test_chat_model_must_be_local():
             OllamaChat(bad)
     st = OllamaChat("http://127.0.0.1:9").status()  # nothing listens there
     assert st["available"] is False and "not running" in st["reason"]
+
+
+def test_counting_rule_for_animals():
+    scores = {"dog": [0.9, 0.6, 0.55], "person": [0.6, 0.45], "bird": [0.55]}
+    assert decide_counts(scores) == ({"dog": 1, "person": 1, "bird": 1}, [])  # unsure dogs dropped, people/birds kept
+    assert decide_counts(scores, None, lambda im, label: True) == ({"dog": 3, "person": 1, "bird": 1}, ["dog"])
+    assert decide_counts({"cat": [0.52]}, None, lambda im, label: False) == ({}, ["cat"])
+
+
+def test_unsure_animal_confirmed_by_chat_model(tmp_path):
+    chat = FakeChat([json.dumps({"present": True})])
+    c, *_ = make_client(tmp_path, chat)
+    try:
+        job = wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+        assert job["result"]["chat_model_checks"] == 1  # only the blue photo's unsure dog was asked about
+        assert "Is there a dog in this photo?" in chat.requests[0]["messages"][0]["content"]
+        assert chat.requests[0]["messages"][0]["images"]
+        assert ask(c, "how many dogs")["answer"].startswith("Dogs appear in 3 of 4 photos (5 dogs counted).")
+    finally:
+        c.__exit__(None, None, None)

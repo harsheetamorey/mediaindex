@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 from typing import Literal
 
 import numpy as np
@@ -12,7 +13,9 @@ from pydantic import BaseModel, Field
 
 from .api_search import embed_query, run_search
 from .assistant import Assistant, Turn
+from .assistant import display
 from .detect import DETECTOR_ID, DETECTOR_KEY, DetectorHost, run_detection
+from .llm import ChatUnavailable
 from .jobs import QueueFull
 from .media.images import ImageRejected, load_image
 
@@ -37,6 +40,30 @@ class PrepareRequest(BaseModel):
     library_ids: list[str] | None = None
 
 
+def encode_image(im) -> str:
+    im = im.copy()
+    im.thumbnail((DESCRIBE_MAX_SIDE, DESCRIBE_MAX_SIDE))
+    buf = io.BytesIO()
+    im.convert("RGB").save(buf, "JPEG", quality=90)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
+CONFIRM_SCHEMA = {"type": "object", "properties": {"present": {"type": "boolean"}}, "required": ["present"]}
+
+
+def make_confirm(chat):
+    """Ask the local chat model a yes/no question about one photo. An error counts as 'no' (the box is dropped)."""
+    def confirm(image, label: str) -> bool:
+        try:
+            raw = chat.chat([{"role": "user", "content": f"Is there a {display(label, 1)} in this photo? Only say yes if "
+                              "you can clearly see one.", "images": [encode_image(image)]}],
+                            schema=CONFIRM_SCHEMA, max_tokens=20)
+            return bool(json.loads(raw).get("present"))
+        except (ChatUnavailable, ValueError, AttributeError):
+            return False
+    return confirm
+
+
 def register(app: FastAPI, detector_host: DetectorHost, chat) -> None:
     store = app.state.store
 
@@ -57,13 +84,9 @@ def register(app: FastAPI, detector_host: DetectorHost, chat) -> None:
     def image_b64(asset_id: str) -> str:
         _, path = app.state.asset_path(asset_id)
         try:
-            im = load_image(path)
+            return encode_image(load_image(path))
         except ImageRejected as e:
             raise HTTPException(422, f"cannot read this photo: {str(e).split(':')[0]}")
-        im.thumbnail((DESCRIBE_MAX_SIDE, DESCRIBE_MAX_SIDE))
-        buf = io.BytesIO()
-        im.save(buf, "JPEG", quality=90)
-        return base64.b64encode(buf.getvalue()).decode()
 
     assistant = Assistant(store, DETECTOR_KEY, search, rank_within, image_b64, chat)
     app.state.assistant = assistant
@@ -90,9 +113,11 @@ def register(app: FastAPI, detector_host: DetectorHost, chat) -> None:
         for j in app.state.runner.list():
             if j.kind == "count-objects" and j.status in ("queued", "running"):
                 return j.to_dict()
+        confirm = make_confirm(chat) if chat is not None and chat.status().get("available") else None
         try:
             return app.state.runner.submit(
-                "count-objects", lambda ctx: run_detection(ctx, store, detector_host, body.library_ids)).to_dict()
+                "count-objects",
+                lambda ctx: run_detection(ctx, store, detector_host, body.library_ids, confirm=confirm)).to_dict()
         except QueueFull as e:
             raise HTTPException(503, str(e))
 

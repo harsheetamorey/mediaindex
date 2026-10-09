@@ -1,13 +1,15 @@
 """Object counts for the Ask assistant: RT-DETR v2 (Apache-2.0, 80 COCO object types), run once per image.
 
-Counts are what the detector found at a fixed score threshold. They can be wrong (small or crowded objects are
-missed, look-alikes are confused), so every answer shows the photos it is based on.
+Counting rule (checked on the demo photos, see docs/ask.md):
+- most objects: boxes with score >= 0.5;
+- animals: boxes with score >= 0.75; boxes between 0.5 and 0.75 only when the local chat model (if running) confirms that
+  animal is in the photo. Low-score animal boxes were the wrong answers (a sunset cliff "dog", people on steps "cat").
+Counts can still be wrong (small or crowded objects are missed, look-alikes are confused), so every answer shows the photos.
 """
 
 from __future__ import annotations
 
 import threading
-from collections import Counter
 from pathlib import Path
 from typing import Callable, Protocol
 
@@ -19,7 +21,9 @@ from .store import INDEXED, Store
 DETECTOR_ID = "PekingU/rtdetr_v2_r50vd"
 DETECTOR_REVISION = "282494075698cab9faa1096ae26856890030c817"
 SCORE_THRESHOLD = 0.5  # 0.3 added many false objects in the 20-image check (docs/ask.md)
-DETECTOR_KEY = f"rtdetr_v2_r50vd@{DETECTOR_REVISION[:12]}:t{SCORE_THRESHOLD}"
+ANIMAL_SURE = 0.75
+ANIMALS = {"dog", "cat", "cow", "sheep", "horse", "bear", "elephant", "zebra", "giraffe"}  # not birds: flocks are counted as is
+DETECTOR_KEY = f"rtdetr_v2_r50vd@{DETECTOR_REVISION[:12]}:t{SCORE_THRESHOLD}:a{ANIMAL_SURE}"
 
 # The detector's own label names, as written in its config.
 LABELS = tuple(s.replace("_", " ") for s in (
@@ -32,7 +36,7 @@ LABELS = tuple(s.replace("_", " ") for s in (
 
 
 class Detector(Protocol):
-    def detect(self, image) -> dict[str, int]: ...
+    def detect(self, image) -> dict[str, list[float]]: ...  # label -> box scores >= SCORE_THRESHOLD
     def close(self) -> None: ...
 
 
@@ -47,7 +51,7 @@ class RTDetrDetector:
         self.model = AutoModelForObjectDetection.from_pretrained(DETECTOR_ID, revision=DETECTOR_REVISION)
         self.model.to(device).eval()
 
-    def detect(self, image) -> dict[str, int]:
+    def detect(self, image) -> dict[str, list[float]]:
         torch = self._torch
         inputs = self.processor(images=image, return_tensors="pt").to(self.device)
         with torch.inference_mode():
@@ -55,7 +59,10 @@ class RTDetrDetector:
         r = self.processor.post_process_object_detection(out, target_sizes=torch.tensor([image.size[::-1]]),
                                                          threshold=SCORE_THRESHOLD)[0]
         names = self.model.config.id2label
-        return dict(Counter(names[int(i)] for i in r["labels"]))
+        out: dict[str, list[float]] = {}
+        for i, sc in zip(r["labels"], r["scores"]):
+            out.setdefault(names[int(i)], []).append(round(float(sc), 3))
+        return out
 
     def close(self) -> None:
         self.model = None
@@ -84,8 +91,29 @@ class DetectorHost:
                 self._detector = None
 
 
+Confirm = Callable[[object, str], bool]  # (image, label) -> is that thing in the photo?
+
+
+def decide_counts(scores: dict[str, list[float]], image=None, confirm: Confirm | None = None) -> tuple[dict, list]:
+    """Turn box scores into counts. Returns (counts, labels the chat model was asked about)."""
+    counts, asked = {}, []
+    for label, ss in scores.items():
+        if label not in ANIMALS:
+            n = sum(s >= SCORE_THRESHOLD for s in ss)
+        else:
+            n = sum(s >= ANIMAL_SURE for s in ss)
+            unsure = sum(SCORE_THRESHOLD <= s < ANIMAL_SURE for s in ss)
+            if unsure and confirm is not None:
+                asked.append(label)
+                if confirm(image, label):
+                    n += unsure
+        if n:
+            counts[label] = n
+    return counts, asked
+
+
 def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids: list[str] | None,
-                  key: str = DETECTOR_KEY) -> dict:
+                  key: str = DETECTOR_KEY, confirm: Confirm | None = None) -> dict:
     """Count objects in every indexed image that has not been checked yet. Read-only for the originals."""
     rows = images_in_scope(store, library_ids)
     done_hashes = {r["content_hash"] for r in store.db.query("SELECT content_hash FROM detection_runs WHERE detector=?",
@@ -95,7 +123,7 @@ def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids
         if r["content_hash"] not in done_hashes:
             todo.setdefault(r["content_hash"], r)
     ctx.progress(0, len(todo), "Counting objects")
-    checked = failed = 0
+    checked = failed = confirmed_asks = 0
     roots = {}
     try:
         for i, (h, r) in enumerate(todo.items(), 1):
@@ -103,7 +131,8 @@ def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids
             root = roots.setdefault(r["library_id"], store.get_library(r["library_id"])["root_path"])
             try:
                 im = load_image(resolve_in_root(root, r["rel_path"]))
-                counts = host.get().detect(im)
+                counts, asked = decide_counts(host.get().detect(im), im, confirm)
+                confirmed_asks += len(asked)
             except (ImageRejected, PathRejected, OSError):
                 failed += 1
             else:
@@ -112,7 +141,8 @@ def run_detection(ctx: JobContext, store: Store, host: DetectorHost, library_ids
             ctx.progress(i, message=f"Counting objects: {i} of {len(todo)} photos")
     finally:
         host.unload()
-    return {"checked": checked, "failed": failed, "already_checked": len({r["content_hash"] for r in rows}) - len(todo)}
+    return {"checked": checked, "failed": failed, "chat_model_checks": confirmed_asks,
+            "already_checked": len({r["content_hash"] for r in rows}) - len(todo)}
 
 
 def images_in_scope(store: Store, library_ids: list[str] | None) -> list[dict]:
