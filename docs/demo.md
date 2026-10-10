@@ -26,7 +26,7 @@ python scripts/demo_walkthrough.py --out data/demo-walkthrough [--video] [--paus
 This needs Playwright in a separate dev venv (`pip install playwright`, plus `playwright install ffmpeg` for `--video`), and it drives the installed Chrome.
 It exits with a non-zero status if any request leaves the machine.
 
-## 2. Storyboard (60–90 s with narration)
+## 2. Storyboard (about 2 min with narration: search 0–84 s, Ask 84–122 s)
 | # | Time | On screen (actual output) | Narration |
 |---|---|---|---|
 | 1 | 0–8 s | App open, three demo libraries in the sidebar, header "nothing leaves this computer" | "MediaIndex searches my own photos, sounds and videos, entirely on this laptop." |
@@ -36,9 +36,15 @@ It exits with a non-zero status if any request leaves the machine.
 | 5 | 44–56 s | Sounds · "a dog barking" → plays the matched window of fsd-146343 (publisher title: dog). #2 is a horse whinny and #3 a whip, and another dog is #4 | "Sounds work the same way. The top match is a dog, but the next two aren't, so you still listen and choose." |
 | 6 | 56–70 s | Videos · "a dog" → the dog scene, window 0:12–0:20 of the demo video. The moment plays | "For video it finds the moment, an 8-second window, not the exact frame." |
 | 7 | 70–84 s | Export clip → `scenes-silent_00m12_0s-00m20_0s.mp4` (8.00 s) plus a provenance JSON. Then add 3 photos to a selection → "Copied 3 files and mediaindex-manifest.json" | "I keep what I need: a clip, copies and a manifest with every source and licence. My originals are never touched." |
-| 8 | 84–90 s | Back to the grid | "Local, open source, one model: EmbeddingGemma 2." |
+| 8 | 84–92 s | Ask · "How many dogs do I have?" → "Dogs appear in 3 of 512 photos (3 dogs counted). 2 more photos might have dogs…" with 3 outlined photos (stock-00153, 01642, 02057) and 2 dashed "maybe" photos last | "I can also just ask. It counts with an object detector that ran once over the library, so the answer is instant, and the number comes from the database, not the chat model." |
+| 9 | 92–100 s | Zoom on stock-02057: a beach with one tiny outlined dog (score 0.76, just over the 0.75 rule). Ask "why did you say it's a dog?" → the outlined objects and how sure the detector was | "Every count shows its evidence. That speck on the beach is the dog it counted. If it's wrong, I say 'photo 3 isn't a dog' and it's left out from then on." |
+| 10 | 100–110 s | "Show me a city street at night" → 12 photos, then "Which of those have cars?" → "6 of those 12 photos have cars." (stock-02029, 03430, 02408, 03482, 00158, 00139) | "Search and counting work together. It finds the night streets by meaning, then narrows them down using the detector's counts." |
+| 11 | 110–122 s | "Describe the first one" (stock-02029) → "The photo shows a nighttime street scene with blurred lights. There is one car visible on the road." Cut the 10–28 s wait in editing | "A small local Gemma model can describe a photo. It says one car, but there are several blurred cars in that photo, so a description is a quick look, not a record." |
+| 12 | 122–128 s | Back to the grid | "Local and open source. Search uses one model, EmbeddingGemma 2. Ask adds a local detector to count and a small local model to talk." |
 
 Narration rules: separate indexing time (minutes, done ahead) from query time (milliseconds for text, about 2 s for an image reference).
+Ask beats 8–11 are actual outputs from the dev library (512 demo photos, all counted) on 2026-10-09, with Gemma 4 E2B through Ollama.
+Measured on that run: counts and follow-ups answer in under 0.25 s, a search in 1–2 s once the model is warm, and a description in 10–28 s.
 Don't call any example "accurate" or a "breakthrough". Name the miss in beat 4 out loud.
 
 ## 3. What was recorded
@@ -51,6 +57,8 @@ Don't call any example "accurate" or a "breakthrough". Name the miss in beat 4 o
 - [ ] `scripts/demo.sh reset`, then `start` and `setup`. Wait until all three libraries show "searchable" counts equal to their file counts
 - [ ] Close other apps (8 GB machine). Turn on Do Not Disturb, hide the bookmarks bar, and use a 1400×860 window at 100% zoom
 - [ ] Run each query once before recording, so the model is warm (the first query includes about 13 s of model load)
+- [ ] Ask: press **Count objects** and wait until all photos are checked (about 150 s for 512). Check that Ollama is running with `gemma4:e2b-it-qat`
+- [ ] Ask each beat 8–11 question once before recording, then start a new chat so the conversation starts clean
 - [ ] Keep "Show technical scores" off, so no numbers can be read as confidence
 - [ ] Use only demo-pack media. No personal files or paths in view (export to a neutral folder such as `~/Desktop/demo-exports`)
 - [ ] Record with QuickTime (File → New Screen Recording) and the narration from the storyboard. Keep beat 4 (the miss) in the cut
