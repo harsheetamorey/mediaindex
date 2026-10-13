@@ -1,0 +1,578 @@
+{
+ "config": "clip-l14",
+ "model": {
+  "id": "openai/clip-vit-large-patch14",
+  "revision": "32bd64288804d66eefd0ccbe215aa642df71cc41"
+ },
+ "device": "mps",
+ "precision": "float32",
+ "spec_version": 1,
+ "images": 500,
+ "query_text": "as written, no prompt template",
+ "embed_seconds_total": 496.5,
+ "images_per_s": 1.01,
+ "peak_rss_mb": 675.5,
+ "mps_driver_mb": 2092.7,
+ "results": [
+  {
+   "id": "T01",
+   "ranked": [
+    "stock-03456.jpg",
+    "stock-02084.jpg",
+    "stock-01659.jpg",
+    "stock-02400.jpg",
+    "stock-02420.jpg",
+    "stock-01657.jpg",
+    "stock-00163.jpg",
+    "stock-02056.jpg",
+    "stock-02020.jpg",
+    "stock-02075.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T02",
+   "ranked": [
+    "stock-02024.jpg",
+    "stock-01629.jpg",
+    "stock-02433.jpg",
+    "stock-02478.jpg",
+    "stock-02027.jpg",
+    "stock-02467.jpg",
+    "stock-00123.jpg",
+    "stock-02417.jpg",
+    "stock-02028.jpg",
+    "stock-01650.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T03",
+   "ranked": [
+    "stock-02478.jpg",
+    "stock-03457.jpg",
+    "stock-00135.jpg",
+    "stock-02475.jpg",
+    "stock-00123.jpg",
+    "stock-02460.jpg",
+    "stock-02029.jpg",
+    "stock-02483.jpg",
+    "stock-02046.jpg",
+    "stock-02408.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T04",
+   "ranked": [
+    "stock-01617.jpg",
+    "stock-01614.jpg",
+    "stock-02487.jpg",
+    "stock-02026.jpg",
+    "stock-03496.jpg",
+    "stock-03402.jpg",
+    "stock-01619.jpg",
+    "stock-00113.jpg",
+    "stock-03405.jpg",
+    "stock-01647.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T05",
+   "ranked": [
+    "stock-03445.jpg",
+    "stock-02446.jpg",
+    "stock-02441.jpg",
+    "stock-02082.jpg",
+    "stock-01616.jpg",
+    "stock-03423.jpg",
+    "stock-01653.jpg",
+    "stock-01643.jpg",
+    "stock-00145.jpg",
+    "stock-01694.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T06",
+   "ranked": [
+    "stock-00172.jpg",
+    "stock-00121.jpg",
+    "stock-00122.jpg",
+    "stock-00133.jpg",
+    "stock-00143.jpg",
+    "stock-02036.jpg",
+    "stock-00177.jpg",
+    "stock-00161.jpg",
+    "stock-00199.jpg",
+    "stock-03497.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T07",
+   "ranked": [
+    "stock-00127.jpg",
+    "stock-02045.jpg",
+    "stock-00148.jpg",
+    "stock-02028.jpg",
+    "stock-02056.jpg",
+    "stock-00123.jpg",
+    "stock-02075.jpg",
+    "stock-02046.jpg",
+    "stock-00159.jpg",
+    "stock-02077.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T08",
+   "ranked": [
+    "stock-01658.jpg",
+    "stock-02075.jpg",
+    "stock-02083.jpg",
+    "stock-00185.jpg",
+    "stock-02056.jpg",
+    "stock-02407.jpg",
+    "stock-02494.jpg",
+    "stock-00169.jpg",
+    "stock-01652.jpg",
+    "stock-00160.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T09",
+   "ranked": [
+    "stock-03417.jpg",
+    "stock-01613.jpg",
+    "stock-01697.jpg",
+    "stock-01684.jpg",
+    "stock-02092.jpg",
+    "stock-00189.jpg",
+    "stock-01614.jpg",
+    "stock-02487.jpg",
+    "stock-00149.jpg",
+    "stock-01619.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T10",
+   "ranked": [
+    "stock-01623.jpg",
+    "stock-02034.jpg",
+    "stock-02056.jpg",
+    "stock-01650.jpg",
+    "stock-01643.jpg",
+    "stock-01611.jpg",
+    "stock-02482.jpg",
+    "stock-00116.jpg",
+    "stock-00126.jpg",
+    "stock-02075.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T11",
+   "ranked": [
+    "stock-02403.jpg",
+    "stock-03467.jpg",
+    "stock-02022.jpg",
+    "stock-02401.jpg",
+    "stock-00150.jpg",
+    "stock-03421.jpg",
+    "stock-02483.jpg",
+    "stock-02050.jpg",
+    "stock-02457.jpg",
+    "stock-00154.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T12",
+   "ranked": [
+    "stock-03479.jpg",
+    "stock-03463.jpg",
+    "stock-00198.jpg",
+    "stock-00189.jpg",
+    "stock-00140.jpg",
+    "stock-00147.jpg",
+    "stock-01675.jpg",
+    "stock-00109.jpg",
+    "stock-00182.jpg",
+    "stock-01634.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T13",
+   "ranked": [
+    "stock-02461.jpg",
+    "stock-01688.jpg",
+    "stock-03477.jpg",
+    "stock-03448.jpg",
+    "stock-01637.jpg",
+    "stock-00147.jpg",
+    "stock-03454.jpg",
+    "stock-01638.jpg",
+    "stock-02083.jpg",
+    "stock-00187.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T14",
+   "ranked": [
+    "stock-03481.jpg",
+    "stock-02451.jpg",
+    "stock-02432.jpg",
+    "stock-00196.jpg",
+    "stock-02413.jpg",
+    "stock-02056.jpg",
+    "stock-01688.jpg",
+    "stock-01611.jpg",
+    "stock-00107.jpg",
+    "stock-02490.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T15",
+   "ranked": [
+    "stock-02025.jpg",
+    "stock-02078.jpg",
+    "stock-01646.jpg",
+    "stock-02433.jpg",
+    "stock-02094.jpg",
+    "stock-02067.jpg",
+    "stock-01629.jpg",
+    "stock-01675.jpg",
+    "stock-02473.jpg",
+    "stock-02438.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T16",
+   "ranked": [
+    "stock-00121.jpg",
+    "stock-03469.jpg",
+    "stock-02028.jpg",
+    "stock-03482.jpg",
+    "stock-02430.jpg",
+    "stock-02029.jpg",
+    "stock-02004.jpg",
+    "stock-02060.jpg",
+    "stock-00132.jpg",
+    "stock-00163.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T17",
+   "ranked": [
+    "stock-03410.jpg",
+    "stock-02005.jpg",
+    "stock-00144.jpg",
+    "stock-03489.jpg",
+    "stock-03481.jpg",
+    "stock-02498.jpg",
+    "stock-01688.jpg",
+    "stock-01666.jpg",
+    "stock-00164.jpg",
+    "stock-03443.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T18",
+   "ranked": [
+    "stock-01601.jpg",
+    "stock-02075.jpg",
+    "stock-03440.jpg",
+    "stock-03443.jpg",
+    "stock-03459.jpg",
+    "stock-02413.jpg",
+    "stock-01680.jpg",
+    "stock-03439.jpg",
+    "stock-02028.jpg",
+    "stock-02056.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T19",
+   "ranked": [
+    "stock-00115.jpg",
+    "stock-00108.jpg",
+    "stock-02067.jpg",
+    "stock-00126.jpg",
+    "stock-02448.jpg",
+    "stock-02059.jpg",
+    "stock-03406.jpg",
+    "stock-01613.jpg",
+    "stock-01674.jpg",
+    "stock-03486.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "T20",
+   "ranked": [
+    "stock-01673.jpg",
+    "stock-00151.jpg",
+    "stock-03465.jpg",
+    "stock-02089.jpg",
+    "stock-02060.jpg",
+    "stock-00167.jpg",
+    "stock-00190.jpg",
+    "stock-01684.jpg",
+    "stock-02065.jpg",
+    "stock-00171.jpg"
+   ],
+   "excluded_identical": -1
+  },
+  {
+   "id": "I01",
+   "ranked": [
+    "stock-00127.jpg",
+    "stock-02045.jpg",
+    "stock-00135.jpg",
+    "stock-01638.jpg",
+    "stock-00198.jpg",
+    "stock-02024.jpg",
+    "stock-02433.jpg",
+    "stock-00187.jpg",
+    "stock-01634.jpg",
+    "stock-00109.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I02",
+   "ranked": [
+    "stock-00139.jpg",
+    "stock-03485.jpg",
+    "stock-02087.jpg",
+    "stock-03411.jpg",
+    "stock-03413.jpg",
+    "stock-02067.jpg",
+    "stock-00136.jpg",
+    "stock-01672.jpg",
+    "stock-02418.jpg",
+    "stock-02433.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I03",
+   "ranked": [
+    "stock-01638.jpg",
+    "stock-00153.jpg",
+    "stock-03446.jpg",
+    "stock-00187.jpg",
+    "stock-03477.jpg",
+    "stock-03413.jpg",
+    "stock-03411.jpg",
+    "stock-02055.jpg",
+    "stock-00198.jpg",
+    "stock-02461.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I04",
+   "ranked": [
+    "stock-02466.jpg",
+    "stock-03479.jpg",
+    "stock-01638.jpg",
+    "stock-00157.jpg",
+    "stock-00189.jpg",
+    "stock-01634.jpg",
+    "stock-00151.jpg",
+    "stock-02060.jpg",
+    "stock-00198.jpg",
+    "stock-01646.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I05",
+   "ranked": [
+    "stock-00144.jpg",
+    "stock-01661.jpg",
+    "stock-02029.jpg",
+    "stock-01671.jpg",
+    "stock-02448.jpg",
+    "stock-01664.jpg",
+    "stock-00108.jpg",
+    "stock-01663.jpg",
+    "stock-02408.jpg",
+    "stock-01686.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I06",
+   "ranked": [
+    "stock-00159.jpg",
+    "stock-01634.jpg",
+    "stock-02045.jpg",
+    "stock-00127.jpg",
+    "stock-02030.jpg",
+    "stock-01635.jpg",
+    "stock-00171.jpg",
+    "stock-00157.jpg",
+    "stock-01646.jpg",
+    "stock-00146.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I07",
+   "ranked": [
+    "stock-00171.jpg",
+    "stock-03441.jpg",
+    "stock-03469.jpg",
+    "stock-02039.jpg",
+    "stock-00151.jpg",
+    "stock-00157.jpg",
+    "stock-02030.jpg",
+    "stock-01646.jpg",
+    "stock-02060.jpg",
+    "stock-01634.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I08",
+   "ranked": [
+    "stock-02447.jpg",
+    "stock-01690.jpg",
+    "stock-02445.jpg",
+    "stock-01692.jpg",
+    "stock-02044.jpg",
+    "stock-01695.jpg",
+    "stock-01693.jpg",
+    "stock-02476.jpg",
+    "stock-01609.jpg",
+    "stock-02475.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I09",
+   "ranked": [
+    "stock-00172.jpg",
+    "stock-01699.jpg",
+    "stock-02429.jpg",
+    "stock-02466.jpg",
+    "stock-00121.jpg",
+    "stock-00187.jpg",
+    "stock-00198.jpg",
+    "stock-03477.jpg",
+    "stock-00133.jpg",
+    "stock-00182.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I10",
+   "ranked": [
+    "stock-00126.jpg",
+    "stock-01689.jpg",
+    "stock-00197.jpg",
+    "stock-01698.jpg",
+    "stock-03448.jpg",
+    "stock-03478.jpg",
+    "stock-00145.jpg",
+    "stock-02080.jpg",
+    "stock-01643.jpg",
+    "stock-01649.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I11",
+   "ranked": [
+    "stock-00189.jpg",
+    "stock-00109.jpg",
+    "stock-01614.jpg",
+    "stock-02429.jpg",
+    "stock-00198.jpg",
+    "stock-02066.jpg",
+    "stock-00129.jpg",
+    "stock-00144.jpg",
+    "stock-00151.jpg",
+    "stock-02411.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I12",
+   "ranked": [
+    "stock-00139.jpg",
+    "stock-03411.jpg",
+    "stock-02418.jpg",
+    "stock-03413.jpg",
+    "stock-00136.jpg",
+    "stock-02000.jpg",
+    "stock-01664.jpg",
+    "stock-01663.jpg",
+    "stock-00144.jpg",
+    "stock-01661.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I13",
+   "ranked": [
+    "stock-02434.jpg",
+    "stock-00196.jpg",
+    "stock-02419.jpg",
+    "stock-02433.jpg",
+    "stock-01638.jpg",
+    "stock-00198.jpg",
+    "stock-00109.jpg",
+    "stock-01629.jpg",
+    "stock-00192.jpg",
+    "stock-02045.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I14",
+   "ranked": [
+    "stock-00159.jpg",
+    "stock-02065.jpg",
+    "stock-02094.jpg",
+    "stock-00151.jpg",
+    "stock-02021.jpg",
+    "stock-00171.jpg",
+    "stock-02455.jpg",
+    "stock-02426.jpg",
+    "stock-00167.jpg",
+    "stock-02466.jpg"
+   ],
+   "excluded_identical": 0
+  },
+  {
+   "id": "I15",
+   "ranked": [
+    "stock-00169.jpg",
+    "stock-00155.jpg",
+    "stock-01625.jpg",
+    "stock-02429.jpg",
+    "stock-00185.jpg",
+    "stock-02053.jpg",
+    "stock-03448.jpg",
+    "stock-02439.jpg",
+    "stock-02063.jpg",
+    "stock-03406.jpg"
+   ],
+   "excluded_identical": 0
+  }
+ ]
+}

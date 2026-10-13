@@ -1,6 +1,6 @@
 # Optional specialist-model comparison (Phase 18)
 
-**Status: COMPLETE for audio (all 5 configurations on the full split). Image comparison skipped** (see Caveats).
+**Status: COMPLETE for audio (all 5 configurations on the full split). Images: runs done, waiting for human labels** (see Images below).
 Run on 2026-10-07 on an Apple M1, 8 GB, macOS 14, one configuration at a time.
 
 **Finding:** on Clotho text→audio retrieval, EmbeddingGemma 2 scores far below the specialist CLAP model:
@@ -41,7 +41,7 @@ Observations:
 ## Caveats
 - **Training overlap:** CLAP's training data (LAION-Audio-630K) includes Clotho and other Freesound-derived audio, so its scores may be inflated.
   EmbeddingGemma 2's training data is not documented in enough detail to rule out overlap either.
-- **Images:** the image comparison was skipped. Flickr30k needs a terms-gated download, and the CC0 demo pack has no human relevance labels yet.
+- **Images:** Flickr30k needs a terms-gated download, so images are compared on the app's own labelled evaluation instead (see Images below).
 - Clotho captions are licensed for non-commercial experimental use only (Tampere University). The audio carries per-file Freesound licences.
   The data stays local in `data/bench/clotho` and is never bundled. Clotho: K. Drossos, S. Lipping, T. Virtanen, *Clotho: an Audio Captioning Dataset*, ICASSP 2020.
 - The benchmark is for evaluation only. **The app uses only EmbeddingGemma 2.**
@@ -53,3 +53,36 @@ uv run --extra bench python evaluation/bench_clotho.py --config gemma-ctrl   # a
 uv run --extra bench python evaluation/bench_clotho.py --summarize
 ```
 The first attempt at the EmbeddingGemma runs was stopped because the machine ran low on memory. After other apps were closed, all three completed (11 min, 65 min and 39 min).
+
+## Images: open baselines on the app's evaluation (runs done 2026-10-13; labels pending)
+Same 500 CC0 photos, same frozen queries (`evaluation/queries.json`, spec v1), same top-10 depth and label rules as
+`docs/evaluation-report.md`. Script: `evaluation/bench_images.py`. Evaluation only. **The app uses only EmbeddingGemma 2.**
+
+| Config | Model | Precision | Notes |
+|---|---|---|---|
+| `clip-l14` | `openai/clip-vit-large-patch14` @ `32bd6428…` | MPS fp32 | 224 px |
+| `siglip2-so400m` | `google/siglip2-so400m-patch14-384` @ `e8e48729…` | MPS bf16 | 384 px, text padded to 64 tokens (model card) |
+
+- Query text is used as written, with no prompt template, so nothing is tuned on the test queries.
+- Image references exclude the reference and identical-hash copies, as the app does. Image+text queries are not run:
+  neither baseline has a native joint image+text query.
+- **Fair pooling:** the human labels so far cover only EmbeddingGemma 2's top 10. Each baseline's top 10 was merged into
+  `evaluation/pool-v1.json` (+289 new candidates). Still unlabelled: 155 text, 284 image, 120 image+text. `label_server.py` shows them shuffled
+  with the source hidden. An unlabelled result counts as unknown, never as irrelevant.
+
+Early look on the existing labels (text queries only; **not a result**, because 88–92 of each baseline's 200 top-10 results are unlabelled):
+
+| System | Hit@1 | Hit@5 |
+|---|---|---|
+| EmbeddingGemma 2 (app run) | 0.900 (n=20) | 0.950 (n=20) |
+| CLIP ViT-L/14 | 0.947 (n=19) | 1.000 (n=19) |
+| SigLIP 2 so400m | 0.850 (n=20) | 1.000 (n=19) |
+
+With 20 queries, one query moves Hit@1 by 0.05, so these three are not distinguishable yet. nDCG@10 needs every candidate labelled.
+
+To finish: label the new candidates, then
+```bash
+uv run python evaluation/label_server.py --images data/demo/stockimages-cc0 --labeler "<name>"
+uv run python evaluation/bench_images.py --summarize
+```
+Embedding time on the M1 included the first model download (497 s for CLIP, 1,768 s for SigLIP 2), so it is not a speed comparison.
