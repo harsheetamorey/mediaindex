@@ -47,6 +47,22 @@ Searching still uses EmbeddingGemma only. RT-DETR and Gemma 4 are helpers for As
 
 Ask can also **edit photos, make images and make videos** ("remove the car from photo 2"): see [`edit.md`](edit.md).
 
+## Confidence and follow-ups (2026-10-15)
+
+- **"Show me cars"** (and the Search tab, approved 2026-10-15): when the words name one of the detector's 80 objects,
+  photos where the detector found it (score ≥ 0.6) come first, in similarity order; the rest are marked “maybe” in Ask
+  and listed under **Low confidence detection** in Search. On the 500-photo stock library, "give me pictures of car"
+  now lists the 30 photos with a detected car first; a cat photo that used to be 17th is no longer in the top 48.
+- **"Only the red ones"** after a count: the share of each detected object's box in that colour, measured from the
+  pixels (HSV), not by a model. On the 13 car photos in a personal library the 4 red cars scored 0.13–0.47 and every
+  other car 0.01 or less, so ≥ 0.10 is kept and 0.04–0.10 is “maybe”. Only red was checked against photos; the other
+  colour ranges are untested guesses.
+- **"Which one has the peacock?"** (a follow-up the detector can't check): the 3 closest by similarity first, the
+  rest marked “maybe”.
+- **"Replace them with a table instead"** after a removal, **"put a truck instead"** after a replacement, **"go
+  ahead"** after a "too big" refusal and **"make it seamless"** after a removal re-run the last edit on the original
+  photo with that change.
+
 ## Setup
 
 1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.
