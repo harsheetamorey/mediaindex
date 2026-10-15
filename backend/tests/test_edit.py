@@ -2,6 +2,7 @@
 "make a video of those". Mocked detector, outline, fill and image models; the video is really encoded (FFmpeg)."""
 
 import subprocess
+import time
 
 import numpy as np
 import pytest
@@ -13,7 +14,7 @@ from mediaindex.app import create_app
 from mediaindex import api_ask
 from mediaindex.assistant import create_plan, edit_plan, is_plural, rule_plan
 from mediaindex.config import Settings
-from mediaindex.edit import Editor, fill_region, grow
+from mediaindex.edit import Editor, KeepWarm, fill_region, grow
 from mediaindex.model.backend import FakeBackend
 from test_search import wait_job
 
@@ -314,3 +315,56 @@ def test_replace_checks_the_new_thing_and_tries_once_more():
         a, b = np.asarray(r.image), np.asarray(im)
         assert (a[~r.mask] == b[~r.mask]).all()  # only the painted area changes, on every try
         assert (a[r.mask][:, 1] > 150).all() == found  # a failed retry keeps a result, never a half-painted mix
+
+
+class CountingModel:
+    made = closed = 0
+
+    def __init__(self, mode="paint"):
+        CountingModel.made += 1
+        self.mode, self.seed = mode, 0
+
+    def close(self):
+        CountingModel.closed += 1
+
+
+def test_keep_warm_reuses_the_model_and_frees_it():
+    CountingModel.made = CountingModel.closed = 0
+    warm = KeepWarm(CountingModel, idle=60, available=lambda: 8 * 2**30)
+    for _ in range(3):
+        m = warm()
+        m.seed += 1  # attributes go to the model itself
+        m.close()
+    assert (CountingModel.made, CountingModel.closed, warm.loaded) == (1, 0, True)
+    m = warm()
+    assert m.seed == 3
+    m.close()
+    warm("generate").close()  # another kind: the old one is closed first
+    assert (CountingModel.made, CountingModel.closed) == (2, 1)
+    warm.unload()
+    assert (CountingModel.closed, warm.loaded) == (2, False)
+
+
+def test_keep_warm_frees_when_memory_is_low_or_idle():
+    CountingModel.made = CountingModel.closed = 0
+    low = KeepWarm(CountingModel, idle=60, available=lambda: 0.5 * 2**30)
+    low().close()
+    assert (CountingModel.closed, low.loaded) == (1, False)
+    quick = KeepWarm(CountingModel, idle=0.05, available=lambda: 8 * 2**30)
+    quick().close()
+    deadline = time.time() + 5
+    while quick.loaded and time.time() < deadline:
+        time.sleep(0.02)
+    assert not quick.loaded
+
+
+def test_replace_with_a_warm_painter_starts_every_edit_from_the_same_seed():
+    im = Image.new("RGB", (160, 120), RED)
+    im.paste(BLUE, (40, 30, 80, 60))
+    green = lambda out, mask: bool((np.asarray(out)[mask][:, 1] > 150).mean() > 0.5)  # noqa: E731
+    warm = KeepWarm(lambda: SeededPainter(1), idle=60, available=lambda: 8 * 2**30)
+    ed = Editor(KeepWarm(FakeSegmenter, idle=60), KeepWarm(FakeFiller, idle=60), warm)
+    for _ in range(2):
+        r = ed.replace(im, [(40, 30, 80, 60)], "a cat", new_there=green)
+        assert (r.attempts, r.new_found) == (2, True)
+    assert warm.loaded

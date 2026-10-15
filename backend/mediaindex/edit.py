@@ -7,7 +7,8 @@
 
 Originals are never modified: every edit is a new JPEG under <data>/edits, served by its random id. Only the pixels
 inside the (slightly grown) outline change; everything else is copied from the original unchanged.
-Models load on first use and are freed after each edit, because memory is tight on 8 GB Macs.
+Models load on first use and stay loaded for a few minutes (KeepWarm), so the next edit skips loading; they are freed
+when idle, or right after an edit if memory is low, because memory is tight on 8 GB Macs.
 """
 
 from __future__ import annotations
@@ -37,6 +38,8 @@ FILL_MAX_SIDE = 1024  # LaMa works on a crop around the object, scaled to at mos
 JPEG_QUALITY = 95
 REPLACE_MASK = "box"  # replacing paints the object's box (plus outline), not its silhouette: the new thing has its own shape
 REPLACE_CONTEXT = 0.5  # and looks at less surroundings than removing, so the object is big enough on the model's canvas
+KEEP_WARM_S = 300  # keep edit models loaded this long after the last edit (replacing: 89 s with loading, 35 s without)
+MIN_AVAILABLE = 1.5 * 2**30  # but free them right after an edit when less memory than this is available
 MAX_CHANGE = 0.35  # never change more than this share of a photo: a bigger hole can only be filled with made-up scenery
 
 
@@ -151,6 +154,101 @@ class LamaFiller:
         self.model = None
 
 
+def _available_memory() -> float:
+    try:
+        import psutil
+
+        return float(psutil.virtual_memory().available)
+    except Exception:  # can't tell: behave as if memory is low
+        return 0.0
+
+
+class KeepWarm:
+    """A model factory that keeps the model it made for `idle` seconds after use. Callers use it like the factory:
+    `m = warm(); try: ... finally: m.close()`; close() ends the use, and the model is really closed when idle, when
+    memory is low, or when another kind (other args) is asked for. One use at a time."""
+
+    def __init__(self, make: Callable, idle: float = KEEP_WARM_S, min_available: float = MIN_AVAILABLE,
+                 available: Callable[[], float] = _available_memory):
+        self._make, self.idle, self.min_available, self._available = make, idle, min_available, available
+        self._model, self._args, self._last, self._timer = None, None, 0.0, None
+        self._lock = threading.Lock()
+
+    def __getattr__(self, name):  # model_name etc. of the wrapped factory
+        return getattr(self._make, name)
+
+    def __call__(self, *args):
+        self._lock.acquire()
+        try:
+            if self._timer is not None:
+                self._timer.cancel()
+                self._timer = None
+            if self._model is not None and self._args != args:
+                self._free()
+            if self._model is None:
+                self._model, self._args = self._make(*args), args
+        except BaseException:
+            self._lock.release()
+            raise
+        return _Lease(self, self._model)
+
+    def _release(self) -> None:
+        try:
+            self._last = time.monotonic()
+            if self.idle <= 0 or self._available() < self.min_available:
+                self._free()
+            else:
+                self._timer = threading.Timer(self.idle, self._expire)
+                self._timer.daemon = True
+                self._timer.start()
+        finally:
+            self._lock.release()
+
+    def _expire(self) -> None:
+        with self._lock:
+            if time.monotonic() - self._last >= self.idle - 0.5:  # not used again since this timer was set
+                self._free()
+
+    def _free(self) -> None:
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+        if self._model is not None:
+            model, self._model, self._args = self._model, None, None
+            model.close()
+            import gc
+
+            gc.collect()
+
+    def unload(self) -> None:
+        with self._lock:
+            self._free()
+
+    @property
+    def loaded(self) -> bool:
+        return self._model is not None
+
+
+class _Lease:
+    """The warm model for one use: attributes go to the model; close() hands it back to KeepWarm."""
+
+    def __init__(self, warm: KeepWarm, model):
+        object.__setattr__(self, "_warm", warm)
+        object.__setattr__(self, "_model", model)
+        object.__setattr__(self, "_open", True)
+
+    def __getattr__(self, name):
+        return getattr(self._model, name)
+
+    def __setattr__(self, name, value):
+        setattr(self._model, name, value)
+
+    def close(self) -> None:
+        if self._open:
+            object.__setattr__(self, "_open", False)
+            self._warm._release()
+
+
 def _sha256(path: str) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -218,7 +316,8 @@ class EditResult:
 
 
 class Editor:
-    """Loads SAM and the fillers on first use; frees them after each edit. One edit at a time."""
+    """Gets SAM and the fillers from their factories for each edit and closes them after it (pass KeepWarm factories
+    to keep them loaded between edits). One edit at a time."""
 
     def __init__(self, segmenter_factory: Callable[[], Segmenter], filler_factory: Callable[[], Filler],
                  painter_factory: Callable[[], object] | None = None):
@@ -302,6 +401,7 @@ class Editor:
                 if boxed.mean() <= MAX_CHANGE:
                     mask = boxed
             painter = self._paint_factory()
+            seed = getattr(painter, "seed", None)
             try:
                 def paint() -> Image.Image:
                     return fill_region(image, mask, lambda im, m: painter.paint(im, m, prompt),  # type: ignore[attr-defined]
@@ -315,6 +415,8 @@ class Editor:
                     if new_there(again, mask):  # type: ignore[misc]
                         out, found = again, True
             finally:
+                if seed is not None:
+                    painter.seed = seed  # type: ignore[attr-defined]  # a model kept warm starts the next edit the same
                 painter.close()  # type: ignore[attr-defined]
             clean = None
             if still_there is not None:
@@ -386,8 +488,12 @@ def download() -> None:
     hf_hub_download(LAMA_REPO, LAMA_FILE, revision=LAMA_REVISION)
 
 
-def default_editor(device: str, painter_factory=None) -> Editor:
-    return Editor(lambda: SamSegmenter(device), lambda: LamaFiller(device), painter_factory)
+def default_editor(device: str, painter_factory=None, keep_warm: float = 0) -> Editor:
+    """keep_warm > 0: keep SAM and LaMa loaded that many seconds between edits (wrap painter_factory in KeepWarm too)."""
+    if keep_warm <= 0:
+        return Editor(lambda: SamSegmenter(device), lambda: LamaFiller(device), painter_factory)
+    return Editor(KeepWarm(lambda: SamSegmenter(device), keep_warm), KeepWarm(lambda: LamaFiller(device), keep_warm),
+                  painter_factory)
 
 
 def main() -> int:

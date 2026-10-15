@@ -95,6 +95,13 @@ Pixels outside the painted area were unchanged in every edit. Median time **35 s
 loaded; 13 of 40 edits needed the retry. In the app, which loads the models for each edit, a replacement took 89 s end
 to end (a car → a believable white van in a car park; "now remove the truck" then edited that copy in 14 s).
 
+**Loading faster (2026-10-15):** most of the loading was merging the LCM adapter into the model in half precision on the
+CPU (14 s). It is now merged after the model is on the GPU (2 s): loading the image model went from 31 s to 13 s on an
+M1, with the same pictures (mean pixel difference 0.07 of 255). The app also keeps the edit models loaded for 5 minutes
+after an edit (`KEEP_WARM_S`), but only while at least 1.5 GB of memory stays available. On an 8 GB Mac that isn't the
+case with Stable Diffusion loaded (0.7 GB left, measured), so there it is still freed after every edit; machines with
+more memory skip loading on the next edit.
+
 **Caveat:** the retry uses the same detector that scores the benchmark, so its +3 is an upper bound. **Looked at by eye**
 (12 random successes): all 12 show the asked-for thing, 11 believably (a fluffy dog where a baby was, a bus, a pick-up truck,
 pizza on the cake plate); one, a dog standing in a tennis player's pose, is clearly a dog but odd. In failures the model

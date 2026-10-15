@@ -6,7 +6,7 @@ makes new images (painting a blank canvas). The original text-to-image UNet ("ge
 measured too: it finds the asked-for thing as often and is twice as fast, but with LCM its pictures are harsh and
 oversaturated whatever the prompt, so it isn't the default (docs/edit.md).
 
-Optional: needs `uv sync --extra create` and a one-time download. Loads on first use and is freed afterwards.
+Optional: needs `uv sync --extra create` and a one-time download. Loads on first use; the app keeps it loaded for a few minutes (edit.KeepWarm).
 """
 
 from __future__ import annotations
@@ -73,9 +73,10 @@ class Painter:
         else:
             pipe = StableDiffusionInpaintPipeline.from_pretrained(SD_ID, revision=SD_REVISION, variant="fp16", **common)
         pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+        pipe.to(device)  # before fusing: fusing in half precision on the CPU took 14 s, on the GPU 2 s
         pipe.load_lora_weights(LCM_ID, weight_name=LCM_FILE, revision=LCM_REVISION)
         pipe.fuse_lora()
-        self.pipe = pipe.to(device)
+        self.pipe = pipe
         self.pipe.enable_attention_slicing()  # 8 GB Macs: ~12 s per image instead of minutes of swapping
         self.pipe.set_progress_bar_config(disable=True)
 

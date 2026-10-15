@@ -32,7 +32,7 @@ from .security import BodySizeLimitMiddleware, LocalGuardMiddleware
 from .watch import FolderWatcher
 from .detect import DetectorHost, default_factory as default_detector_factory
 from .creative import painter_factory
-from .edit import default_editor
+from .edit import KEEP_WARM_S, KeepWarm, default_editor
 from .llm import OllamaChat
 
 
@@ -290,9 +290,9 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
     if chat is ...:
         chat = OllamaChat(settings.ollama_url, settings.chat_model) if settings.chat_model else None
     if painter is ...:
-        painter = painter_factory(settings.resolved_device())
+        painter = KeepWarm(painter_factory(settings.resolved_device()))  # shared by replacing and making images
     if editor is ...:
-        editor = default_editor(settings.resolved_device(), painter)
+        editor = default_editor(settings.resolved_device(), painter, keep_warm=KEEP_WARM_S)
     api_ask.register(app, DetectorHost(detector_factory or default_detector_factory(settings.resolved_device())), chat,
                      editor, painter)
     mount_frontend(app)
