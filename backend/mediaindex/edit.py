@@ -35,6 +35,8 @@ DOWNLOAD_HINT = "MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.edit --
 GROW = 0.012  # the outline is grown by this fraction of the photo's longer side, so edges and shadows go too
 FILL_MAX_SIDE = 1024  # LaMa works on a crop around the object, scaled to at most this size
 JPEG_QUALITY = 95
+REPLACE_MASK = "box"  # replacing paints the object's box (plus outline), not its silhouette: the new thing has its own shape
+REPLACE_CONTEXT = 0.5  # and looks at less surroundings than removing, so the object is big enough on the model's canvas
 MAX_CHANGE = 0.35  # never change more than this share of a photo: a bigger hole can only be filled with made-up scenery
 
 
@@ -183,11 +185,11 @@ def crop_box(mask: np.ndarray, context: float = 1.0) -> tuple[int, int, int, int
 
 
 def fill_region(image: Image.Image, mask: np.ndarray, fill: Callable[[Image.Image, np.ndarray], Image.Image],
-                max_side: int | None = None) -> Image.Image:
+                max_side: int | None = None, context: float = 1.0) -> Image.Image:
     """Run `fill` on a crop around the mask (scaled to max_side), then paste only the masked pixels back."""
     max_side = max_side or FILL_MAX_SIDE
     image = image.convert("RGB")
-    x0, y0, x1, y1 = crop_box(mask)
+    x0, y0, x1, y1 = crop_box(mask, context)
     crop = image.crop((x0, y0, x1, y1))
     cm = mask[y0:y1, x0:x1]
     scale = min(1.0, max_side / max(crop.size))
@@ -212,6 +214,7 @@ class EditResult:
     seconds: float
     attempts: int = 1
     clean: bool | None = None  # None: not checked; False: the object may still be visible
+    new_found: bool | None = None  # replacing: None if not checked; False if a check doesn't find the new thing
 
 
 class Editor:
@@ -278,26 +281,45 @@ class Editor:
             return EditResult(out, mask, len(boxes), time.perf_counter() - t, attempts, clean)
 
     def replace(self, image: Image.Image, boxes: list[PixelBox], prompt: str,
-                still_there: Callable[[Image.Image], list[PixelBox]] | None = None) -> EditResult:
-        """Paint `prompt` into the objects' outlines. `clean` is False if the old object is still detected there."""
+                still_there: Callable[[Image.Image], list[PixelBox]] | None = None,
+                new_there: Callable[[Image.Image, np.ndarray], bool] | None = None) -> EditResult:
+        """Paint `prompt` over the objects. `clean` is False if the old object is still detected there; if `new_there`
+        says the new thing isn't there, it paints once more with another seed and keeps a result that has it."""
         if self._paint_factory is None:
             raise RuntimeError("replacing objects needs the image model, which is not set up on this computer")
         with self._lock:
             t = time.perf_counter()
             raw = self.segment(image, boxes)
-            mask = grow(raw, max(2, round(GROW * max(image.size))))
+            step = max(2, round(GROW * max(image.size)))
+            mask = grow(raw, step)
             if mask.mean() > MAX_CHANGE:
                 raise EditRefused(f"it covers about {round(100 * float(raw.mean()))}% of the photo")
+            if REPLACE_MASK == "box":  # room for the new thing's own shape, unless that would be too big a change
+                boxed = raw.copy()
+                for b in boxes:
+                    boxed[max(0, int(b[1])):int(np.ceil(b[3])), max(0, int(b[0])):int(np.ceil(b[2]))] = True
+                boxed = grow(boxed, step)
+                if boxed.mean() <= MAX_CHANGE:
+                    mask = boxed
             painter = self._paint_factory()
             try:
-                out = fill_region(image, mask, lambda im, m: painter.paint(im, m, prompt),  # type: ignore[attr-defined]
-                                  max_side=painter.max_side)  # type: ignore[attr-defined]
+                def paint() -> Image.Image:
+                    return fill_region(image, mask, lambda im, m: painter.paint(im, m, prompt),  # type: ignore[attr-defined]
+                                       max_side=painter.max_side, context=REPLACE_CONTEXT)  # type: ignore[attr-defined]
+
+                out, attempts = paint(), 1
+                found = new_there(out, mask) if new_there is not None else None
+                if found is False and hasattr(painter, "seed"):
+                    painter.seed += 1  # type: ignore[attr-defined]
+                    again, attempts = paint(), 2
+                    if new_there(again, mask):  # type: ignore[misc]
+                        out, found = again, True
             finally:
                 painter.close()  # type: ignore[attr-defined]
             clean = None
             if still_there is not None:
                 clean = not [b for b in still_there(out) if any(_box_iou(b, x) >= 0.3 for x in boxes)]
-            return EditResult(out, mask, len(boxes), time.perf_counter() - t, 1, clean)
+            return EditResult(out, mask, len(boxes), time.perf_counter() - t, attempts, clean, found)
 
     def models(self, replacing: bool = False) -> list[str]:
         names = [f"{SAM_ID}@{SAM_REVISION[:12]}"]

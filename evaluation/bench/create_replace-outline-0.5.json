@@ -1,0 +1,416 @@
+{
+ "summary": {
+  "mask": "outline",
+  "context": 0.5,
+  "tasks": 40,
+  "refused": 0,
+  "edited": 40,
+  "success_rate": 0.5,
+  "new_found_rate": 0.6,
+  "old_gone_rate": 0.8,
+  "untouched_rate": 1.0,
+  "seconds_median": 32.97
+ },
+ "rows": [
+  {
+   "file": "000000185250.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 35.12
+  },
+  {
+   "file": "000000005586.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 41.05
+  },
+  {
+   "file": "000000407650.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 29.41
+  },
+  {
+   "file": "000000210030.jpg",
+   "label": "cake",
+   "new": "pizza",
+   "new_found": true,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 31.24
+  },
+  {
+   "file": "000000545730.jpg",
+   "label": "zebra",
+   "new": "horse",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 33.16
+  },
+  {
+   "file": "000000520871.jpg",
+   "label": "bottle",
+   "new": "vase",
+   "new_found": false,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 26.2
+  },
+  {
+   "file": "000000112298.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 29.64
+  },
+  {
+   "file": "000000167540.jpg",
+   "label": "aeroplane",
+   "new": "bird",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 44.81
+  },
+  {
+   "file": "000000206027.jpg",
+   "label": "pizza",
+   "new": "cake",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 45.17
+  },
+  {
+   "file": "000000303499.jpg",
+   "label": "horse",
+   "new": "cow",
+   "new_found": false,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 37.15
+  },
+  {
+   "file": "000000356248.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 31.94
+  },
+  {
+   "file": "000000563882.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 39.84
+  },
+  {
+   "file": "000000459153.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 41.52
+  },
+  {
+   "file": "000000314251.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 28.65
+  },
+  {
+   "file": "000000305695.jpg",
+   "label": "truck",
+   "new": "bus",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 38.68
+  },
+  {
+   "file": "000000025394.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 34.92
+  },
+  {
+   "file": "000000377635.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 31.02
+  },
+  {
+   "file": "000000416837.jpg",
+   "label": "cow",
+   "new": "horse",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 28.57
+  },
+  {
+   "file": "000000292456.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 31.74
+  },
+  {
+   "file": "000000157098.jpg",
+   "label": "giraffe",
+   "new": "horse",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 35.06
+  },
+  {
+   "file": "000000263594.jpg",
+   "label": "car",
+   "new": "truck",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 31.77
+  },
+  {
+   "file": "000000082085.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 39.28
+  },
+  {
+   "file": "000000156278.jpg",
+   "label": "chair",
+   "new": "pottedplant",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 36.73
+  },
+  {
+   "file": "000000577976.jpg",
+   "label": "truck",
+   "new": "bus",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 33.63
+  },
+  {
+   "file": "000000156071.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 39.04
+  },
+  {
+   "file": "000000129054.jpg",
+   "label": "zebra",
+   "new": "horse",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 27.73
+  },
+  {
+   "file": "000000281687.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 35.71
+  },
+  {
+   "file": "000000336232.jpg",
+   "label": "car",
+   "new": "truck",
+   "new_found": true,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 27.92
+  },
+  {
+   "file": "000000137950.jpg",
+   "label": "aeroplane",
+   "new": "bird",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 33.74
+  },
+  {
+   "file": "000000520324.jpg",
+   "label": "aeroplane",
+   "new": "bird",
+   "new_found": false,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 36.5
+  },
+  {
+   "file": "000000414673.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 28.18
+  },
+  {
+   "file": "000000565853.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 27.53
+  },
+  {
+   "file": "000000556000.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 31.32
+  },
+  {
+   "file": "000000005037.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 22.81
+  },
+  {
+   "file": "000000226984.jpg",
+   "label": "bottle",
+   "new": "vase",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 32.77
+  },
+  {
+   "file": "000000269121.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 36.1
+  },
+  {
+   "file": "000000177213.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 30.78
+  },
+  {
+   "file": "000000052413.jpg",
+   "label": "cup",
+   "new": "bowl",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 27.86
+  },
+  {
+   "file": "000000070158.jpg",
+   "label": "zebra",
+   "new": "horse",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 39.65
+  },
+  {
+   "file": "000000025424.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 32.6
+  }
+ ]
+}

@@ -31,8 +31,10 @@ REPO = HERE.parent
 sys.path.insert(0, str(REPO / "backend"))
 sys.path.insert(0, str(HERE))
 from bench_edit import COCO, OUT, TO_DET, gt_mask, iou, tasks  # noqa: E402
+import mediaindex.creative as creative  # noqa: E402
 from mediaindex.creative import Painter, painter_factory  # noqa: E402
 from mediaindex.detect import RTDetrDetector  # noqa: E402
+import mediaindex.edit as edit_mod  # noqa: E402
 from mediaindex.edit import EditRefused, Editor, LamaFiller, SamSegmenter  # noqa: E402
 
 SWAP = {"dog": "cat", "cat": "dog", "horse": "cow", "cow": "horse", "sheep": "dog", "bear": "dog", "zebra": "horse",
@@ -63,8 +65,12 @@ def word(label: str) -> str:
 
 def replace(a) -> None:
     files, imgs, anns, cats = tasks(a.n, a.seed)
+    edit_mod.REPLACE_MASK, edit_mod.REPLACE_CONTEXT = a.mask, a.context
+    creative.PAINT_GUIDANCE, creative.STEPS = a.guidance, a.steps
     det = RTDetrDetector(a.device)
-    editor = Editor(lambda: SamSegmenter(a.device), lambda: LamaFiller(a.device), painter_factory(a.device))
+    painter = painter_factory(a.device)()  # loaded once (the app loads it per edit): seconds exclude loading
+    painter.close = lambda: None
+    editor = Editor(lambda: SamSegmenter(a.device), lambda: LamaFiller(a.device), lambda: painter)
     sheet = OUT / f"create_{a.tag}_sheet"
     if a.sheet:
         sheet.mkdir(parents=True, exist_ok=True)
@@ -92,8 +98,16 @@ def replace(a) -> None:
         label, box, _ = best
         new = SWAP[label]
         px = (box[0] * w, box[1] * h, box[2] * w, box[3] * h)
+        def new_there(edited, mask, new=new):  # as the app does it (detector at its normal threshold)
+            for _, b in det.detect(edited).get(new, []):
+                region = mask[int(b[1] * h):int(np.ceil(b[3] * h)), int(b[0] * w):int(np.ceil(b[2] * w))]
+                if region.size and region.mean() >= 0.5:
+                    return True
+            return False
+
+        painter.seed = 0
         try:
-            r = editor.replace(im, [px], word(new))
+            r = editor.replace(im, [px], word(new), new_there=new_there if a.retry else None)
         except EditRefused as e:
             rows.append({"file": name, "label": label, "new": new, "refused": str(e)})
             continue
@@ -109,7 +123,7 @@ def replace(a) -> None:
         diff = np.abs(np.asarray(r.image, dtype=np.int16) - np.asarray(im, dtype=np.int16)).max(axis=2)
         row = {"file": name, "label": label, "new": new, "new_found": new_found, "old_gone": old_gone,
                "success": new_found and old_gone, "untouched": bool((diff[~r.mask] == 0).all()),
-               "seconds": round(r.seconds, 2)}
+               "attempts": r.attempts, "seconds": round(r.seconds, 2)}
         rows.append(row)
         print(json.dumps(row), flush=True)
         if a.sheet:
@@ -118,7 +132,7 @@ def replace(a) -> None:
             both.paste(r.image, (w + 8, 0))
             both.save(sheet / f"{len(rows):03d}_{'ok' if row['success'] else 'MISS'}_{label}-to-{new}_{name}", quality=85)
     done = [r for r in rows if "refused" not in r]
-    summary = {"tasks": len(rows), "refused": len(rows) - len(done), "edited": len(done),
+    summary = {"mask": a.mask, "context": a.context, "guidance": a.guidance, "steps": a.steps, "seed": a.seed, "retry": a.retry, "tasks": len(rows), "refused": len(rows) - len(done), "edited": len(done),
                "success_rate": round(np.mean([r["success"] for r in done]), 3),
                "new_found_rate": round(np.mean([r["new_found"] for r in done]), 3),
                "old_gone_rate": round(np.mean([r["old_gone"] for r in done]), 3),
@@ -170,6 +184,11 @@ def main() -> int:
                     help="paint: the inpainting model on a blank canvas (the app's choice); generate: text-to-image UNet "
                          "(download it with: python -m mediaindex.creative --download --base)")
     ap.add_argument("--tag", default=None)
+    ap.add_argument("--mask", choices=["box", "outline"], default="box", help="replace: the area painted")
+    ap.add_argument("--context", type=float, default=0.5, help="replace: surroundings around the object, x its size")
+    ap.add_argument("--guidance", type=float, default=creative.PAINT_GUIDANCE, help="replace: the painting guidance")
+    ap.add_argument("--steps", type=int, default=creative.STEPS)
+    ap.add_argument("--no-retry", dest="retry", action="store_false", help="replace: don't repaint when the check fails")
     a = ap.parse_args()
     a.tag = a.tag or a.mode
     (replace if a.mode == "replace" else generate)(a)

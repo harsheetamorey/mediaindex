@@ -16,7 +16,7 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from .api_search import embed_query, run_search
-from .assistant import Assistant, Turn, display
+from .assistant import Assistant, Turn, display, resolve_label
 from .detect import DETECTOR_ID, DETECTOR_KEY, SURE, DetectorHost, run_detection
 from .edit import DOWNLOAD_HINT as EDIT_DOWNLOAD_HINT
 from .edit import EditRefused, Editor, EditStore
@@ -191,9 +191,20 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
             def still_there(edited):
                 return [px(b) for _, b in detector.detect(edited).get(label, [])]
 
+            new_label = resolve_label(new) if new else None
+
+            def new_there(edited, mask):  # the new thing is found, mostly inside the painted area
+                for _, b in detector.detect(edited).get(new_label, []):
+                    x0, y0, x1, y1 = int(b[0] * w), int(b[1] * h), int(np.ceil(b[2] * w)), int(np.ceil(b[3] * h))
+                    region = mask[y0:y1, x0:x1]
+                    if region.size and region.mean() >= 0.5:
+                        return True
+                return False
+
             try:
                 if new:
-                    r = editor.replace(image, [px(b) for b in picked], new, still_there)
+                    r = editor.replace(image, [px(b) for b in picked], new, still_there,
+                                       new_there if new_label else None)
                 else:
                     r = editor.remove(image, [px(b) for b in picked], still_there)
             except EditRefused as e:
@@ -208,6 +219,7 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         ctx.progress(3, message="Saving a copy")
         meta = edits.save(r.image, {**source, "op": "replace" if new else "remove", "label": label, "new": new,
                                     "objects": r.objects, "clean": r.clean, "attempts": r.attempts,
+                                    "new_found": getattr(r, "new_found", None),
                                     "seconds": round(r.seconds, 1), "changed_share": round(float(r.mask.mean()), 4),
                                     "models": editor.models(bool(new))})
         n_found, n_done = len(sure), len(picked)
@@ -219,6 +231,9 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         if n_found > n_done:
             text += (f" There {'is' if n_found - n_done == 1 else 'are'} {n_found - n_done} more; I changed the biggest. "
                      f"Say “{'replace' if new else 'remove'} all the {display(label)}” to change every one.")
+        if new and r.new_found is False:
+            text += (f" A check doesn't find {new} in the result{' after two tries' if r.attempts > 1 else ''}, so it "
+                     f"may not look like one.")
         if r.clean is False:
             text += f" A check still finds something like a {thing} there, so look closely: it may not be clean."
         elif r.mask.mean() > BIG_FILL:

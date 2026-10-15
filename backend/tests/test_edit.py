@@ -289,3 +289,28 @@ def test_replace_generate_and_video(client, monkeypatch):
     assert c.post(f"/api/edits/{v['id']}/save", json={"destination": str(tmp / "out")}).json()["saved"].endswith(
         "video.mp4")
     assert tree_digest(root) == before
+
+
+class SeededPainter(FakePainter):
+    """Paints the asked-for thing only from seed `works_from` on (a model that sometimes paints background)."""
+
+    def __init__(self, works_from):
+        self.seed, self.works_from = 0, works_from
+
+    def paint(self, image, mask, prompt):
+        ok = self.seed >= self.works_from
+        return Image.new("RGB", image.size, (0, 200, 0) if ok else (90, 90, 90))
+
+
+def test_replace_checks_the_new_thing_and_tries_once_more():
+    im = Image.new("RGB", (160, 120), RED)
+    im.paste(BLUE, (40, 30, 80, 60))
+    green = lambda out, mask: bool((np.asarray(out)[mask][:, 1] > 150).mean() > 0.5)  # noqa: E731
+    for works_from, attempts, found in ((0, 1, True), (1, 2, True), (5, 2, False)):
+        painter = SeededPainter(works_from)
+        ed = Editor(FakeSegmenter, FakeFiller, lambda: painter)
+        r = ed.replace(im, [(40, 30, 80, 60)], "a cat", new_there=green)
+        assert (r.attempts, r.new_found) == (attempts, found)
+        a, b = np.asarray(r.image), np.asarray(im)
+        assert (a[~r.mask] == b[~r.mask]).all()  # only the painted area changes, on every try
+        assert (a[r.mask][:, 1] > 150).all() == found  # a failed retry keeps a result, never a half-painted mix

@@ -1,0 +1,279 @@
+{
+ "summary": {
+  "mask": "box",
+  "context": 0.5,
+  "guidance": 2.5,
+  "steps": 6,
+  "seed": 1,
+  "tasks": 30,
+  "refused": 10,
+  "edited": 20,
+  "success_rate": 0.65,
+  "new_found_rate": 0.7,
+  "old_gone_rate": 0.9,
+  "untouched_rate": 1.0,
+  "seconds_median": 25.79
+ },
+ "rows": [
+  {
+   "file": "000000050896.jpg",
+   "label": "orange",
+   "new": "apple",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 21.54
+  },
+  {
+   "file": "000000156278.jpg",
+   "label": "chair",
+   "new": "pottedplant",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 23.39
+  },
+  {
+   "file": "000000228144.jpg",
+   "label": "chair",
+   "new": "pottedplant",
+   "refused": "it covers about 55% of the photo"
+  },
+  {
+   "file": "000000516804.jpg",
+   "label": "bus",
+   "new": "truck",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 25.06
+  },
+  {
+   "file": "000000206135.jpg",
+   "label": "cow",
+   "new": "horse",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 35.76
+  },
+  {
+   "file": "000000182417.jpg",
+   "label": "cake",
+   "new": "pizza",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 30.35
+  },
+  {
+   "file": "000000474039.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 37.86
+  },
+  {
+   "file": "000000391648.jpg",
+   "label": "clock",
+   "new": "vase",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 23.58
+  },
+  {
+   "file": "000000507223.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 34% of the photo"
+  },
+  {
+   "file": "000000531134.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 24.8
+  },
+  {
+   "file": "000000542856.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 23.27
+  },
+  {
+   "file": "000000343937.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 29.54
+  },
+  {
+   "file": "000000318138.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 37% of the photo"
+  },
+  {
+   "file": "000000430961.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 75% of the photo"
+  },
+  {
+   "file": "000000481582.jpg",
+   "label": "horse",
+   "new": "cow",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 35.33
+  },
+  {
+   "file": "000000231879.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 32% of the photo"
+  },
+  {
+   "file": "000000545730.jpg",
+   "label": "zebra",
+   "new": "horse",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 26.05
+  },
+  {
+   "file": "000000556000.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 32.46
+  },
+  {
+   "file": "000000014007.jpg",
+   "label": "cat",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 30.08
+  },
+  {
+   "file": "000000055150.jpg",
+   "label": "car",
+   "new": "truck",
+   "new_found": true,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 22.99
+  },
+  {
+   "file": "000000415716.jpg",
+   "label": "chair",
+   "new": "pottedplant",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 35.03
+  },
+  {
+   "file": "000000498032.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 37% of the photo"
+  },
+  {
+   "file": "000000336232.jpg",
+   "label": "car",
+   "new": "truck",
+   "new_found": false,
+   "old_gone": false,
+   "success": false,
+   "untouched": true,
+   "seconds": 26.84
+  },
+  {
+   "file": "000000563882.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 66% of the photo"
+  },
+  {
+   "file": "000000111207.jpg",
+   "label": "person",
+   "new": "dog",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 23.98
+  },
+  {
+   "file": "000000412531.jpg",
+   "label": "car",
+   "new": "truck",
+   "new_found": false,
+   "old_gone": true,
+   "success": false,
+   "untouched": true,
+   "seconds": 24.11
+  },
+  {
+   "file": "000000416837.jpg",
+   "label": "cow",
+   "new": "horse",
+   "new_found": true,
+   "old_gone": true,
+   "success": true,
+   "untouched": true,
+   "seconds": 25.53
+  },
+  {
+   "file": "000000070158.jpg",
+   "label": "zebra",
+   "new": "horse",
+   "refused": "it covers about 44% of the photo"
+  },
+  {
+   "file": "000000391722.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 35% of the photo"
+  },
+  {
+   "file": "000000154425.jpg",
+   "label": "person",
+   "new": "dog",
+   "refused": "it covers about 40% of the photo"
+  }
+ ]
+}

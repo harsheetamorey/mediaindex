@@ -74,6 +74,29 @@ Changes made because of this benchmark:
 - re-checking and filling a wider area once when the object is still found (90% → 92% on 100);
 - declining edits that would change more than 35% of a photo: a close-up arm had made a retry repaint 92% of the photo.
 
+## Measured: replacing objects (REAL MODEL, M1 8 GB)
+
+`evaluation/bench_create.py replace`: the same kind of tasks as removing (one sure, human-confirmed object per COCO photo),
+replaced with a fixed other kind of thing (person → dog, car → truck, zebra → horse, cake → pizza…). Success = the
+detector (at 0.3) no longer finds the old thing there **and** finds the new thing mostly inside the painted area.
+
+| Version | 40 photos (seed 0) | 30 new photos (seed 1) |
+|---|---|---|
+| First version: exact outline, 3× surroundings, guidance 1.5 | 16 / 40 (40%) | — |
+| Less surroundings (0.5×), so the object is bigger on the model's canvas | 20 / 40 | — |
+| … paint the object's box, not its outline (box refused when > 35% of the photo) | 19 / 40 | 11 / 30 |
+| … guidance 2.5 instead of 1.5 (4.0 was worse: 50%) | — | 13 / 30 |
+| **Now:** box (outline if the box is too big), guidance 2.5, one retry if the new thing isn't found | **28 / 40 (70%)** | **19 / 30 (63%)** |
+| … same, without the retry | 25 / 40 | — |
+
+Pixels outside the painted area were unchanged in every edit. Median time **35 s** per replacement with the model already
+loaded (about 25 s more in the app, which loads it for each edit); 13 of 40 edits needed the retry.
+
+**Caveat:** the retry uses the same detector that scores the benchmark, so its +3 is an upper bound. **Looked at by eye**
+(12 random successes): all 12 show the asked-for thing, 11 believably (a fluffy dog where a baby was, a bus, a pick-up truck,
+pizza on the cake plate); one, a dog standing in a tennis player's pose, is clearly a dog but odd. In failures the model
+mostly paints background (the object disappears), and the answer then says the check didn't find the new thing.
+
 ## Measured: making new images (REAL MODEL, M1 8 GB)
 
 `evaluation/bench_create.py generate`: "a <thing>" for 24 of the detector's object types plus 12 scenes ("a dog on a

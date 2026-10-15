@@ -34,6 +34,7 @@ DOWNLOAD_HINT = "uv sync --extra create && MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run py
 
 STEPS = 6
 GUIDANCE = 1.5  # LCM works with little or no guidance; a little keeps the picture closer to the words
+PAINT_GUIDANCE = 2.5  # replacing: more, or the model often paints background instead (55% -> 65% replaced; 4.0: 50%)
 NATIVE = 512  # the model's training size
 STYLE = "a photo of {}, realistic, natural light, detailed, high quality"
 NEGATIVE = "blurry, deformed, distorted, low quality, text, watermark, cartoon, drawing, frame, border"
@@ -78,7 +79,8 @@ class Painter:
         self.pipe.enable_attention_slicing()  # 8 GB Macs: ~12 s per image instead of minutes of swapping
         self.pipe.set_progress_bar_config(disable=True)
 
-    def _run(self, image: Image.Image, mask: np.ndarray, prompt: str, size: tuple[int, int]) -> Image.Image:
+    def _run(self, image: Image.Image, mask: np.ndarray, prompt: str, size: tuple[int, int],
+             guidance: float | None = None) -> Image.Image:
         torch = self._torch
         w, h = size
         g = torch.Generator("cpu").manual_seed(self.seed)
@@ -86,13 +88,13 @@ class Painter:
             out = self.pipe(prompt=STYLE.format(prompt), negative_prompt=NEGATIVE,
                             image=image.convert("RGB").resize((w, h), Image.Resampling.LANCZOS),
                             mask_image=Image.fromarray(mask.astype(np.uint8) * 255).resize((w, h), Image.Resampling.NEAREST),
-                            height=h, width=w, num_inference_steps=STEPS, guidance_scale=GUIDANCE, strength=1.0,
+                            height=h, width=w, num_inference_steps=STEPS, guidance_scale=guidance or GUIDANCE, strength=1.0,
                             generator=g).images[0]
         return out
 
     def paint(self, image: Image.Image, mask: np.ndarray, prompt: str) -> Image.Image:
         """Paint `prompt` where mask is True; returns an image the size of `image` (the caller keeps only the mask)."""
-        out = self._run(image, mask, prompt, _size(*image.size))
+        out = self._run(image, mask, prompt, _size(*image.size), PAINT_GUIDANCE)
         return out.resize(image.size, Image.Resampling.LANCZOS)
 
     def generate(self, prompt: str, width: int = NATIVE, height: int = NATIVE) -> Image.Image:
