@@ -247,7 +247,7 @@ export default function App() {
       ? [
           { label: `Found by the object detector: ${objectCheck.name}`, offset: 0, items: results.filter((r) => r.object_check === 'found') },
           {
-            label: `Similar, but the object detector found no ${objectCheck.name} in these`,
+            label: 'Low confidence detection',
             offset: objectCheck.found,
             items: results.filter((r) => r.object_check !== 'found'),
           },
