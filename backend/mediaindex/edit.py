@@ -128,6 +128,12 @@ def _inside(box: PixelBox, mask: np.ndarray, share: float = 0.5) -> bool:
     return bool(r.size) and float(r.mean()) >= share
 
 
+def _centre_in(a: PixelBox, b: PixelBox) -> bool:
+    """The centre of box a lies inside box b."""
+    cx, cy = (a[0] + a[2]) / 2, (a[1] + a[3]) / 2
+    return b[0] <= cx <= b[2] and b[1] <= cy <= b[3]
+
+
 def _with_boxes(raw: np.ndarray, boxes: list[PixelBox], px: int) -> np.ndarray:
     """The outline plus each object's whole box, grown by px: room for shadows and the bits the outline missed."""
     m = raw.copy()
@@ -419,12 +425,13 @@ class Editor:
                           find_all: Callable[[Image.Image], Found], seed: int,
                           place: str = "background") -> tuple[Image.Image, int, bool, str]:
         """Returns (image, tries, clean, filled_by). clean: nothing new or left over is found in the filled area."""
-        kept = [(lab, b) for lab, b in find_all(image)  # other things there before, partly under the mask
-                if _inside(b, mask) and not any(_box_iou(b, x) >= 0.3 for x in boxes)]
+        kept = [(lab, b) for lab, b in find_all(image)  # other things there before, touching the mask at all
+                if _inside(b, mask, share=0.01) and not any(_box_iou(b, x) >= 0.3 for x in boxes)]
 
-        def new_things(out: Image.Image) -> list[str]:
+        def new_things(out: Image.Image) -> list[str]:  # a kept thing may look bigger once what hid it is gone
             return [lab for lab, b in find_all(out)
-                    if _inside(b, mask) and not any(lab == k and _box_iou(b, kb) >= 0.5 for k, kb in kept)]
+                    if _inside(b, mask) and not any(lab == k and (_box_iou(b, kb) >= 0.3 or _centre_in(kb, b))
+                                                    for k, kb in kept)]
 
         lama_clean = not new_things(lama)
         if self._paint_factory is None:

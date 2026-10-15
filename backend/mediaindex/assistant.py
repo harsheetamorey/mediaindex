@@ -21,6 +21,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
+import numpy as np
+
 from .detect import LABELS, SURE
 from .llm import ChatUnavailable, OllamaChat
 from .store import Store
@@ -126,8 +128,25 @@ COUNT_RE = re.compile(r"\b(how many|number of|count)\b", re.I)
 COMPARE_RE = re.compile(r"\b(more|fewer|less|most)\b.+\bor\b", re.I)
 DESCRIBE_RE = re.compile(r"\b(describe|tell me (more )?about|what'?s (in|happening in)|what is (in|happening in)|"
                          r"what do you see)\b", re.I)
-REFINE_RE = re.compile(r"\b(which of|of those|of these|among (them|those|these)|the ones|which ones|only keep|keep only|"
-                       r"just keep|those|these|them)\b", re.I)
+REFINE_RE = re.compile(r"\b(which of|of those|of these|among (them|those|these)|the ones|which ones|which one|the one with|"
+                       r"the one that|only keep|keep only|just keep|only the|just the|those|these|them)\b", re.I)
+TOP_REFINE = 3  # a follow-up the detector can't check ("which one has the peacock?"): the closest 3 first, the rest "maybe"
+# colour of a detected object, measured in its own box (PIL HSV, 0-255): name -> test on hue, saturation, value
+COLOUR_TESTS = {
+    "red": lambda h, s, v: ((h < 10) | (h > 240)) & (s > 110) & (v > 60),
+    "orange": lambda h, s, v: (h >= 10) & (h < 26) & (s > 120) & (v > 90),
+    "yellow": lambda h, s, v: (h >= 26) & (h < 46) & (s > 110) & (v > 100),
+    "green": lambda h, s, v: (h >= 46) & (h < 120) & (s > 70) & (v > 50),
+    "blue": lambda h, s, v: (h >= 130) & (h < 190) & (s > 80) & (v > 50),
+    "purple": lambda h, s, v: (h >= 190) & (h <= 240) & (s > 70) & (v > 50),
+    "white": lambda h, s, v: (s < 40) & (v > 190),
+    "black": lambda h, s, v: v < 50,
+    "grey": lambda h, s, v: (s < 40) & (v >= 70) & (v <= 190),
+}
+COLOUR_WORDS = {**{c: c for c in COLOUR_TESTS}, "gray": "grey", "silver": "grey"}
+# share of the box in that colour: kept / "maybe". Set on 13 car photos: the 4 red cars 0.13-0.47 (a small car in
+# a big box, or deep shadow, gives less), every other car <= 0.01. Only red has been checked against photos.
+COLOUR_SURE, COLOUR_MAYBE = 0.10, 0.04
 REFERENCE_RE = re.compile(r"\b(this|that|it|one|photo|picture|image)\b", re.I)
 EXPLAIN_RE = re.compile(r"\b(why|where('?s| is| are)?|not an?|isn'?t|is not|are not|aren'?t|none of|wrong|are you sure|really|"
                         r"(don'?t|do not|can'?t|cannot) see|no (dog|cat|one)s?)\b", re.I)
@@ -160,7 +179,7 @@ REDO_RE = re.compile(r"^\s*(?:(?:can|could|would)\s+(?:you|u)\s+|please\s+|now\s
                      r"(?:put|try|use|make it|do|give me|paint|show me)\s+(?P<new>(?:an?|some|the)\s+[\w\s-]+?)"
                      r"(?:\s+(?:instead|there|here|in it|in there))?\s*$", re.I)
 REDO_WITH_RE = re.compile(r"^\s*(?:(?:can|could|would)\s+(?:you|u)\s+|please\s+|now\s+|ok\s+|okay\s+)*"
-                          r"(?:replace|swap|change)\s+(?:it\s+|that\s+|this\s+|them\s+)?(?:with|for|to|into)\s+"
+                          r"(?:replace|swap|change)\s+(?:it\s+|that\s+|this\s+|them\s+|those\s+|these\s+)?(?:with|for|to|into)\s+"
                           r"(?P<new>.+?)(?:\s+instead)?\s*$", re.I)
 # after a removal: "it should look seamless", "there's a gap", "try again": the same removal, another try
 RETRY_RE = re.compile(r"\b(seamless|seamlessly|gap|smudge|smudges|smear|smeared|blur|blurry|blocky|patch|shadow|"
@@ -183,6 +202,10 @@ class Plan:
     new: str = ""  # edit: what to put in place of `subject` ("" = remove it)
     big: bool = False  # edit: the user said to go ahead although it changes most of the photo
     seed: int = 0  # edit: > 0 when the user asked to try a removal again
+
+
+def _parts(message: str) -> list[str]:
+    return re.split(r"[.;!?]|,\s|\s+-\s+", message.strip())
 
 
 def clean_new(new: str) -> str:
@@ -326,7 +349,8 @@ RankFn = Callable[[str, list[str]], list[str]]  # text, candidate asset ids -> t
 
 class Assistant:
     def __init__(self, store: Store, detector_key: str, search: SearchFn, rank_within: RankFn,
-                 image_b64: Callable[[str], str], chat: OllamaChat | None = None, result_limit: int = 12):
+                 image_b64: Callable[[str], str], chat: OllamaChat | None = None, result_limit: int = 12,
+                 load_photo: Callable[[str], object] | None = None):
         self.store = store
         self.key = detector_key
         self.search = search
@@ -334,6 +358,7 @@ class Assistant:
         self.image_b64 = image_b64
         self.chat = chat
         self.limit = result_limit
+        self.load_photo = load_photo  # asset id -> PIL image (colour follow-ups)
 
     # ---- routing --------------------------------------------------------------------
     def plan(self, message: str, history: list[Turn], use_chat: bool) -> Plan:
@@ -458,15 +483,33 @@ class Assistant:
 
     def _search(self, plan, message, history, library_ids, use_chat, asset_id):
         q = plan.subject or message
-        ids = self.search(q, library_ids, self.limit)
+        labels = resolve_labels(q)
+        checked = len(labels) == 1 and self._coverage(library_ids)["checked"] > 0
+        ids = self.search(q, library_ids, self.limit * 4 if checked else self.limit)
         if not ids:
             return {"answer": "Nothing is indexed yet. Add a folder on the left first.", "facts": {"query": q}}
+        if checked:  # like the Search tab: photos where the detector found it first, the rest marked "maybe"
+            label = labels[0]
+            sure = set(self._without_corrections(
+                label, self.store.count_objects(self.key, label, library_ids, sure=SURE)["asset_ids"]))
+            found = [a for a in ids if a in sure][:self.limit]
+            rest = [a for a in ids if a not in sure][:max(0, self.limit - len(found))]
+            text = (f"{len(found)} of these have {display(label)} (found by the object detector), closest to “{q}” "
+                    f"first." if found else f"The object detector didn't find {display(label)} in the closest matches.")
+            if rest:
+                text += " The ones marked “maybe” are only similar: low confidence."
+            return {"answer": text, "asset_ids": found + rest, "maybe_ids": rest,
+                    "facts": {"query": q, "label": label, "found": len(found)}, "box_labels": [label] if found else False}
         return {"answer": f"Here are the closest matches for “{q}”, best first. Similar isn't always a match, "
                           f"so the last ones may be off.", "asset_ids": ids, "facts": {"query": q}}
 
     def _refine(self, plan, message, history, library_ids, use_chat, asset_id):
         prev = self._previous(history)
         q = plan.subject or message
+        colour = next((COLOUR_WORDS[w] for w in re.findall(r"[a-z]+", message.lower()) if w in COLOUR_WORDS), None)
+        topic = resolve_label(q) or self._topic_label(message, history)
+        if colour and topic and self.load_photo is not None and self._coverage(library_ids)["checked"]:
+            return self._by_colour(prev, colour, topic, library_ids)
         label = resolve_label(q)
         if label is not None and self._coverage(library_ids)["checked"]:
             keep = set(self.store.count_objects(self.key, label, library_ids, sure=SURE)["asset_ids"])
@@ -475,8 +518,48 @@ class Assistant:
                               f"{display(label)}.",
                     "asset_ids": ids, "facts": {"label": label, "of": len(prev), "kept": len(ids)}, "box_labels": [label]}
         ids = self.rank_within(q, prev)
+        if len(ids) > TOP_REFINE:
+            return {"answer": f"Closest to “{q}”: the first {TOP_REFINE}. The rest, marked “maybe”, are low "
+                              f"confidence.", "asset_ids": ids, "maybe_ids": ids[TOP_REFINE:],
+                    "facts": {"query": q, "of": len(prev), "top": TOP_REFINE}}
         return {"answer": f"Here {'is that photo' if len(prev) == 1 else f'are those {len(prev)} photos'} again, closest to “{q}” first. I can't be sure which "
                           f"ones truly match, so have a look.", "asset_ids": ids, "facts": {"query": q, "of": len(prev)}}
+
+    def _by_colour(self, prev: list[str], colour: str, label: str, library_ids) -> dict:
+        """ "only the red ones": the share of each detected object's box in that colour (pixels, not a model)."""
+        from PIL import Image
+
+        sure = set(self.store.count_objects(self.key, label, library_ids, sure=SURE)["asset_ids"])
+        test = COLOUR_TESTS[colour]
+        scored = []
+        for aid in prev:
+            a = self.store.get_asset(aid)
+            if aid not in sure or a is None:
+                continue
+            boxes = [b["box"] for b in self.store.boxes_for(a["content_hash"], self.key, [label]) if b["score"] >= SURE]
+            try:
+                im = self.load_photo(aid).convert("RGB")
+            except Exception:
+                continue
+            best = 0.0
+            for x0, y0, x1, y1 in boxes:
+                crop = im.crop((int(x0 * im.width), int(y0 * im.height), int(x1 * im.width), int(y1 * im.height)))
+                crop.thumbnail((128, 128))
+                h, s_, v = (np.asarray(c, dtype=np.int16) for c in crop.convert("HSV").split())
+                best = max(best, float(test(h, s_, v).mean()))
+            scored.append((best, aid))
+        scored.sort(key=lambda x: -x[0])
+        keep = [a for f, a in scored if f >= COLOUR_SURE]
+        maybe = [a for f, a in scored if COLOUR_MAYBE <= f < COLOUR_SURE]
+        thing = display(label, 2)
+        if keep:
+            text = f"{len(keep)} of those have {colour} {thing}, checked by colour inside each detected {display(label, 1)}."
+        else:
+            text = f"None of those clearly have {colour} {thing}."
+        if maybe:
+            text += f" {len(maybe)} more {'is' if len(maybe) == 1 else 'are'} partly {colour}, marked “maybe”."
+        return {"answer": text, "asset_ids": keep + maybe, "maybe_ids": maybe, "box_labels": [label],
+                "facts": {"label": label, "colour": colour, "kept": len(keep), "maybe": len(maybe)}}
 
     def _describe(self, plan, message, history, library_ids, use_chat, asset_id):
         prev = self._previous(history)
@@ -610,8 +693,8 @@ class Assistant:
         i, p = found
         if TOO_BIG_RE.search(last.text) and CONFIRM_RE.search(message):
             p.big = True
-        elif p.new and (new := self._redo_new(message)):
-            p.new = new
+        elif (new := self._redo_new(message)) and (p.new or any(REDO_WITH_RE.match(x) for x in _parts(message))):
+            p.new = new  # after a replacement: something else; after a removal: "replace them with a table instead"
         elif not p.new and RETRY_RE.search(message) and not edit_plan(message):
             p.seed = 1 + sum(1 for t in history[i + 1:] if t.role == "user")  # each "try again" a new picture
         else:
@@ -626,7 +709,7 @@ class Assistant:
     @staticmethod
     def _redo_new(message: str) -> str:
         """ "wait no not that, replace with a tesla cybertruck" -> "a tesla cybertruck" (any phrase may say it)."""
-        for part in reversed(re.split(r"[.;!?]|,\s|\s+-\s+", message.strip())):
+        for part in reversed(_parts(message)):
             if (r := REDO_WITH_RE.match(part) or REDO_RE.match(part)):
                 return clean_new(r.group("new"))
         return ""

@@ -483,3 +483,24 @@ def test_search_puts_detected_objects_first(client):
     assert [x["rank"] for x in r["results"]] == [1, 2, 3]
     r = c.post("/api/search/text", json={**body, "text": "sunset"}).json()
     assert "object_check" not in r and "object_check" not in r["results"][0]
+
+
+def test_replace_after_removal_and_colour_and_top3(client):
+    c, root, _ = client
+    r, pos = photos(c)
+    hist = [{"role": "user", "text": "show me my photos"}, turn(r)]
+    ask1 = f"remove the dog from photo {pos['park.png']}"
+    r1 = ask(c, ask1, hist)
+    res1 = finish(c, r1)
+    h2 = hist + [{"role": "user", "text": ask1}, {**turn(r1, res1["edit"]), "text": res1["answer"]}]
+    r2 = ask(c, "now replace it with a cat instead", h2)
+    res2 = finish(c, r2)
+    assert res2["edit"]["op"] == "replace" and res2["edit"]["new"] == "a cat" and res2["edit"]["parent_edit_id"] is None
+
+    wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+    r3 = ask(c, "how many dogs?", [])
+    h3 = [{"role": "user", "text": "how many dogs?"}, turn(r3)]
+    r4 = ask(c, "only the blue ones", h3)  # the test dogs are blue boxes
+    assert r4["action"] == "refine" and "blue dogs" in r4["answer"] and len(r4["asset_ids"]) == 2
+    r5 = ask(c, "only the red ones", h3)
+    assert "None of those" in r5["answer"]

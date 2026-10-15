@@ -96,7 +96,10 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         except ImageRejected as e:
             raise HTTPException(422, f"cannot read this photo: {str(e).split(':')[0]}")
 
-    assistant = Assistant(store, DETECTOR_KEY, search, rank_within, image_b64, chat)
+    def load_photo(asset_id: str):
+        return load_image(app.state.asset_path(asset_id)[1])
+
+    assistant = Assistant(store, DETECTOR_KEY, search, rank_within, image_b64, chat, load_photo=load_photo)
     app.state.assistant = assistant
 
     def _check_libs(library_ids):
