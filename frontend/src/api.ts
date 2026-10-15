@@ -140,12 +140,36 @@ export type ExportPlan = {
   overwrites: number
 }
 
-export type AskTurn = { role: 'user' | 'assistant'; text: string; asset_ids?: string[]; action?: string }
+export type AskTurn = {
+  role: 'user' | 'assistant'
+  text: string
+  asset_ids?: string[]
+  action?: string
+  edit_id?: string | null
+}
+
+/** Made in Ask: an edited copy ("remove the car"), a made-up image, or a video of photos. Originals never change. */
+export type EditInfo = {
+  id: string
+  op: 'remove' | 'replace' | 'generate' | 'video'
+  kind: 'image' | 'video'
+  label: string | null
+  new: string
+  objects: number
+  clean: boolean | null
+  source_asset_id: string | null
+  parent_edit_id: string | null
+  width: number
+  height: number
+  seconds: number
+  url: string
+}
 
 export type AskResponse = {
   answer: string
-  action: 'count' | 'search' | 'refine' | 'describe' | 'explain' | 'chat'
+  action: 'count' | 'search' | 'refine' | 'describe' | 'explain' | 'summary' | 'chat' | 'edit'
   routed_by: string
+  job?: Job
   described_by?: string
   asset_ids: string[]
   maybe_ids?: string[]
@@ -204,6 +228,8 @@ export const api = {
   addLibrary: (path: string, name?: string) => request<Library>('/api/libraries', json({ path, name })),
   setLibraryWatch: (id: string, watch: boolean) =>
     request<Library>(`/api/libraries/${id}`, { ...json({ watch }), method: 'PATCH' }),
+  saveEdit: (id: string, destination: string) =>
+    request<{ saved: string; destination: string }>(`/api/edits/${id}/save`, json({ destination })),
   pickFolder: () => request<{ cancelled: boolean; path?: string }>('/api/pick-folder', { method: 'POST' }),
   settings: () => request<AppSettings>('/api/settings'),
   setLowPriority: (on: boolean) =>

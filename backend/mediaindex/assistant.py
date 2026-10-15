@@ -4,6 +4,10 @@
 - "Show me beach sunsets"    -> EmbeddingGemma search (ranked by similarity, as in Search)
 - "Which of those have people?" / "...are at night?" -> narrows or re-ranks the previous answer's photos
 - "Describe the second one"  -> the local chat model looks at that one photo (needs Ollama + Gemma 4)
+- "Remove the car from photo 2" / "replace the dog with a cat" -> a new, edited copy of that photo (edit.py);
+  the original is never changed. The edit itself runs as a background job (api_ask.py).
+- "Make an image of a red bicycle"  -> a new, made-up image from the local image model (creative.py), labelled as such
+- "Make a video of those" / "turn my beach photos into a reel" -> a slideshow video of exactly those photos (slideshow.py)
 - anything else              -> the local chat model replies, given only facts from the library
 
 Numbers always come from the database, never from the chat model: factual answers are fixed sentences, and a free
@@ -93,6 +97,20 @@ def resolve_labels(subject: str) -> list[str]:
     return found
 
 
+IRREGULAR_PLURALS = {"people", "persons", "men", "women", "children", "kids", "mice", "geese", "cattle", "sheep"}
+
+
+def is_plural(subject: str) -> bool:
+    """ "cars", "the people", "puppies" -> True; "car", "bus", "wine glass" -> False."""
+    for w in re.findall(r"[a-z]+", subject.lower()):
+        if w in IRREGULAR_PLURALS or w in {PLURAL.get(lab, DISPLAY.get(lab, lab) + "s") for lab in LABELS} - {"sheep"}:
+            return True
+        if w.endswith("s") and w not in WORD_TO_LABEL.values() and \
+                (w[:-1] in WORD_TO_LABEL or w[:-2] in WORD_TO_LABEL or w[:-3] + "y" in WORD_TO_LABEL):
+            return True
+    return False
+
+
 def resolve_label(subject: str) -> str | None:
     labels = resolve_labels(subject)
     return labels[0] if labels else None
@@ -114,6 +132,24 @@ REFERENCE_RE = re.compile(r"\b(this|that|it|one|photo|picture|image)\b", re.I)
 EXPLAIN_RE = re.compile(r"\b(why|where('?s| is| are)?|not an?|isn'?t|is not|are not|aren'?t|none of|wrong|are you sure|really|"
                         r"(don'?t|do not|can'?t|cannot) see|no (dog|cat|one)s?)\b", re.I)
 NEGATION_RE = re.compile(r"\b(not|isn'?t|aren'?t|no|wrong|none)\b", re.I)
+REMOVE_VERBS = r"remove|erase|delete|get rid of|take out|take away|edit out|clean up|cut out"
+REMOVE_RE = re.compile(rf"\b(?:{REMOVE_VERBS})\s+(?P<obj>.+)$", re.I)
+REPLACE_RE = re.compile(r"\b(?:replace|swap|change|turn)\s+(?P<obj>.+?)\s+(?:with|for|into|to)\s+(?P<new>.+)$", re.I)
+# where the edit should happen: "... from the second one", "... in photo 2", "... in it"
+WHERE_RE = re.compile(r"\s+(?:from|in|on|off|of)\s+(?:the\s+|this\s+|that\s+|my\s+)?(?:photo|picture|image|pic|one|it|"
+                      r"this|that|#?\d|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|"
+                      r"3rd)\b.*$", re.I)
+GENERATE_RE = re.compile(r"^\s*(?:please\s+|can you\s+|could you\s+)*(?:generate|create|make|draw|paint|imagine|design)"
+                         r"\s+(?:me\s+)?(?:an?\s+|some\s+)?(?:new\s+)?(?:(?:wide|tall|square|landscape|portrait)\s+)?"
+                         r"(?:image|picture|photo|drawing|painting|illustration|artwork|art|pic)s?\s+"
+                         r"(?:of|showing|with|that shows)\s+(?P<what>.+)$", re.I)
+VIDEO_RE = re.compile(r"\b(?:make|create|generate|turn|build|put|render)\b.*\b(?P<kind>video|slideshow|slide show|reel|"
+                      r"short|movie|montage|story)s?\b", re.I)
+VERTICAL_RE = re.compile(r"\b(reel|short|story|vertical|portrait|tiktok|instagram|phone)s?\b", re.I)
+SQUARE_RE = re.compile(r"\bsquare\b", re.I)
+PRONOUN_RE = re.compile(r"^\s*(those|these|them|they|it|this|that|the ones|those ones|these ones|the photos|the pictures)?\s*$",
+                        re.I)
+ALL_RE = re.compile(r"\b(all|every|each|both)\b", re.I)
 CHAT_RE = re.compile(r"^\s*(hi|hello|hey|thanks|thank you|help|who are you|what can you do)\b", re.I)
 
 
@@ -123,6 +159,43 @@ class Plan:
     subject: str = ""
     item: int | None = None
     routed_by: str = "rules"
+    new: str = ""  # edit: what to put in place of `subject` ("" = remove it)
+
+
+def create_plan(message: str) -> Plan | None:
+    """ "make an image of a red bike" -> generate; "make a video of my beach photos" -> video (new = its shape)."""
+    m = message.strip().rstrip(".!?")
+    if (g := GENERATE_RE.search(m)) is not None:
+        shape = "wide" if re.search(r"\b(wide|landscape)\b", m, re.I) else \
+            "tall" if re.search(r"\b(tall|portrait)\b", m, re.I) else "square"
+        return Plan("generate", g.group("what").strip(), new=shape)
+    if (v := VIDEO_RE.search(m)) is not None:
+        shape = "vertical" if VERTICAL_RE.search(m) else "square" if SQUARE_RE.search(m) else "landscape"
+        rest = m[:v.start("kind")] + " " + m[v.end("kind"):]  # what the video is of, around the word "video"
+        rest = re.sub(r"\b(make|create|generate|turn|build|put|render|me|a|an|the|out of|of|from|with|into|my|our|all|"
+                      r"photos?|pictures?|pics?|images?|shots?|please|can you|could you|vertical|square|landscape|"
+                      r"portrait|for|instagram|tiktok|youtube|phone)\b", " ", rest, flags=re.I)
+        rest = re.sub(r"\s+", " ", rest).strip(" ,")
+        return Plan("video", "" if PRONOUN_RE.match(rest) else rest, new=shape)
+    return None
+
+
+def edit_plan(message: str) -> Plan | None:
+    """ "remove the car from photo 2" -> edit(subject="car", item=2); "replace the dog with a cat" -> new="a cat"."""
+    m = message.strip().rstrip(".!?")
+    r = REPLACE_RE.search(m)
+    if r:
+        obj, new = WHERE_RE.sub("", r.group("obj")), WHERE_RE.sub("", r.group("new"))
+    elif (r := REMOVE_RE.search(m)):
+        obj, new = WHERE_RE.sub("", r.group("obj")), ""
+    else:
+        return None
+    obj = re.sub(r"^\s*(?:all the|both the|all of the|the|a|an|all|every|each|both|that|this|those|these)\s+", "", obj, flags=re.I)
+    obj = re.sub(r"\s+(?:too|also|as well|please|now|again)\s*$", "", obj, flags=re.I).strip()
+    new = re.sub(r"\s+(?:please|instead|too|now)\s*$", "", new, flags=re.I).strip()
+    if not obj:
+        return None
+    return Plan("edit", obj, _item(m), new=new)
 
 
 def _items(text: str) -> list[int]:
@@ -155,6 +228,11 @@ def rule_plan(message: str, has_previous: bool, has_focus: bool | None = None) -
     m = message.strip()
     if (has_previous if has_focus is None else has_focus) and EXPLAIN_RE.search(m) and not COUNT_RE.search(m):
         return Plan("explain", _strip(m))  # "why did you say it's a dog?", "that's not a cat", "where is the dog?"
+    if (c := create_plan(m)) is not None:  # "make an image of…", "make a video of those"
+        return c
+    e = edit_plan(m)  # only ever routed by these rules, never by the chat model: edits must be asked for in words
+    if e is not None and ((has_previous if has_focus is None else has_focus) or REMOVE_RE.search(m)):
+        return e  # "remove the car from the second one", "replace the dog with a cat"
     if COUNT_RE.search(m):
         return Plan("count", _strip(COUNT_RE.split(m, 1)[-1]))
     if COMPARE_RE.search(m) and len(resolve_labels(m)) >= 2:  # "more cats or dogs?"
@@ -194,6 +272,7 @@ class Turn:
     text: str
     asset_ids: list[str] = field(default_factory=list)
     action: str | None = None  # for assistant turns: which kind of answer it was
+    edit_id: str | None = None  # for assistant turns that showed an edited copy
 
 
 USER = "user"  # corrections typed by the user ("photo 3 isn't a dog") always win
@@ -240,7 +319,7 @@ class Assistant:
     @staticmethod
     def _previous(history: list[Turn]) -> list[str]:
         for t in reversed(history):
-            if t.role == "assistant" and t.asset_ids and t.action != "describe":  # the last list, not one photo
+            if t.role == "assistant" and t.asset_ids and t.action not in ("describe", "edit"):  # a list, not one photo
                 return t.asset_ids
         return []
 
@@ -274,8 +353,8 @@ class Assistant:
             asset_id: str | None = None) -> dict:
         status = self.chat.status() if self.chat else {"available": False, "reason": "no chat model configured"}
         use_chat = bool(status.get("available"))
-        if asset_id:  # the user clicked a photo and asked about it
-            plan = Plan("describe", item=None)
+        if asset_id:  # the user clicked a photo and asked about it: describe it, or edit it
+            plan = edit_plan(message) or Plan("describe", item=None)
         else:
             plan = self.plan(message, history, use_chat)
         handler = getattr(self, "_" + plan.action)
@@ -392,6 +471,83 @@ class Assistant:
                 f"{asset['rel_path']} hasn't been checked for objects yet.")
         return {"answer": text + " (Turn on the local chat model to get a written description.)",
                 "asset_ids": [asset_id], "facts": facts, "box_labels": None}
+
+    @staticmethod
+    def _last_edit(history: list[Turn]) -> str | None:
+        """The edited copy the conversation is about now (the latest answer, if it showed one)."""
+        for t in reversed(history):
+            if t.role == "assistant":
+                return t.edit_id
+        return None
+
+    def _edit(self, plan, message, history, library_ids, use_chat, asset_id):
+        """Work out which photo and which object; the edit itself runs as a job (api_ask.py) using `edit_request`."""
+        labels = resolve_labels(plan.subject)
+        verb = "replace" if plan.new else "remove"
+        if not labels:
+            if re.search(r"\b(photo|picture|image|pic|file|one)s?\b|^\s*#?\d+\s*$", plan.subject, re.I):
+                return {"answer": "MediaIndex never deletes or changes your photos. To take something out of a photo, "
+                                  "say what: “remove the car from photo 2”.", "facts": {}}
+            return {"answer": f"I can only {verb} things the object detector recognises, like people, cars, dogs, "
+                              f"cats, birds, bikes, boats or cups, not “{plan.subject}” yet.",
+                    "facts": {"subject": plan.subject}}
+        source: dict | None = None
+        prev = self._previous(history)
+        last_edit = self._last_edit(history)
+        if asset_id:
+            source = {"asset_id": asset_id}
+        elif plan.item is not None and prev:
+            n = len(prev) if plan.item == -1 else plan.item
+            if not 1 <= n <= len(prev):
+                return {"answer": f"The last answer had {len(prev)} photos; pick a number from 1 to {len(prev)}.",
+                        "facts": {}}
+            source = {"asset_id": prev[n - 1]}
+        elif last_edit:  # "now remove the person too": keep editing the copy just made
+            source = {"edit_id": last_edit}
+        elif len(focus := self._focus(history)) == 1:
+            source = {"asset_id": focus[0]}
+        elif focus:
+            return {"answer": f"Which photo? Say for example “{verb} the {display(labels[0], 1)} "
+                              f"{'with ' + plan.new + ' ' if plan.new else ''}in photo 2”.", "asset_ids": focus,
+                    "facts": {}}
+        if source is None:
+            return {"answer": f"First find the photo (for example “show me photos with {display(labels[0])}”), "
+                              f"then tell me which one to edit.", "facts": {}}
+        if "asset_id" in source:
+            a = self.store.get_asset(source["asset_id"])
+            if a is None or a["media_type"] != "image":
+                return {"answer": "I can only edit photos.", "facts": {}}
+        everything = bool(ALL_RE.search(plan.subject) or ALL_RE.search(message)) or is_plural(plan.subject)
+        thing = display(labels[0], 2 if everything else 1)
+        doing = f"Replacing the {thing} with {plan.new}" if plan.new else f"Removing the {thing}"
+        return {"answer": f"{doing}… This makes a new copy; your original photo stays as it is.",
+                "asset_ids": [source["asset_id"]] if "asset_id" in source else [],
+                "edit_request": {**source, "label": labels[0], "all": everything, "new": plan.new},
+                "facts": {"label": labels[0], "all": everything, "new": plan.new}}
+
+    def _generate(self, plan, message, history, library_ids, use_chat, asset_id):
+        """A new image from words; made up by the image model, so the answer says it isn't one of your photos."""
+        what = plan.subject.strip()
+        return {"answer": f"Making a new image of “{what}”… It is made up by a local image model, not one of your photos.",
+                "create_request": {"op": "generate", "prompt": what, "shape": plan.new or "square"},
+                "facts": {"prompt": what}}
+
+    def _video(self, plan, message, history, library_ids, use_chat, asset_id):
+        """A slideshow of exactly the photos asked for: the last answer's, or the closest matches for a subject."""
+        if plan.subject:
+            ids = self.search(plan.subject, library_ids, self.limit)
+            source = f"the {len(ids)} closest matches for “{plan.subject}”"
+        else:
+            ids = self._previous(history) or self._focus(history)
+            source = f"{'this photo' if len(ids) == 1 else f'these {len(ids)} photos'}"
+        if not ids:
+            return {"answer": "Which photos? Ask for some first (“show me beach photos”), then say “make a video of "
+                              "those”, or name them: “make a video of my beach photos”.", "facts": {}}
+        shape = {"vertical": "a vertical (9:16)", "square": "a square"}.get(plan.new, "a widescreen (16:9)")
+        note = " Similar isn't always a match, so check the photos below." if plan.subject else ""
+        return {"answer": f"Making {shape} video from {source}, in this order…{note}",
+                "asset_ids": ids, "create_request": {"op": "video", "asset_ids": ids, "shape": plan.new or "landscape"},
+                "facts": {"photos": len(ids), "shape": plan.new}}
 
     def _explain(self, plan, message, history, library_ids, use_chat, asset_id):
         """Show the evidence for an earlier answer: where the detector found the object, and how sure it was."""

@@ -45,6 +45,8 @@ object and how sure the detector was. Ask doesn't guess.
 
 Searching still uses EmbeddingGemma only. RT-DETR and Gemma 4 are helpers for Ask; they never change search results.
 
+Ask can also **edit photos, make images and make videos** ("remove the car from photo 2"): see [`edit.md`](edit.md).
+
 ## Setup
 
 1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.

@@ -226,6 +226,11 @@ button { font: inherit; }
 .msg-photo.maybe { border-style: dashed; border-color: var(--muted); opacity: 0.85; }
 .msg-maybe { position: absolute; right: 4px; bottom: 4px; background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; }
 .msg-photo.maybe .det-box { border-style: dashed; }
+.edit-view { display: flex; flex-direction: column; gap: 6px; width: min(520px, 100%); }
+.edit-img { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line, rgba(0, 0, 0, 0.12)); display: block; object-fit: contain; background: rgba(0, 0, 0, 0.04); }
+.edit-view.tall { width: min(300px, 100%); }
+.edit-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.edit-tag { font-size: 12px; font-weight: 600; opacity: 0.75; margin-right: auto; }
 .det-box { position: absolute; border: 2px solid #ffd60a; border-radius: 3px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); pointer-events: none; min-width: 6px; min-height: 6px; }
 .det-box[data-label]::after { content: attr(data-label); position: absolute; left: -2px; bottom: 100%; margin-bottom: 2px; background: #ffd60a; color: #111; font-size: 11px; line-height: 1; padding: 2px 4px; border-radius: 3px; white-space: nowrap; }
 .msg-photo:disabled { cursor: default; }

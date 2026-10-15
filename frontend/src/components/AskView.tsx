@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ApiError, type Asset, type AskStatus, type AskTurn, type DetectedBox } from '../api'
+import { api, ApiError, type Asset, type AskStatus, type AskTurn, type DetectedBox, type EditInfo } from '../api'
 
 type Message = {
   role: 'user' | 'assistant'
@@ -10,6 +10,63 @@ type Message = {
   action?: string
   via?: string
   error?: boolean
+  edit?: EditInfo | null
+  job?: string // an edit still being made
+  progress?: string
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** The edited copy, with the original one click away, and a way to keep it. */
+function EditView({ edit, source }: { edit: EditInfo; source?: Asset }) {
+  const [showOriginal, setShowOriginal] = useState(false)
+  const [saved, setSaved] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const save = async () => {
+    setError(null)
+    setSaving(true)
+    try {
+      const picked = await api.pickFolder()
+      if (picked.cancelled || !picked.path) return
+      const r = await api.saveEdit(edit.id, picked.path)
+      setSaved(`Saved as “${r.saved}” in ${r.destination}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+  const comparable = (edit.op === 'remove' || edit.op === 'replace') && source
+  const original = showOriginal && comparable
+  const tag = original ? 'Original' : { remove: 'Edited copy', replace: 'Edited copy', generate: 'Made-up image', video: 'Video' }[edit.op]
+  return (
+    <div className={edit.kind === 'video' && edit.height > edit.width ? 'edit-view tall' : 'edit-view'}>
+      {edit.kind === 'video' ? (
+        <video className="edit-img" src={edit.url} controls playsInline style={{ aspectRatio: `${edit.width} / ${edit.height}` }} />
+      ) : (
+        <img
+          className="edit-img"
+          src={original ? source.file_url : edit.url}
+          alt={original ? `original: ${source.rel_path}` : edit.op === 'generate' ? `made-up image of ${edit.new}` : `edited copy of ${source?.rel_path ?? 'the photo'}`}
+          style={{ aspectRatio: `${edit.width} / ${edit.height}` }}
+        />
+      )}
+      <div className="edit-actions">
+        <span className="edit-tag">{tag}</span>
+        {comparable && (
+          <button className="btn small" onClick={() => setShowOriginal((v) => !v)} aria-pressed={showOriginal}>
+            {showOriginal ? 'Show edited' : 'Show original'}
+          </button>
+        )}
+        <button className="btn small primary" onClick={save} disabled={saving}>
+          {saving ? 'Choose a folder…' : 'Save a copy…'}
+        </button>
+      </div>
+      {saved && <div className="muted small">{saved}</div>}
+      {error && <div className="error small" role="alert">{error}</div>}
+    </div>
+  )
 }
 
 const SUGGESTIONS = ['How many dogs do I have?', 'Show me a city street at night', 'Which of those have cars?', "What's in my library?"]
@@ -53,7 +110,14 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
     const history: AskTurn[] = messages
       .filter((m) => !m.error)
       .slice(-12)
-      .map((m) => ({ role: m.role, text: m.text, asset_ids: m.results?.map((a) => a.id) ?? [], action: m.action }))
+      .filter((m) => !m.job)
+      .map((m) => ({
+        role: m.role,
+        text: m.text,
+        asset_ids: m.results?.map((a) => a.id) ?? [],
+        action: m.action,
+        edit_id: m.edit?.id ?? null,
+      }))
     setMessages((ms) => [...ms, { role: 'user', text: q, results: asset ? [asset] : undefined }])
     setText('')
     setBusy(true)
@@ -70,12 +134,37 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
           maybe: r.maybe_ids,
           action: r.action,
           via: via ? r.chat_model.model : undefined,
+          job: r.job?.id,
         },
       ])
+      if (r.job) await followEdit(r.job.id)
     } catch (e) {
       setMessages((ms) => [...ms, { role: 'assistant', text: e instanceof ApiError ? e.message : String(e), error: true }])
     } finally {
       setBusy(false)
+    }
+  }
+
+  // An edit runs as a background job: show its steps, then the finished copy (or why nothing was changed).
+  const followEdit = async (jobId: string) => {
+    const update = (patch: Partial<Message>) =>
+      setMessages((ms) => ms.map((m) => (m.job === jobId ? { ...m, ...patch } : m)))
+    for (;;) {
+      await sleep(700)
+      let j
+      try {
+        j = await api.job(jobId)
+      } catch {
+        continue
+      }
+      if (j.status === 'queued') update({ progress: 'Waiting for other work to finish…' })
+      else if (j.status === 'running') update({ progress: j.message || 'Working…' })
+      else {
+        const res = (j.result ?? {}) as { answer?: string; edit?: EditInfo | null }
+        if (j.status === 'done') update({ text: res.answer ?? 'Done.', edit: res.edit ?? null, job: undefined, progress: undefined })
+        else update({ text: `The edit didn't work: ${j.error ?? j.status}`, error: true, job: undefined, progress: undefined })
+        return
+      }
     }
   }
 
@@ -152,8 +241,10 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
               <div className="bubble">
                 {m.text}
                 {m.via && <div className="muted small">answered with {m.via}</div>}
+                {m.job && <div className="muted small">{m.progress ?? 'Starting…'}</div>}
               </div>
-              {all.length > 0 && (
+              {m.edit && <EditView edit={m.edit} source={all[0]} />}
+              {all.length > 0 && (!m.edit || m.edit.op === 'video') && (
                 <div className={all.length === 1 && m.role === 'assistant' ? 'msg-photos single' : 'msg-photos'}>
                   {shown.map((a, n) => (
                     <button

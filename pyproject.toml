@@ -32,6 +32,10 @@ app = [
     "pyinstaller>=6",
     "pywebview>=5",
 ]
+create = [
+    "diffusers==0.41.0",
+    "peft==0.21.2",
+]
 
 [dependency-groups]
 dev = ["pytest", "httpx"]

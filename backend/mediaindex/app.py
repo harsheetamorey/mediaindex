@@ -31,6 +31,8 @@ from .model.profiles import IndexProfile
 from .security import BodySizeLimitMiddleware, LocalGuardMiddleware
 from .watch import FolderWatcher
 from .detect import DetectorHost, default_factory as default_detector_factory
+from .creative import painter_factory
+from .edit import default_editor
 from .llm import OllamaChat
 
 
@@ -51,7 +53,8 @@ PICK_FOLDER_SCRIPT = ['tell me to activate',
                       'POSIX path of (choose folder with prompt "Choose a media folder for MediaIndex")']
 
 
-def create_app(settings: Settings | None = None, backend_factory=None, detector_factory=None, chat=...) -> FastAPI:
+def create_app(settings: Settings | None = None, backend_factory=None, detector_factory=None, chat=...,
+               editor=..., painter=...) -> FastAPI:
     settings = settings or Settings()
     settings.ensure_dirs()
     profile = IndexProfile(precision=settings.resolved_precision())
@@ -286,7 +289,12 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
     api_selections.register_clips(app)
     if chat is ...:
         chat = OllamaChat(settings.ollama_url, settings.chat_model) if settings.chat_model else None
-    api_ask.register(app, DetectorHost(detector_factory or default_detector_factory(settings.resolved_device())), chat)
+    if painter is ...:
+        painter = painter_factory(settings.resolved_device())
+    if editor is ...:
+        editor = default_editor(settings.resolved_device(), painter)
+    api_ask.register(app, DetectorHost(detector_factory or default_detector_factory(settings.resolved_device())), chat,
+                     editor, painter)
     mount_frontend(app)
     return app
 

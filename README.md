@@ -44,6 +44,17 @@ The **Ask** tab answers questions like "how many dogs do I have?", "show me a ci
 
 Nothing is uploaded. Setup, measured accuracy and limits: [`docs/ask.md`](docs/ask.md).
 
+### Edit photos, make images and videos (in Ask)
+Follow-ups like "remove the car from photo 2", "replace the dog with a cat", "make an image of a red bicycle" and "turn
+those into a reel" make **new files**; your originals never change.
+- Removing: SAM outlines the object the detector found, LaMa fills it in. On 100 COCO photos the object was gone in 92,
+  and nothing outside the edited area changed in any of them.
+- Replacing and new images: Stable Diffusion 1.5 inpainting (optional, `uv sync --extra create`). They are made up, and
+  labelled that way.
+- Videos are slideshows of exactly the photos you asked for.
+
+Setup, measurements and limits: [`docs/edit.md`](docs/edit.md).
+
 ### Optional demo data (traceable, publisher-declared CC0)
 ```bash
 uv run --extra demo python scripts/download_demo.py         # 500 stock photos, ~115 MB  -> data/demo/stockimages-cc0
@@ -151,7 +162,7 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 [Architecture](docs/architecture.md) · [Environment](docs/environment.md) · [Model compatibility](docs/model-compatibility.md) ·
 [Progress & gates](docs/progress.md) · [Offline & robustness](docs/offline-and-robustness.md) · [Evaluation](docs/evaluation.md) ·
 [Release checklist](docs/release-checklist.md) · [Demo](docs/demo.md) · [Release draft & handoff](docs/release-draft.md) ·
-[Model comparison](docs/model-comparison.md) · [Desktop app](docs/desktop-app.md) · [Ask](docs/ask.md) · [Contributing](CONTRIBUTING.md)
+[Model comparison](docs/model-comparison.md) · [Desktop app](docs/desktop-app.md) · [Ask](docs/ask.md) · [Edit & create](docs/edit.md) · [Contributing](CONTRIBUTING.md)
 
 ## Licence
 Original code: Apache-2.0 ([`LICENSE`](LICENSE)). The model, third-party software and data have their own terms: [`NOTICE.md`](NOTICE.md) and
