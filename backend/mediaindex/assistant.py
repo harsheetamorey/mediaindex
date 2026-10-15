@@ -527,8 +527,6 @@ class Assistant:
 
     def _by_colour(self, prev: list[str], colour: str, label: str, library_ids) -> dict:
         """ "only the red ones": the share of each detected object's box in that colour (pixels, not a model)."""
-        from PIL import Image
-
         sure = set(self.store.count_objects(self.key, label, library_ids, sure=SURE)["asset_ids"])
         test = COLOUR_TESTS[colour]
         scored = []
