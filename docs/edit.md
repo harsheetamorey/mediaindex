@@ -130,6 +130,13 @@ Results in `evaluation/bench/create_generate-paint.json` and `create_generate-ba
 - **Shadows and reflections stay** unless the detector's outline covers them.
 - **Crowded scenes fill badly.** Removing one car from a full car park (11% of the photo, no warning) left a dark,
   blocky patch: there is no clean background nearby to copy from.
+- **Big removals (over 12% of the photo), since 2026-10-15:** LaMa fills the object's whole box at 512 px (fewer blocks
+  than at 1024), then the image model paints "an empty road" (vehicles) or "an empty background" there, and if that
+  isn't accepted, lightly repaints LaMa's fill (strength 0.6). A try is kept only if the detector finds nothing new in
+  the filled area: the image model often paints a new car where a car was. Checked by eye on two photos only: a
+  sports car on a night road is now filled with road and kerb (before: a dark smear); a VW van in a busy junction
+  still falls back to LaMa (every image-model try added a car), with less blocking but a smudge and its shadow left.
+  Not yet measured on the 100-photo benchmark. "Make it seamless" or "try again" after a removal tries another seed.
 - **Large objects leave smudges.** Anything over about 12% of the photo gets a warning; over about 35% is declined.
 - **Replacing and new images are made up** by a small image model (Stable Diffusion 1.5): faces, hands and text are often
   wrong. Its licence (CreativeML OpenRAIL-M) forbids some uses; read it before publishing results.

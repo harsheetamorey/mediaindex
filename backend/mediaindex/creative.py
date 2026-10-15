@@ -37,6 +37,8 @@ GUIDANCE = 1.5  # LCM works with little or no guidance; a little keeps the pictu
 PAINT_GUIDANCE = 2.5  # replacing: more, or the model often paints background instead (55% -> 65% replaced; 4.0: 50%)
 NATIVE = 512  # the model's training size
 STYLE = "a photo of {}, realistic, natural light, detailed, high quality"
+EMPTY = "an empty {}, nothing there, realistic photo"  # removing: what fills the hole ("road" where a car was)
+EMPTY_NEGATIVE = "car, van, vehicle, truck, bus, person, people, animal, object, blurry, smudge, blocky"
 NEGATIVE = "blurry, deformed, distorted, low quality, text, watermark, cartoon, drawing, frame, border"
 
 
@@ -96,6 +98,22 @@ class Painter:
     def paint(self, image: Image.Image, mask: np.ndarray, prompt: str) -> Image.Image:
         """Paint `prompt` where mask is True; returns an image the size of `image` (the caller keeps only the mask)."""
         out = self._run(image, mask, prompt, _size(*image.size), PAINT_GUIDANCE)
+        return out.resize(image.size, Image.Resampling.LANCZOS)
+
+    def clear(self, image: Image.Image, mask: np.ndarray, strength: float = 1.0, place: str = "background") -> Image.Image:
+        """Paint empty `place` where mask is True (removing a big object). strength < 1 repaints what is there
+        lightly (it keeps its layout) instead of painting from scratch. Saying the place matters: "an empty road"
+        filled a removed car seamlessly, "empty background" painted a new car."""
+        torch = self._torch
+        w, h = _size(*image.size)
+        g = torch.Generator("cpu").manual_seed(self.seed)
+        with torch.inference_mode():
+            out = self.pipe(prompt=EMPTY.format(place), negative_prompt=EMPTY_NEGATIVE,
+                            image=image.convert("RGB").resize((w, h), Image.Resampling.LANCZOS),
+                            mask_image=Image.fromarray(mask.astype(np.uint8) * 255).resize((w, h), Image.Resampling.NEAREST),
+                            height=h, width=w, num_inference_steps=max(STEPS, round(STEPS / strength)),
+                            guidance_scale=PAINT_GUIDANCE if strength >= 1 else GUIDANCE, strength=strength,
+                            generator=g).images[0]
         return out.resize(image.size, Image.Resampling.LANCZOS)
 
     def generate(self, prompt: str, width: int = NATIVE, height: int = NATIVE) -> Image.Image:

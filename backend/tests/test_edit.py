@@ -78,6 +78,9 @@ class FakePainter:
     def generate(self, prompt, width, height):
         return Image.new("RGB", (width, height), (230, 220, 0))
 
+    def clear(self, image, mask, strength=1.0, place="background"):
+        return Image.new("RGB", image.size, RED)  # the background here is red
+
     def close(self):
         pass
 
@@ -409,3 +412,53 @@ def test_go_ahead_redo_and_pronoun(client):
     r5 = ask(c, "replace it with a cat", h5)
     assert r5["action"] == "edit" and "job" in r5 and "dog" in r5["answer"]
     finish(c, r5)
+
+
+class AddsThingsPainter(FakePainter):
+    """Painting from scratch adds a blue thing (like a new car); repainting lightly doesn't."""
+    seed = 0
+
+    def clear(self, image, mask, strength=1.0, place="background"):
+        if strength >= 1 or self.seed < 0:
+            return Image.new("RGB", image.size, BLUE)
+        return Image.new("RGB", image.size, RED)
+
+
+def blue_boxes(im):
+    a = np.asarray(im.convert("RGB")).astype(int)
+    blue = (a[..., 2] > 150) & (a[..., 0] < 100)
+    if not blue.any():
+        return []
+    ys, xs = np.nonzero(blue)
+    return [("car", (float(xs.min()), float(ys.min()), float(xs.max() + 1), float(ys.max() + 1)))]
+
+
+def test_big_removal_paints_background_and_rejects_new_things():
+    im = Image.new("RGB", (160, 120), RED)
+    box = (32, 24, 96, 72)  # 16% of the photo: over BIG_REMOVE
+    im.paste(BLUE, box)
+    gone = lambda out: [b for _, b in blue_boxes(out)]  # noqa: E731
+
+    r = Editor(FakeSegmenter, FakeFiller, fake_painter).remove(im, [box], gone, find_all=blue_boxes)
+    assert (r.filled_by, r.attempts, r.clean) == ("image model", 2, True)
+
+    r = Editor(FakeSegmenter, FakeFiller, lambda: AddsThingsPainter()).remove(im, [box], gone, find_all=blue_boxes)
+    assert (r.filled_by, r.attempts, r.clean) == ("image model", 3, True)  # first try added a "car": rejected
+
+    always = AddsThingsPainter()
+    always.seed = -5
+    r = Editor(FakeSegmenter, FakeFiller, lambda: always).remove(im, [box], gone, find_all=blue_boxes)
+    assert r.filled_by == "lama" and r.clean and always.seed == -5  # LaMa's fill kept; seed restored
+    a, b = np.asarray(r.image), np.asarray(im)
+    assert (a[~r.mask] == b[~r.mask]).all()
+
+    r = Editor(FakeSegmenter, FakeFiller, None).remove(im, [box], gone, find_all=blue_boxes)
+    assert r.filled_by == "lama"  # no image model on this computer
+
+
+def test_redo_and_retry_phrasing():
+    from mediaindex.assistant import RETRY_RE, Assistant
+
+    assert Assistant._redo_new("wait no not that, replace with tesla cyber truck") == "tesla cyber truck"
+    assert Assistant._redo_new("swap it for a horse") == "a horse"
+    assert RETRY_RE.search("it should look like the truck is removed seamlessly..")

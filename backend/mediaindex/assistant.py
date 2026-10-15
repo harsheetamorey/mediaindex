@@ -159,6 +159,12 @@ CONFIRM_RE = re.compile(r"^\s*(?:yes|yeah|yep|ok|okay|sure|fine|go ahead|go for 
 REDO_RE = re.compile(r"^\s*(?:(?:can|could|would)\s+(?:you|u)\s+|please\s+|now\s+|instead\s+|ok\s+|okay\s+)*"
                      r"(?:put|try|use|make it|do|give me|paint|show me)\s+(?P<new>(?:an?|some|the)\s+[\w\s-]+?)"
                      r"(?:\s+(?:instead|there|here|in it|in there))?\s*$", re.I)
+REDO_WITH_RE = re.compile(r"^\s*(?:(?:can|could|would)\s+(?:you|u)\s+|please\s+|now\s+|ok\s+|okay\s+)*"
+                          r"(?:replace|swap|change)\s+(?:it\s+|that\s+|this\s+|them\s+)?(?:with|for|to|into)\s+"
+                          r"(?P<new>.+?)(?:\s+instead)?\s*$", re.I)
+# after a removal: "it should look seamless", "there's a gap", "try again": the same removal, another try
+RETRY_RE = re.compile(r"\b(seamless|seamlessly|gap|smudge|smudges|smear|smeared|blur|blurry|blocky|patch|shadow|"
+                      r"cleaner|better|neater|neat|again|redo|retry|another try|not clean|still see)\b", re.I)
 PRONOUN_OBJ = {"this", "that", "it", "them", "this one", "that one", "the thing", "the object"}
 COLOURS = ("white black red blue green yellow orange purple pink brown grey gray silver gold beige dark light navy "
            "maroon teal").split()
@@ -176,6 +182,7 @@ class Plan:
     routed_by: str = "rules"
     new: str = ""  # edit: what to put in place of `subject` ("" = remove it)
     big: bool = False  # edit: the user said to go ahead although it changes most of the photo
+    seed: int = 0  # edit: > 0 when the user asked to try a removal again
 
 
 def clean_new(new: str) -> str:
@@ -566,7 +573,8 @@ class Assistant:
         doing = f"Replacing the {thing} with {plan.new}" if plan.new else f"Removing the {thing}"
         return {"answer": f"{doing}… This makes a new copy; your original photo stays as it is.",
                 "asset_ids": [source["asset_id"]] if "asset_id" in source else [],
-                "edit_request": {**source, "label": labels[0], "all": everything, "new": plan.new, "big": plan.big},
+                "edit_request": {**source, "label": labels[0], "all": everything, "new": plan.new, "big": plan.big,
+                                 "seed": plan.seed},
                 "facts": {"label": labels[0], "all": everything, "new": plan.new}}
 
     def _main_object(self, asset_id, plan, history) -> list[str]:
@@ -602,8 +610,10 @@ class Assistant:
         i, p = found
         if TOO_BIG_RE.search(last.text) and CONFIRM_RE.search(message):
             p.big = True
-        elif p.new and (r := REDO_RE.match(re.split(r"[.;!?]|,\s", message.strip(), maxsplit=1)[0])):
-            p.new = clean_new(r.group("new"))
+        elif p.new and (new := self._redo_new(message)):
+            p.new = new
+        elif not p.new and RETRY_RE.search(message) and not edit_plan(message):
+            p.seed = 1 + sum(1 for t in history[i + 1:] if t.role == "user")  # each "try again" a new picture
         else:
             return None
         before = history[:i]
@@ -612,6 +622,14 @@ class Assistant:
                          else None)
         out["plan"] = p
         return out
+
+    @staticmethod
+    def _redo_new(message: str) -> str:
+        """ "wait no not that, replace with a tesla cybertruck" -> "a tesla cybertruck" (any phrase may say it)."""
+        for part in reversed(re.split(r"[.;!?]|,\s|\s+-\s+", message.strip())):
+            if (r := REDO_WITH_RE.match(part) or REDO_RE.match(part)):
+                return clean_new(r.group("new"))
+        return ""
 
     def _generate(self, plan, message, history, library_ids, use_chat, asset_id):
         """A new image from words; made up by the image model, so the answer says it isn't one of your photos."""

@@ -26,6 +26,7 @@ from .media.images import ImageRejected, load_image
 from .slideshow import LANDSCAPE, SQUARE, VERTICAL, make_slideshow
 from .selections import PARTIAL_PREFIX, SelectionError, _free_name, _place_exclusive, validate_destination
 
+ROAD_THINGS = dict.fromkeys(("car", "truck", "bus", "motorbike", "bicycle"), "road")  # what's under them, for the image model
 BIG_FILL = 0.12  # edits filling more than this share of the photo more often leave smudges (bench: docs/edit.md)
 SHAPES = {"square": (512, 512), "wide": (768, 512), "tall": (512, 768)}
 VIDEO_SHAPES = {"landscape": LANDSCAPE, "vertical": VERTICAL, "square": SQUARE}
@@ -191,6 +192,9 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
             def still_there(edited):
                 return [px(b) for _, b in detector.detect(edited).get(label, [])]
 
+            def find_all(edited):
+                return [(lab, px(b)) for lab, bs in detector.detect(edited).items() for _, b in bs]
+
             limit = MAX_CHANGE_ASKED if req.get("big") else MAX_CHANGE
             check_gone = None if new and same_kind(label, new) else still_there  # a van still looks like a car to it
 
@@ -209,7 +213,8 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
                     r = editor.replace(image, [px(b) for b in picked], new, check_gone,
                                        new_there if new_label else None, max_change=limit)
                 else:
-                    r = editor.remove(image, [px(b) for b in picked], still_there, max_change=limit)
+                    r = editor.remove(image, [px(b) for b in picked], still_there, max_change=limit, find_all=find_all,
+                                      seed=int(req.get("seed", 0)), place=ROAD_THINGS.get(label, "background"))
             except EditRefused as e:
                 if req.get("big"):
                     return {"answer": f"I didn't change it: the {thing} covers almost the whole photo ({e}), so there "
@@ -226,7 +231,7 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         ctx.progress(3, message="Saving a copy")
         meta = edits.save(r.image, {**source, "op": "replace" if new else "remove", "label": label, "new": new,
                                     "objects": r.objects, "clean": r.clean, "attempts": r.attempts,
-                                    "new_found": getattr(r, "new_found", None),
+                                    "new_found": getattr(r, "new_found", None), "filled_by": r.filled_by or None,
                                     "seconds": round(r.seconds, 1), "changed_share": round(float(r.mask.mean()), 4),
                                     "models": editor.models(bool(new))})
         n_found, n_done = len(sure), len(picked)
@@ -245,6 +250,8 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
             text += " Most of this picture is made up by the image model, so it may not look much like the original."
         elif r.clean is False:
             text += f" A check still finds something like a {thing} there, so look closely: it may not be clean."
+        elif r.filled_by == "image model":
+            text += " It was a big area, so the image model painted the background there: details may be made up."
         elif r.mask.mean() > BIG_FILL:
             text += " It was a big area to fill, so check the result closely for smudges or leftover shadows."
         text += " This is a new copy; your original photo is unchanged. Use “Save a copy…” to keep it."

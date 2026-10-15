@@ -41,6 +41,9 @@ REPLACE_CONTEXT = 0.5  # and looks at less surroundings than removing, so the ob
 KEEP_WARM_S = 300  # keep edit models loaded this long after the last edit (replacing: 89 s with loading, 35 s without)
 MIN_AVAILABLE = 1.5 * 2**30  # but free them right after an edit when less memory than this is available
 MAX_CHANGE = 0.35  # never change more than this share of a photo: a bigger hole can only be filled with made-up scenery
+BIG_REMOVE = 0.12  # removing more than this share of a photo: LaMa smears, so the image model paints the background
+BIG_FILL_SIDE = 512  # and LaMa (the fallback) fills the whole box at this size: fewer blocks than at 1024
+REFINE_STRENGTH = 0.6  # second try: lightly repaint LaMa's fill (0.4 left a blur; full strength often adds a new car)
 MAX_CHANGE_ASKED = 0.9  # unless the user says to go ahead anyway: then most of the photo may be made up
 
 
@@ -48,6 +51,7 @@ class EditRefused(ValueError):
     """The edit would not give a believable result (e.g. the object fills most of the photo); nothing was changed."""
 
 PixelBox = tuple[float, float, float, float]  # x0, y0, x1, y1 in pixels
+Found = list[tuple[str, PixelBox]]  # (label, box) for every object the detector finds
 
 
 class Segmenter(Protocol):
@@ -115,6 +119,21 @@ def _box_iou(a: PixelBox, b: PixelBox) -> float:
     inter = ix * iy
     union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
     return inter / union if union > 0 else 0.0
+
+
+def _inside(box: PixelBox, mask: np.ndarray, share: float = 0.5) -> bool:
+    """At least `share` of the box is inside the mask."""
+    x0, y0 = max(0, int(box[0])), max(0, int(box[1]))
+    r = mask[y0:int(np.ceil(box[3])), x0:int(np.ceil(box[2]))]
+    return bool(r.size) and float(r.mean()) >= share
+
+
+def _with_boxes(raw: np.ndarray, boxes: list[PixelBox], px: int) -> np.ndarray:
+    """The outline plus each object's whole box, grown by px: room for shadows and the bits the outline missed."""
+    m = raw.copy()
+    for b in boxes:
+        m[max(0, int(b[1])):int(np.ceil(b[3])), max(0, int(b[0])):int(np.ceil(b[2]))] = True
+    return grow(m, px)
 
 
 def _keep_in_box(mask: np.ndarray, box: PixelBox, margin: float = 0.08) -> np.ndarray:
@@ -314,6 +333,7 @@ class EditResult:
     attempts: int = 1
     clean: bool | None = None  # None: not checked; False: the object may still be visible
     new_found: bool | None = None  # replacing: None if not checked; False if a check doesn't find the new thing
+    filled_by: str = ""  # removing: "lama", or "image model" when it painted the background of a big object
 
 
 class Editor:
@@ -348,12 +368,18 @@ class Editor:
 
     def remove(self, image: Image.Image, boxes: list[PixelBox],
                still_there: Callable[[Image.Image], list[PixelBox]] | None = None,
-               max_change: float = MAX_CHANGE) -> EditResult:
+               max_change: float = MAX_CHANGE, find_all: Callable[[Image.Image], Found] | None = None,
+               seed: int = 0, place: str = "background") -> EditResult:
         """Fill the objects' outlines from their surroundings.
 
         still_there(edited) returns the boxes where the object is still detected. If any remain, the area is grown
         more (edges, shadows and leftovers go too) and filled again from the original, once; `clean` says whether the
         final check passed.
+
+        Big objects (over BIG_REMOVE of the photo), when the image model and find_all are there: LaMa smears big holes,
+        so the whole box is filled by the image model painting empty background instead, then by lightly repainting
+        LaMa's fill. A try is kept only if find_all finds nothing new in the filled area (the model likes to paint a
+        new car where a car was); otherwise LaMa's fill of the box is kept.
         """
         with self._lock:
             t = time.perf_counter()
@@ -362,11 +388,16 @@ class Editor:
             mask = grow(raw, max(2, round(GROW * side)))
             if mask.mean() > max_change:
                 raise EditRefused(f"it covers about {round(100 * float(raw.mean()))}% of the photo")
+            big = mask.mean() > BIG_REMOVE and find_all is not None
+            if big:
+                boxed = _with_boxes(raw, boxes, max(2, round(GROW * side)))
+                if boxed.mean() <= max_change:
+                    mask = boxed
             filler = self._fill_factory()
             try:
-                out = fill_region(image, mask, filler.fill)
+                out = fill_region(image, mask, filler.fill, max_side=BIG_FILL_SIDE if big else None)
                 attempts, clean = 1, None
-                if still_there is not None:
+                if still_there is not None and not big:
                     left = [b for b in still_there(out) if any(_box_iou(b, x) >= 0.3 for x in boxes)]
                     clean = not left
                     wider = grow(raw, max(4, round(3 * GROW * side)))
@@ -378,8 +409,45 @@ class Editor:
                         attempts = 2
                         clean = not [b for b in still_there(out) if any(_box_iou(b, x) >= 0.3 for x in boxes)]
             finally:
-                filler.close()
-            return EditResult(out, mask, len(boxes), time.perf_counter() - t, attempts, clean)
+                filler.close()  # before the image model loads: never both in memory on an 8 GB Mac
+            filled_by = "lama"
+            if big:
+                out, attempts, clean, filled_by = self._paint_background(image, out, mask, boxes, find_all, seed, place)
+            return EditResult(out, mask, len(boxes), time.perf_counter() - t, attempts, clean, filled_by=filled_by)
+
+    def _paint_background(self, image: Image.Image, lama: Image.Image, mask: np.ndarray, boxes: list[PixelBox],
+                          find_all: Callable[[Image.Image], Found], seed: int,
+                          place: str = "background") -> tuple[Image.Image, int, bool, str]:
+        """Returns (image, tries, clean, filled_by). clean: nothing new or left over is found in the filled area."""
+        kept = [(lab, b) for lab, b in find_all(image)  # other things there before, partly under the mask
+                if _inside(b, mask) and not any(_box_iou(b, x) >= 0.3 for x in boxes)]
+
+        def new_things(out: Image.Image) -> list[str]:
+            return [lab for lab, b in find_all(out)
+                    if _inside(b, mask) and not any(lab == k and _box_iou(b, kb) >= 0.5 for k, kb in kept)]
+
+        lama_clean = not new_things(lama)
+        if self._paint_factory is None:
+            return lama, 1, lama_clean, "lama"
+        try:
+            painter = self._paint_factory()
+        except Exception:  # not installed or not downloaded: LaMa's fill it is
+            return lama, 1, lama_clean, "lama"
+        start = getattr(painter, "seed", None)
+        try:
+            if start is not None:
+                painter.seed = start + seed  # type: ignore[attr-defined]  # "try again" asks for another picture
+            tries = [lambda im, m: painter.clear(im, m, place=place),  # type: ignore[attr-defined]
+                     lambda im, m: painter.clear(im, m, strength=REFINE_STRENGTH, place=place)]  # type: ignore[attr-defined]
+            for n, (paint, base) in enumerate(zip(tries, (image, lama)), 2):
+                out = fill_region(base, mask, paint, max_side=painter.max_side, context=1.0)  # type: ignore[attr-defined]
+                if not new_things(out):
+                    return out, n, True, "image model"
+        finally:
+            if start is not None:
+                painter.seed = start  # type: ignore[attr-defined]
+            painter.close()  # type: ignore[attr-defined]
+        return lama, 3, lama_clean, "lama"
 
     def replace(self, image: Image.Image, boxes: list[PixelBox], prompt: str,
                 still_there: Callable[[Image.Image], list[PixelBox]] | None = None,
@@ -397,10 +465,7 @@ class Editor:
             if mask.mean() > max_change:
                 raise EditRefused(f"it covers about {round(100 * float(raw.mean()))}% of the photo")
             if REPLACE_MASK == "box":  # room for the new thing's own shape, unless that would be too big a change
-                boxed = raw.copy()
-                for b in boxes:
-                    boxed[max(0, int(b[1])):int(np.ceil(b[3])), max(0, int(b[0])):int(np.ceil(b[2]))] = True
-                boxed = grow(boxed, step)
+                boxed = _with_boxes(raw, boxes, step)
                 if boxed.mean() <= max_change:
                     mask = boxed
             painter = self._paint_factory()
