@@ -16,10 +16,10 @@ from PIL import Image
 from pydantic import BaseModel, Field
 
 from .api_search import embed_query, run_search
-from .assistant import Assistant, Turn, display, resolve_label
+from .assistant import Assistant, Turn, display, resolve_label, same_kind
 from .detect import DETECTOR_ID, DETECTOR_KEY, SURE, DetectorHost, run_detection
 from .edit import DOWNLOAD_HINT as EDIT_DOWNLOAD_HINT
-from .edit import EditRefused, Editor, EditStore
+from .edit import MAX_CHANGE, MAX_CHANGE_ASKED, EditRefused, Editor, EditStore
 from .finder_tags import set_finder_tags
 from .jobs import JobContext, QueueFull
 from .media.images import ImageRejected, load_image
@@ -191,6 +191,9 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
             def still_there(edited):
                 return [px(b) for _, b in detector.detect(edited).get(label, [])]
 
+            limit = MAX_CHANGE_ASKED if req.get("big") else MAX_CHANGE
+            check_gone = None if new and same_kind(label, new) else still_there  # a van still looks like a car to it
+
             new_label = resolve_label(new) if new else None
 
             def new_there(edited, mask):  # the new thing is found, mostly inside the painted area
@@ -203,14 +206,18 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
 
             try:
                 if new:
-                    r = editor.replace(image, [px(b) for b in picked], new, still_there,
-                                       new_there if new_label else None)
+                    r = editor.replace(image, [px(b) for b in picked], new, check_gone,
+                                       new_there if new_label else None, max_change=limit)
                 else:
-                    r = editor.remove(image, [px(b) for b in picked], still_there)
+                    r = editor.remove(image, [px(b) for b in picked], still_there, max_change=limit)
             except EditRefused as e:
+                if req.get("big"):
+                    return {"answer": f"I didn't change it: the {thing} covers almost the whole photo ({e}), so there "
+                                      f"would be nothing of the original left. Try “make an image of …” instead.",
+                            "edit": None}
                 return {"answer": f"I didn't change it: the {thing} is too big to {'replace' if new else 'remove'} "
-                                  f"believably ({e}). Filling that much would mean making up most of the picture.",
-                        "edit": None}
+                                  f"believably ({e}). Filling that much would mean making up most of the picture. "
+                                  f"Say “go ahead” if that's fine.", "edit": None}
             except OSError as e:  # model files missing
                 raise RuntimeError(f"the editing models aren't downloaded yet. Run this once in the MediaIndex "
                                    f"folder: {EDIT_DOWNLOAD_HINT}") from e
@@ -234,7 +241,9 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         if new and r.new_found is False:
             text += (f" A check doesn't find {new} in the result{' after two tries' if r.attempts > 1 else ''}, so it "
                      f"may not look like one.")
-        if r.clean is False:
+        if req.get("big") and r.mask.mean() > MAX_CHANGE:
+            text += " Most of this picture is made up by the image model, so it may not look much like the original."
+        elif r.clean is False:
             text += f" A check still finds something like a {thing} there, so look closely: it may not be clean."
         elif r.mask.mean() > BIG_FILL:
             text += " It was a big area to fill, so check the result closely for smudges or leftover shadows."

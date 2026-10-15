@@ -150,6 +150,21 @@ SQUARE_RE = re.compile(r"\bsquare\b", re.I)
 PRONOUN_RE = re.compile(r"^\s*(those|these|them|they|it|this|that|the ones|those ones|these ones|the photos|the pictures)?\s*$",
                         re.I)
 ALL_RE = re.compile(r"\b(all|every|each|both)\b", re.I)
+# after "I didn't change it: … too big": the user says to go ahead anyway
+TOO_BIG_RE = re.compile(r"\btoo big to (replace|remove)\b", re.I)
+CONFIRM_RE = re.compile(r"^\s*(?:yes|yeah|yep|ok|okay|sure|fine|go ahead|go for it|do it|please do|try (?:it|anyway)|"
+                        r"it'?s (?:ok|okay|fine)|that'?s (?:ok|okay|fine)|i don'?t mind|(?:do|try) it anyway|anyway|"
+                        r"make (?:it|most of it) up)\b", re.I)
+# after a replacement: "put a truck instead", "try a bus", "make it a lorry": the same edit with something else
+REDO_RE = re.compile(r"^\s*(?:(?:can|could|would)\s+(?:you|u)\s+|please\s+|now\s+|instead\s+|ok\s+|okay\s+)*"
+                     r"(?:put|try|use|make it|do|give me|paint|show me)\s+(?P<new>(?:an?|some|the)\s+[\w\s-]+?)"
+                     r"(?:\s+(?:instead|there|here|in it|in there))?\s*$", re.I)
+PRONOUN_OBJ = {"this", "that", "it", "them", "this one", "that one", "the thing", "the object"}
+COLOURS = ("white black red blue green yellow orange purple pink brown grey gray silver gold beige dark light navy "
+           "maroon teal").split()
+VEHICLES = {"car", "truck", "bus"}
+VEHICLE_WORDS = re.compile(r"\b(car|cars|van|vans|minivan|suv|jeep|truck|trucks|lorry|lorries|pickup|pick-up|bus|buses|"
+                           r"taxi|cab|coach|limo|limousine|sedan|hatchback|wagon|ambulance|camper)\b", re.I)
 CHAT_RE = re.compile(r"^\s*(hi|hello|hey|thanks|thank you|help|who are you|what can you do)\b", re.I)
 
 
@@ -160,6 +175,27 @@ class Plan:
     item: int | None = None
     routed_by: str = "rules"
     new: str = ""  # edit: what to put in place of `subject` ("" = remove it)
+    big: bool = False  # edit: the user said to go ahead although it changes most of the photo
+
+
+def clean_new(new: str) -> str:
+    """ "a van here. van should be white color" -> "a white van": the first phrase, plus a colour said after it."""
+    parts = re.split(r"[.;!?]|,\s|\s+(?:but|and make|so that|which|that should|it should|should be)\b", new, maxsplit=1)
+    head = parts[0]
+    head = re.sub(r"\s+(?:here|there|in it|in this|in that|in there|instead|please|too|now)\s*$", "", head,
+                  flags=re.I).strip()
+    rest = parts[1] if len(parts) > 1 else ""
+    colour = next((c for c in re.findall(r"[a-z]+", rest.lower()) if c in COLOURS), None)
+    if colour and not any(w in COLOURS for w in head.lower().split()):
+        m = re.match(r"^(an?|the|some)\s+(.*)$", head, re.I)
+        head = f"{'an' if colour[0] in 'aeiou' else 'a'} {colour} {m.group(2)}" if m and m.group(1).lower() in ("a", "an") \
+            else f"{m.group(1)} {colour} {m.group(2)}" if m else f"{colour} {head}"
+    return head or new.strip()
+
+
+def same_kind(label: str, new: str) -> bool:
+    """Replacing a car with a van: the detector will still call it a car, so "still there" means nothing."""
+    return label in VEHICLES and bool(VEHICLE_WORDS.search(new))
 
 
 def create_plan(message: str) -> Plan | None:
@@ -192,7 +228,7 @@ def edit_plan(message: str) -> Plan | None:
         return None
     obj = re.sub(r"^\s*(?:all the|both the|all of the|the|a|an|all|every|each|both|that|this|those|these)\s+", "", obj, flags=re.I)
     obj = re.sub(r"\s+(?:too|also|as well|please|now|again)\s*$", "", obj, flags=re.I).strip()
-    new = re.sub(r"\s+(?:please|instead|too|now)\s*$", "", new, flags=re.I).strip()
+    new = clean_new(new) if new else ""
     if not obj:
         return None
     return Plan("edit", obj, _item(m), new=new)
@@ -353,12 +389,15 @@ class Assistant:
             asset_id: str | None = None) -> dict:
         status = self.chat.status() if self.chat else {"available": False, "reason": "no chat model configured"}
         use_chat = bool(status.get("available"))
-        if asset_id:  # the user clicked a photo and asked about it: describe it, or edit it
-            plan = edit_plan(message) or Plan("describe", item=None)
+        if not asset_id and (out := self.follow_up_edit(message, history, library_ids, use_chat)) is not None:
+            plan = out.pop("plan")
         else:
-            plan = self.plan(message, history, use_chat)
-        handler = getattr(self, "_" + plan.action)
-        out = handler(plan, message, history, library_ids, use_chat, asset_id)
+            if asset_id:  # the user clicked a photo and asked about it: describe it, or edit it
+                plan = edit_plan(message) or Plan("describe", item=None)
+            else:
+                plan = self.plan(message, history, use_chat)
+            handler = getattr(self, "_" + plan.action)
+            out = handler(plan, message, history, library_ids, use_chat, asset_id)
         out.update(action=plan.action, routed_by=plan.routed_by, chat_model=status)
         out.setdefault("asset_ids", [])
         box_labels = out.pop("box_labels", False)  # False: no boxes; None: every object; list: these labels
@@ -484,6 +523,11 @@ class Assistant:
         """Work out which photo and which object; the edit itself runs as a job (api_ask.py) using `edit_request`."""
         labels = resolve_labels(plan.subject)
         verb = "replace" if plan.new else "remove"
+        if not labels and plan.subject.lower() in PRONOUN_OBJ:  # "replace this with a lorry": the photo's main object
+            labels = self._main_object(asset_id, plan, history)
+            if not labels:
+                return {"answer": f"Which thing should I {verb}? Say for example “{verb} the car"
+                                  f"{' with ' + plan.new if plan.new else ''}”.", "facts": {}}
         if not labels:
             if re.search(r"\b(photo|picture|image|pic|file|one)s?\b|^\s*#?\d+\s*$", plan.subject, re.I):
                 return {"answer": "MediaIndex never deletes or changes your photos. To take something out of a photo, "
@@ -522,8 +566,52 @@ class Assistant:
         doing = f"Replacing the {thing} with {plan.new}" if plan.new else f"Removing the {thing}"
         return {"answer": f"{doing}… This makes a new copy; your original photo stays as it is.",
                 "asset_ids": [source["asset_id"]] if "asset_id" in source else [],
-                "edit_request": {**source, "label": labels[0], "all": everything, "new": plan.new},
+                "edit_request": {**source, "label": labels[0], "all": everything, "new": plan.new, "big": plan.big},
                 "facts": {"label": labels[0], "all": everything, "new": plan.new}}
+
+    def _main_object(self, asset_id, plan, history) -> list[str]:
+        """The biggest object the detector is sure of in the photo being talked about."""
+        prev, focus = self._previous(history), self._focus(history)
+        aid = asset_id or (prev[(len(prev) if plan.item == -1 else plan.item) - 1]
+                           if plan.item is not None and prev and 1 <= (len(prev) if plan.item == -1 else plan.item)
+                           <= len(prev) else focus[0] if len(focus) == 1 else None)
+        a = self.store.get_asset(aid) if aid else None
+        if a is None:
+            return []
+        boxes = [b for b in self.store.boxes_for(a["content_hash"], self.key) if b["score"] >= SURE]
+        if not boxes:
+            return []
+        big = max(boxes, key=lambda b: (b["box"][2] - b["box"][0]) * (b["box"][3] - b["box"][1]))
+        return [big["label"]]
+
+    @staticmethod
+    def _last_edit_ask(history: list[Turn]) -> tuple[int, Plan] | None:
+        """The latest user message that asked for an edit, and its plan."""
+        for i in range(len(history) - 1, -1, -1):
+            t = history[i]
+            if t.role == "user" and (p := edit_plan(t.text)) is not None:
+                return i, p
+        return None
+
+    def follow_up_edit(self, message: str, history: list[Turn], library_ids, use_chat) -> dict | None:
+        """ "go ahead" after a too-big refusal, or "put a truck instead" after a replacement: the same edit again, on
+        the same photo as before (never on the copy it made), with the change asked for."""
+        last = next((t for t in reversed(history) if t.role == "assistant"), None)
+        if last is None or last.action != "edit" or (found := self._last_edit_ask(history)) is None:
+            return None
+        i, p = found
+        if TOO_BIG_RE.search(last.text) and CONFIRM_RE.search(message):
+            p.big = True
+        elif p.new and (r := REDO_RE.match(re.split(r"[.;!?]|,\s", message.strip(), maxsplit=1)[0])):
+            p.new = clean_new(r.group("new"))
+        else:
+            return None
+        before = history[:i]
+        asked = history[i]
+        out = self._edit(p, asked.text, before, library_ids, use_chat, asked.asset_ids[0] if len(asked.asset_ids) == 1
+                         else None)
+        out["plan"] = p
+        return out
 
     def _generate(self, plan, message, history, library_ids, use_chat, asset_id):
         """A new image from words; made up by the image model, so the answer says it isn't one of your photos."""

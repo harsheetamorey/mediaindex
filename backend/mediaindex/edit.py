@@ -41,6 +41,7 @@ REPLACE_CONTEXT = 0.5  # and looks at less surroundings than removing, so the ob
 KEEP_WARM_S = 300  # keep edit models loaded this long after the last edit (replacing: 89 s with loading, 35 s without)
 MIN_AVAILABLE = 1.5 * 2**30  # but free them right after an edit when less memory than this is available
 MAX_CHANGE = 0.35  # never change more than this share of a photo: a bigger hole can only be filled with made-up scenery
+MAX_CHANGE_ASKED = 0.9  # unless the user says to go ahead anyway: then most of the photo may be made up
 
 
 class EditRefused(ValueError):
@@ -346,7 +347,8 @@ class Editor:
         return mask
 
     def remove(self, image: Image.Image, boxes: list[PixelBox],
-               still_there: Callable[[Image.Image], list[PixelBox]] | None = None) -> EditResult:
+               still_there: Callable[[Image.Image], list[PixelBox]] | None = None,
+               max_change: float = MAX_CHANGE) -> EditResult:
         """Fill the objects' outlines from their surroundings.
 
         still_there(edited) returns the boxes where the object is still detected. If any remain, the area is grown
@@ -358,7 +360,7 @@ class Editor:
             raw = self.segment(image, boxes)
             side = max(image.size)
             mask = grow(raw, max(2, round(GROW * side)))
-            if mask.mean() > MAX_CHANGE:
+            if mask.mean() > max_change:
                 raise EditRefused(f"it covers about {round(100 * float(raw.mean()))}% of the photo")
             filler = self._fill_factory()
             try:
@@ -370,7 +372,7 @@ class Editor:
                     wider = grow(raw, max(4, round(3 * GROW * side)))
                     for b in left:  # the whole box where it was detected again: the outline missed part of it
                         wider[int(b[1]):int(np.ceil(b[3])), int(b[0]):int(np.ceil(b[2]))] = True
-                    if left and wider.mean() <= MAX_CHANGE:
+                    if left and wider.mean() <= max_change:
                         mask = wider
                         out = fill_region(image, mask, filler.fill)
                         attempts = 2
@@ -381,7 +383,8 @@ class Editor:
 
     def replace(self, image: Image.Image, boxes: list[PixelBox], prompt: str,
                 still_there: Callable[[Image.Image], list[PixelBox]] | None = None,
-                new_there: Callable[[Image.Image, np.ndarray], bool] | None = None) -> EditResult:
+                new_there: Callable[[Image.Image, np.ndarray], bool] | None = None,
+                max_change: float = MAX_CHANGE) -> EditResult:
         """Paint `prompt` over the objects. `clean` is False if the old object is still detected there; if `new_there`
         says the new thing isn't there, it paints once more with another seed and keeps a result that has it."""
         if self._paint_factory is None:
@@ -391,14 +394,14 @@ class Editor:
             raw = self.segment(image, boxes)
             step = max(2, round(GROW * max(image.size)))
             mask = grow(raw, step)
-            if mask.mean() > MAX_CHANGE:
+            if mask.mean() > max_change:
                 raise EditRefused(f"it covers about {round(100 * float(raw.mean()))}% of the photo")
             if REPLACE_MASK == "box":  # room for the new thing's own shape, unless that would be too big a change
                 boxed = raw.copy()
                 for b in boxes:
                     boxed[max(0, int(b[1])):int(np.ceil(b[3])), max(0, int(b[0])):int(np.ceil(b[2]))] = True
                 boxed = grow(boxed, step)
-                if boxed.mean() <= MAX_CHANGE:
+                if boxed.mean() <= max_change:
                     mask = boxed
             painter = self._paint_factory()
             seed = getattr(painter, "seed", None)

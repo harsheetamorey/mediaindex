@@ -368,3 +368,44 @@ def test_replace_with_a_warm_painter_starts_every_edit_from_the_same_seed():
         r = ed.replace(im, [(40, 30, 80, 60)], "a cat", new_there=green)
         assert (r.attempts, r.new_found) == (2, True)
     assert warm.loaded
+
+
+def test_follow_up_phrasing():
+    from mediaindex.assistant import clean_new, same_kind
+
+    p = edit_plan("replace the car with a van here. van shoud be white color same as the car.")
+    assert (p.subject, p.new) == ("car", "a white van")
+    assert edit_plan("can u replace this with a lorry").subject == "this"
+    assert clean_new("a cat please") == "a cat"
+    assert same_kind("car", "a white van") and not same_kind("dog", "a cat")
+
+
+def test_go_ahead_redo_and_pronoun(client):
+    c, root, _ = client
+    r, pos = photos(c)
+    hist = [{"role": "user", "text": "show me my photos"}, turn(r)]
+    ask1 = f"remove the dog from photo {pos['closeup.png']}"
+    r1 = ask(c, ask1, hist)
+    res = finish(c, r1)
+    assert "too big to remove" in res["answer"] and "go ahead" in res["answer"]
+    h2 = hist + [{"role": "user", "text": ask1}, {**turn(r1), "text": res["answer"]}]
+    r2 = ask(c, "it's ok to make it up most of the picture", h2)
+    assert r2["action"] == "edit"
+    res = finish(c, r2)  # this dog fills ~all of the photo: still declined, with a different reason
+    assert res["edit"] is None and "almost the whole photo" in res["answer"]
+
+    ask3 = f"replace the dog with a cat in photo {pos['park.png']}"
+    r3 = ask(c, ask3, hist)
+    res3 = finish(c, r3)
+    assert res3["edit"]["new"] == "a cat"
+    h4 = hist + [{"role": "user", "text": ask3}, {**turn(r3, res3["edit"]), "text": res3["answer"]}]
+    r4 = ask(c, "can u put a horse instead, keep it simple", h4)
+    res4 = finish(c, r4)
+    assert res4["edit"]["new"] == "a horse" and res4["edit"]["parent_edit_id"] is None  # from the original again
+
+    wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])  # count objects, so "it" can be resolved
+    park = r["results"][pos["park.png"] - 1]["id"]
+    h5 = [{"role": "user", "text": "show me my photos"}, {**turn(r), "asset_ids": [park]}]
+    r5 = ask(c, "replace it with a cat", h5)
+    assert r5["action"] == "edit" and "job" in r5 and "dog" in r5["answer"]
+    finish(c, r5)
