@@ -48,6 +48,7 @@ export type Result = {
   other_segments?: Segment[]
   window_thumbnail_url?: string
   overlapping_windows_merged?: number
+  object_check?: 'found' | 'not found' | 'not checked'
 }
 
 export type MediaType = 'image' | 'audio' | 'video'
@@ -88,6 +89,7 @@ export type SearchResponse = {
   timing_ms: { query_embedding: number; ranking: number }
   index_state: IndexState | Record<string, IndexState>
   note: string
+  object_check?: { label: string; name: string; found: number; detector: string }
 }
 
 export type Job = {

@@ -462,3 +462,24 @@ def test_redo_and_retry_phrasing():
     assert Assistant._redo_new("wait no not that, replace with tesla cyber truck") == "tesla cyber truck"
     assert Assistant._redo_new("swap it for a horse") == "a horse"
     assert RETRY_RE.search("it should look like the truck is removed seamlessly..")
+
+
+def test_search_puts_detected_objects_first(client):
+    from mediaindex.api_search import clean_query
+
+    assert clean_query("give me pictures of car") == "car"
+    assert clean_query("show me photos of my dog at the beach") == "my dog at the beach"
+    assert clean_query("sunset over the sea") == "sunset over the sea"
+    c, root, _ = client
+    body = {"text": "give me pictures of dog", "media_types": ["image"], "limit": 10}
+    r = c.post("/api/search/text", json=body).json()
+    assert "object_check" in r and all(x["object_check"] == "not checked" for x in r["results"])  # not counted yet
+    wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
+    r = c.post("/api/search/text", json=body).json()
+    checks = [(x["asset"]["rel_path"], x["object_check"]) for x in r["results"]]
+    assert r["query"]["searched_for"] == "dog" and r["object_check"]["found"] == 2
+    assert [k for _, k in checks] == ["found", "found", "not found"], checks
+    assert {p for p, k in checks if k == "found"} == {"park.png", "closeup.png"}
+    assert [x["rank"] for x in r["results"]] == [1, 2, 3]
+    r = c.post("/api/search/text", json={**body, "text": "sunset"}).json()
+    assert "object_check" not in r and "object_check" not in r["results"][0]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Literal
 
@@ -20,6 +21,49 @@ MEDIA_MODALITIES = {"image": ["image"], "audio": ["audio"], "video": ["video-vis
 VIDEO_SIGNALS = {"visual": "video-visual", "audio": "video-audio", "joint": "video-joint"}
 SIMILARITY_NOTE = ("similarity is raw cosine similarity between embeddings; it is not a probability or confidence, "
                    "and nearest-neighbour search always returns candidates even when nothing truly matches")
+
+
+# "give me pictures of car" -> "car": the request words only blur the embedding
+REQUEST_RE = re.compile(r"^\s*(?:please\s+)?(?:(?:can|could)\s+(?:you|u)\s+)?(?:give me|show me|show|find me|find|"
+                        r"search for|search|look for|get me|i want|i need)?\s*(?:some\s+|the\s+|all\s+|all the\s+|my\s+)?"
+                        r"(?:pictures?|photos?|images?|pics?|shots?)\s+(?:of|with|showing|containing)\s+", re.I)
+REQUEST_ONLY_RE = re.compile(r"^\s*(?:please\s+)?(?:give me|show me|find me|find|search for|look for|get me)\s+", re.I)
+
+
+def clean_query(text: str) -> str:
+    t = REQUEST_RE.sub("", text.strip())
+    t = REQUEST_ONLY_RE.sub("", t).strip(" ?.!")
+    return t or text.strip()
+
+
+def object_first(app: FastAPI, out: dict, text: str, library_ids, limit: int) -> dict:
+    """When the query names one thing the object detector knows ("car"), photos where it found one go first; each
+    part stays in similarity order. Uses the detections stored by the Ask tab; photos it hasn't checked yet are
+    marked so. Approved by the maintainer for the Search tab, 2026-10-15."""
+    from .assistant import display, resolve_labels
+    from .detect import DETECTOR_KEY, SURE
+
+    labels = resolve_labels(text)
+    if len(labels) != 1:
+        return out
+    label = labels[0]
+    store = app.state.store
+    found = set(store.count_objects(DETECTOR_KEY, label, library_ids, sure=SURE)["asset_ids"])
+    results = out["results"]
+    checked = store.checked_hashes(DETECTOR_KEY, list({r["asset"]["content_hash"] for r in results
+                                                       if r["asset"].get("content_hash")}))
+    for r in results:
+        r["object_check"] = "found" if r["asset"]["id"] in found else \
+            "not found" if r["asset"].get("content_hash") in checked else "not checked"
+    order = {"found": 0, "not checked": 1, "not found": 1}
+    results = sorted(results, key=lambda r: order[r["object_check"]])[:limit]  # stable: similarity order kept
+    for i, r in enumerate(results):
+        r["rank"] = i + 1
+    out["results"] = results
+    out["object_check"] = {"label": label, "name": display(label), "found": sum(r["object_check"] == "found"
+                                                                                for r in results),
+                           "detector": DETECTOR_KEY}
+    return out
 
 
 class TextSearchRequest(BaseModel):
@@ -181,14 +225,23 @@ def register(app: FastAPI) -> None:
 
     @app.post("/api/search/text")
     def search_text(req: TextSearchRequest) -> dict:
-        vec, ms = embed_query(app, lambda b: b.embed_query_texts([req.text.strip()])[0])
+        text = clean_query(req.text)
+        vec, ms = embed_query(app, lambda b: b.embed_query_texts([text])[0])
         info = {"text": req.text}
+        if text != req.text.strip():
+            info["searched_for"] = text
         if "video" in req.media_types:
             info["video_signal"] = req.video_signal
-        return run_search(app, mode="text", query_info=info, vec=vec, embed_ms=ms,
-                          library_ids=req.library_ids, media_types=req.media_types, limit=req.limit,
-                          group_segments=req.group_segments, global_rank=req.global_rank,
-                          video_modality=VIDEO_SIGNALS[req.video_signal])
+        images_only = list(dict.fromkeys(req.media_types)) == ["image"]
+        out = run_search(app, mode="text", query_info=info, vec=vec, embed_ms=ms,
+                         library_ids=req.library_ids, media_types=req.media_types,
+                         limit=max(req.limit * 4, 200) if images_only else req.limit,  # room to bring found ones up
+                         group_segments=req.group_segments, global_rank=req.global_rank,
+                         video_modality=VIDEO_SIGNALS[req.video_signal])
+        if images_only:
+            out = object_first(app, out, text, req.library_ids, req.limit)
+            out["results"] = out["results"][:req.limit]
+        return out
 
 
 def _parse_libs(library_ids: str | None) -> list[str] | None:

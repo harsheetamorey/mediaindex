@@ -233,6 +233,7 @@ export default function App() {
           Object.values(rawState as Record<string, IndexState>)[0])
         : undefined
   const grouped = response?.grouping === 'by_modality'
+  const objectCheck = response?.object_check
   const sections: { label: string; offset: number; items: Result[] }[] = grouped
     ? (['image', 'audio', 'video'] as MediaType[])
         .filter((m) => response?.media_types?.includes(m) ?? true)
@@ -242,7 +243,16 @@ export default function App() {
           acc.push({ label: { image: 'Images', audio: 'Sounds', video: 'Videos' }[g.m], offset, items: g.items })
           return acc
         }, [])
-    : [{ label: 'Search results', offset: 0, items: results }]
+    : objectCheck
+      ? [
+          { label: `Found by the object detector: ${objectCheck.name}`, offset: 0, items: results.filter((r) => r.object_check === 'found') },
+          {
+            label: `Similar, but the object detector found no ${objectCheck.name} in these`,
+            offset: objectCheck.found,
+            items: results.filter((r) => r.object_check !== 'found'),
+          },
+        ].filter((sec) => sec.items.length > 0)
+      : [{ label: 'Search results', offset: 0, items: results }]
 
   return (
     <div className="app">
@@ -460,7 +470,10 @@ export default function App() {
                 )}
                 {results.length > 0 && (
                   <p className="muted small">
-                    Results are ranked by similarity. The closest matches are always shown, even when nothing truly matches.
+                    {objectCheck
+                      ? `Photos where the object detector found ${objectCheck.name} come first; each part is ranked by similarity.`
+                      : 'Results are ranked by similarity. The closest matches are always shown, even when nothing truly matches.'}
+                    {typeof response.query.searched_for === 'string' && ` Searched for “${response.query.searched_for}”.`}
                   </p>
                 )}
                 {response.grouping === 'global (experimental)' && (
@@ -476,7 +489,7 @@ export default function App() {
                 )}
                 {sections.map((sec) => (
                   <div key={sec.label} className="section">
-                    {grouped && (
+                    {(grouped || objectCheck) && (
                       <h2 className="section-title">
                         {sec.label} <span className="muted small">({sec.items.length})</span>
                       </h2>

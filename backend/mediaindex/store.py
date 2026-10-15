@@ -324,6 +324,16 @@ class Store:
                             WHERE {where}""", [detector, *params])
         return {"photos": r["photos"], "checked": r["checked"]}
 
+    def checked_hashes(self, detector: str, hashes: list[str]) -> set[str]:
+        """Which of these photos the object detector has looked at."""
+        out: set[str] = set()
+        for i in range(0, len(hashes), 500):
+            part = hashes[i:i + 500]
+            rows = self.db.query(f"""SELECT content_hash FROM detection_runs WHERE detector=?
+                                     AND content_hash IN ({','.join('?' * len(part))})""", [detector, *part])
+            out |= {r["content_hash"] for r in rows}
+        return out
+
     def count_objects(self, detector: str, label: str, library_ids: list[str] | None = None,
                       sure: float = 0.0) -> dict:
         """Photos (files) where the detector found `label`. A photo counts if it has a box scoring >= `sure`;
