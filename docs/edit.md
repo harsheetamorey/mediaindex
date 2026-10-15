@@ -27,7 +27,7 @@ In the **Ask** tab you can change a photo or make something new by asking in pla
 | Outline it exactly | **SAM ViT-B** (`facebook/sam-vit-base`, pinned revision), prompted with the detector's box | Apache-2.0 | 375 MB |
 | Remove it: fill from the surroundings | **LaMa** (`big-lama`, TorchScript from `fashn-ai/LaMa`, pinned revision and SHA-256) | Apache-2.0 | 206 MB |
 | Replace it, or make a new image | **Stable Diffusion 1.5 inpainting** + **LCM-LoRA** (6 steps instead of 50), fp16 | CreativeML OpenRAIL-M / openrail++ | 2.1 GB |
-| Make a video of photos | No model: Pillow + torch draw the frames, FFmpeg encodes H.264 | — | — |
+| Make a video of photos | No model: Pillow draws the frames, FFmpeg encodes H.264 | — | — |
 
 - **Which object:** "the car" removes the biggest car the detector is sure of; "the cars" or "all the cars" removes every
   one. If there are more, the answer says how many and how to remove them all.
@@ -37,6 +37,8 @@ In the **Ask** tab you can change a photo or make something new by asking in pla
   1024 px. Lower resolutions (512, 384) were tried on the hard cases and were no better.
 - **Videos:** each photo is shown for 3 s with a slow zoom and a 0.6 s crossfade. Photos that don't fit the shape are shown
   whole over a blurred copy instead of being cropped. Shapes: 16:9 (default), 9:16 ("reel", "short", "story"), square.
+  Measured on an M1: 8 of your photos → a 20 s 1080p video in **11 s** (a 9:16 reel: 12 s), every frame present. Frames
+  are drawn by Pillow on 4 threads (~11 ms each); torch on the GPU took 25 s for the same video.
 - **Made-up images are labelled** in the answer, in the app ("Made-up image") and in Finder tags when saved ("Made up").
 
 ## Setup
