@@ -1,0 +1,661 @@
+{
+ "summary": {
+  "model": "paint",
+  "images": 72,
+  "found_rate": 0.986,
+  "single_found_rate": 0.979,
+  "scene_found_rate": 1.0,
+  "seconds_median": 23.79,
+  "load_seconds": 27.1
+ },
+ "rows": [
+  {
+   "label": "dog",
+   "prompt": "a dog",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.96,
+   "seconds": 13.99
+  },
+  {
+   "label": "dog",
+   "prompt": "a dog",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.943,
+   "seconds": 13.27
+  },
+  {
+   "label": "cat",
+   "prompt": "a cat",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.956,
+   "seconds": 14.36
+  },
+  {
+   "label": "cat",
+   "prompt": "a cat",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.959,
+   "seconds": 17.39
+  },
+  {
+   "label": "horse",
+   "prompt": "a horse",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.967,
+   "seconds": 21.21
+  },
+  {
+   "label": "horse",
+   "prompt": "a horse",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.968,
+   "seconds": 21.97
+  },
+  {
+   "label": "bird",
+   "prompt": "a bird",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.942,
+   "seconds": 25.06
+  },
+  {
+   "label": "bird",
+   "prompt": "a bird",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.966,
+   "seconds": 25.28
+  },
+  {
+   "label": "cow",
+   "prompt": "a cow",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.963,
+   "seconds": 29.52
+  },
+  {
+   "label": "cow",
+   "prompt": "a cow",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.977,
+   "seconds": 41.34
+  },
+  {
+   "label": "sheep",
+   "prompt": "a sheep",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.967,
+   "seconds": 28.91
+  },
+  {
+   "label": "sheep",
+   "prompt": "a sheep",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.97,
+   "seconds": 22.16
+  },
+  {
+   "label": "elephant",
+   "prompt": "an elephant",
+   "scene": false,
+   "seed": 0,
+   "found": false,
+   "score": 0.0,
+   "seconds": 19.49
+  },
+  {
+   "label": "elephant",
+   "prompt": "an elephant",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.974,
+   "seconds": 20.33
+  },
+  {
+   "label": "car",
+   "prompt": "a car",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.969,
+   "seconds": 27.8
+  },
+  {
+   "label": "car",
+   "prompt": "a car",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.963,
+   "seconds": 23.62
+  },
+  {
+   "label": "bus",
+   "prompt": "a bus",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.978,
+   "seconds": 25.9
+  },
+  {
+   "label": "bus",
+   "prompt": "a bus",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.969,
+   "seconds": 22.17
+  },
+  {
+   "label": "bicycle",
+   "prompt": "a bicycle",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.972,
+   "seconds": 25.55
+  },
+  {
+   "label": "bicycle",
+   "prompt": "a bicycle",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.969,
+   "seconds": 22.46
+  },
+  {
+   "label": "motorbike",
+   "prompt": "a motorcycle",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.965,
+   "seconds": 21.18
+  },
+  {
+   "label": "motorbike",
+   "prompt": "a motorcycle",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.974,
+   "seconds": 23.92
+  },
+  {
+   "label": "boat",
+   "prompt": "a boat",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.942,
+   "seconds": 23.35
+  },
+  {
+   "label": "boat",
+   "prompt": "a boat",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.771,
+   "seconds": 22.43
+  },
+  {
+   "label": "aeroplane",
+   "prompt": "an airplane",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.957,
+   "seconds": 26.17
+  },
+  {
+   "label": "aeroplane",
+   "prompt": "an airplane",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.969,
+   "seconds": 21.65
+  },
+  {
+   "label": "train",
+   "prompt": "a train",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.966,
+   "seconds": 17.68
+  },
+  {
+   "label": "train",
+   "prompt": "a train",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.957,
+   "seconds": 18.35
+  },
+  {
+   "label": "pizza",
+   "prompt": "a pizza",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.907,
+   "seconds": 19.42
+  },
+  {
+   "label": "pizza",
+   "prompt": "a pizza",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.955,
+   "seconds": 24.24
+  },
+  {
+   "label": "cake",
+   "prompt": "a cake",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.957,
+   "seconds": 21.08
+  },
+  {
+   "label": "cake",
+   "prompt": "a cake",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.78,
+   "seconds": 24.78
+  },
+  {
+   "label": "banana",
+   "prompt": "a banana",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.963,
+   "seconds": 28.2
+  },
+  {
+   "label": "banana",
+   "prompt": "a banana",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.723,
+   "seconds": 25.14
+  },
+  {
+   "label": "apple",
+   "prompt": "an apple",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.932,
+   "seconds": 20.06
+  },
+  {
+   "label": "apple",
+   "prompt": "an apple",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.926,
+   "seconds": 23.75
+  },
+  {
+   "label": "cup",
+   "prompt": "a cup",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.968,
+   "seconds": 29.75
+  },
+  {
+   "label": "cup",
+   "prompt": "a cup",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.956,
+   "seconds": 19.55
+  },
+  {
+   "label": "bottle",
+   "prompt": "a bottle",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.935,
+   "seconds": 18.27
+  },
+  {
+   "label": "bottle",
+   "prompt": "a bottle",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.942,
+   "seconds": 18.56
+  },
+  {
+   "label": "chair",
+   "prompt": "a chair",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.964,
+   "seconds": 23.83
+  },
+  {
+   "label": "chair",
+   "prompt": "a chair",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.967,
+   "seconds": 22.11
+  },
+  {
+   "label": "laptop",
+   "prompt": "a laptop",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.959,
+   "seconds": 29.67
+  },
+  {
+   "label": "laptop",
+   "prompt": "a laptop",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.973,
+   "seconds": 18.76
+  },
+  {
+   "label": "clock",
+   "prompt": "a clock",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.963,
+   "seconds": 24.22
+  },
+  {
+   "label": "clock",
+   "prompt": "a clock",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.951,
+   "seconds": 21.39
+  },
+  {
+   "label": "umbrella",
+   "prompt": "an umbrella",
+   "scene": false,
+   "seed": 0,
+   "found": true,
+   "score": 0.961,
+   "seconds": 30.97
+  },
+  {
+   "label": "umbrella",
+   "prompt": "an umbrella",
+   "scene": false,
+   "seed": 1,
+   "found": true,
+   "score": 0.952,
+   "seconds": 26.08
+  },
+  {
+   "label": "dog",
+   "prompt": "a dog on a beach at sunset",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.947,
+   "seconds": 25.12
+  },
+  {
+   "label": "dog",
+   "prompt": "a dog on a beach at sunset",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.972,
+   "seconds": 23.82
+  },
+  {
+   "label": "cat",
+   "prompt": "a cat sleeping on a sofa",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.946,
+   "seconds": 40.57
+  },
+  {
+   "label": "cat",
+   "prompt": "a cat sleeping on a sofa",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.945,
+   "seconds": 24.64
+  },
+  {
+   "label": "car",
+   "prompt": "a red car on a city street at night",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.959,
+   "seconds": 23.48
+  },
+  {
+   "label": "car",
+   "prompt": "a red car on a city street at night",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.958,
+   "seconds": 23.19
+  },
+  {
+   "label": "bird",
+   "prompt": "a bird on a tree branch",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.954,
+   "seconds": 20.57
+  },
+  {
+   "label": "bird",
+   "prompt": "a bird on a tree branch",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.965,
+   "seconds": 35.29
+  },
+  {
+   "label": "horse",
+   "prompt": "a horse in a snowy field",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.96,
+   "seconds": 20.98
+  },
+  {
+   "label": "horse",
+   "prompt": "a horse in a snowy field",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.965,
+   "seconds": 21.73
+  },
+  {
+   "label": "boat",
+   "prompt": "a boat on a lake with mountains behind",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.842,
+   "seconds": 23.45
+  },
+  {
+   "label": "boat",
+   "prompt": "a boat on a lake with mountains behind",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.804,
+   "seconds": 24.39
+  },
+  {
+   "label": "cup",
+   "prompt": "a cup of coffee on a wooden table",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.956,
+   "seconds": 24.4
+  },
+  {
+   "label": "cup",
+   "prompt": "a cup of coffee on a wooden table",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.959,
+   "seconds": 19.15
+  },
+  {
+   "label": "bicycle",
+   "prompt": "a bicycle leaning against a brick wall",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.937,
+   "seconds": 20.27
+  },
+  {
+   "label": "bicycle",
+   "prompt": "a bicycle leaning against a brick wall",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.947,
+   "seconds": 24.79
+  },
+  {
+   "label": "pizza",
+   "prompt": "a pizza on a picnic table in a park",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.948,
+   "seconds": 25.46
+  },
+  {
+   "label": "pizza",
+   "prompt": "a pizza on a picnic table in a park",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.919,
+   "seconds": 29.08
+  },
+  {
+   "label": "umbrella",
+   "prompt": "a person with an umbrella on a rainy street",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.944,
+   "seconds": 27.66
+  },
+  {
+   "label": "umbrella",
+   "prompt": "a person with an umbrella on a rainy street",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.936,
+   "seconds": 27.58
+  },
+  {
+   "label": "sheep",
+   "prompt": "sheep on a green hill",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.933,
+   "seconds": 25.51
+  },
+  {
+   "label": "sheep",
+   "prompt": "sheep on a green hill",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.919,
+   "seconds": 24.0
+  },
+  {
+   "label": "bus",
+   "prompt": "a bus in the rain",
+   "scene": true,
+   "seed": 0,
+   "found": true,
+   "score": 0.962,
+   "seconds": 31.67
+  },
+  {
+   "label": "bus",
+   "prompt": "a bus in the rain",
+   "scene": true,
+   "seed": 1,
+   "found": true,
+   "score": 0.956,
+   "seconds": 26.11
+  }
+ ]
+}

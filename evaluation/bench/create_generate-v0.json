@@ -1,0 +1,346 @@
+{
+ "summary": {
+  "images": 48,
+  "found_rate": 0.979,
+  "seconds_median": 26.41,
+  "load_seconds": 33.6
+ },
+ "rows": [
+  {
+   "label": "dog",
+   "seed": 0,
+   "found": true,
+   "score": 0.96,
+   "seconds": 15.99
+  },
+  {
+   "label": "dog",
+   "seed": 1,
+   "found": true,
+   "score": 0.943,
+   "seconds": 11.35
+  },
+  {
+   "label": "cat",
+   "seed": 0,
+   "found": true,
+   "score": 0.956,
+   "seconds": 12.48
+  },
+  {
+   "label": "cat",
+   "seed": 1,
+   "found": true,
+   "score": 0.959,
+   "seconds": 24.45
+  },
+  {
+   "label": "horse",
+   "seed": 0,
+   "found": true,
+   "score": 0.967,
+   "seconds": 32.91
+  },
+  {
+   "label": "horse",
+   "seed": 1,
+   "found": true,
+   "score": 0.968,
+   "seconds": 25.48
+  },
+  {
+   "label": "bird",
+   "seed": 0,
+   "found": true,
+   "score": 0.942,
+   "seconds": 27.08
+  },
+  {
+   "label": "bird",
+   "seed": 1,
+   "found": true,
+   "score": 0.966,
+   "seconds": 12.98
+  },
+  {
+   "label": "cow",
+   "seed": 0,
+   "found": true,
+   "score": 0.963,
+   "seconds": 21.4
+  },
+  {
+   "label": "cow",
+   "seed": 1,
+   "found": true,
+   "score": 0.977,
+   "seconds": 31.26
+  },
+  {
+   "label": "sheep",
+   "seed": 0,
+   "found": true,
+   "score": 0.967,
+   "seconds": 21.77
+  },
+  {
+   "label": "sheep",
+   "seed": 1,
+   "found": true,
+   "score": 0.97,
+   "seconds": 12.63
+  },
+  {
+   "label": "elephant",
+   "seed": 0,
+   "found": false,
+   "score": 0.0,
+   "seconds": 22.56
+  },
+  {
+   "label": "elephant",
+   "seed": 1,
+   "found": true,
+   "score": 0.974,
+   "seconds": 23.63
+  },
+  {
+   "label": "car",
+   "seed": 0,
+   "found": true,
+   "score": 0.969,
+   "seconds": 20.24
+  },
+  {
+   "label": "car",
+   "seed": 1,
+   "found": true,
+   "score": 0.963,
+   "seconds": 27.31
+  },
+  {
+   "label": "bus",
+   "seed": 0,
+   "found": true,
+   "score": 0.978,
+   "seconds": 13.07
+  },
+  {
+   "label": "bus",
+   "seed": 1,
+   "found": true,
+   "score": 0.969,
+   "seconds": 28.54
+  },
+  {
+   "label": "bicycle",
+   "seed": 0,
+   "found": true,
+   "score": 0.972,
+   "seconds": 24.74
+  },
+  {
+   "label": "bicycle",
+   "seed": 1,
+   "found": true,
+   "score": 0.969,
+   "seconds": 27.16
+  },
+  {
+   "label": "motorbike",
+   "seed": 0,
+   "found": true,
+   "score": 0.965,
+   "seconds": 23.3
+  },
+  {
+   "label": "motorbike",
+   "seed": 1,
+   "found": true,
+   "score": 0.974,
+   "seconds": 39.56
+  },
+  {
+   "label": "boat",
+   "seed": 0,
+   "found": true,
+   "score": 0.942,
+   "seconds": 19.5
+  },
+  {
+   "label": "boat",
+   "seed": 1,
+   "found": true,
+   "score": 0.771,
+   "seconds": 43.89
+  },
+  {
+   "label": "aeroplane",
+   "seed": 0,
+   "found": true,
+   "score": 0.957,
+   "seconds": 18.57
+  },
+  {
+   "label": "aeroplane",
+   "seed": 1,
+   "found": true,
+   "score": 0.969,
+   "seconds": 28.46
+  },
+  {
+   "label": "train",
+   "seed": 0,
+   "found": true,
+   "score": 0.966,
+   "seconds": 12.71
+  },
+  {
+   "label": "train",
+   "seed": 1,
+   "found": true,
+   "score": 0.957,
+   "seconds": 36.64
+  },
+  {
+   "label": "pizza",
+   "seed": 0,
+   "found": true,
+   "score": 0.907,
+   "seconds": 30.5
+  },
+  {
+   "label": "pizza",
+   "seed": 1,
+   "found": true,
+   "score": 0.955,
+   "seconds": 12.8
+  },
+  {
+   "label": "cake",
+   "seed": 0,
+   "found": true,
+   "score": 0.957,
+   "seconds": 25.75
+  },
+  {
+   "label": "cake",
+   "seed": 1,
+   "found": true,
+   "score": 0.78,
+   "seconds": 39.46
+  },
+  {
+   "label": "banana",
+   "seed": 0,
+   "found": true,
+   "score": 0.963,
+   "seconds": 36.97
+  },
+  {
+   "label": "banana",
+   "seed": 1,
+   "found": true,
+   "score": 0.723,
+   "seconds": 36.24
+  },
+  {
+   "label": "apple",
+   "seed": 0,
+   "found": true,
+   "score": 0.932,
+   "seconds": 24.07
+  },
+  {
+   "label": "apple",
+   "seed": 1,
+   "found": true,
+   "score": 0.926,
+   "seconds": 41.88
+  },
+  {
+   "label": "cup",
+   "seed": 0,
+   "found": true,
+   "score": 0.968,
+   "seconds": 20.63
+  },
+  {
+   "label": "cup",
+   "seed": 1,
+   "found": true,
+   "score": 0.956,
+   "seconds": 31.85
+  },
+  {
+   "label": "bottle",
+   "seed": 0,
+   "found": true,
+   "score": 0.935,
+   "seconds": 25.14
+  },
+  {
+   "label": "bottle",
+   "seed": 1,
+   "found": true,
+   "score": 0.942,
+   "seconds": 27.27
+  },
+  {
+   "label": "chair",
+   "seed": 0,
+   "found": true,
+   "score": 0.964,
+   "seconds": 23.83
+  },
+  {
+   "label": "chair",
+   "seed": 1,
+   "found": true,
+   "score": 0.967,
+   "seconds": 33.74
+  },
+  {
+   "label": "laptop",
+   "seed": 0,
+   "found": true,
+   "score": 0.959,
+   "seconds": 31.94
+  },
+  {
+   "label": "laptop",
+   "seed": 1,
+   "found": true,
+   "score": 0.973,
+   "seconds": 29.81
+  },
+  {
+   "label": "clock",
+   "seed": 0,
+   "found": true,
+   "score": 0.963,
+   "seconds": 27.19
+  },
+  {
+   "label": "clock",
+   "seed": 1,
+   "found": true,
+   "score": 0.951,
+   "seconds": 29.25
+  },
+  {
+   "label": "umbrella",
+   "seed": 0,
+   "found": true,
+   "score": 0.961,
+   "seconds": 30.83
+  },
+  {
+   "label": "umbrella",
+   "seed": 1,
+   "found": true,
+   "score": 0.952,
+   "seconds": 30.34
+  }
+ ]
+}

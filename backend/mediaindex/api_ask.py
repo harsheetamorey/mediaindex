@@ -231,7 +231,7 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         device = app.state.settings.resolved_device()
         if req["op"] == "generate":
             ctx.progress(0, 1, "Loading the image model")
-            painter = painter_factory()
+            painter = painter_factory()  # the inpainting model on a blank canvas: more natural pictures
             try:
                 ctx.progress(0, 1, "Making the image")
                 w, h = SHAPES.get(req.get("shape"), SHAPES["square"])

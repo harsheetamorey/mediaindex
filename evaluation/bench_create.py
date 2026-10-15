@@ -5,7 +5,8 @@ replace: the same COCO val2017 tasks as bench_edit.py (one sure, human-confirmed
   - new found: the detector (threshold 0.3) finds the new kind of thing mostly inside the changed area;
   - old gone: it no longer finds the old kind there (box IoU >= 0.3);
   - success: both. Pixels outside the changed area must be unchanged.
-generate: a new image for "a photo of a <thing>" for 24 of the detector's object types, 2 seeds each.
+generate: a new image for "a <thing>" for 24 of the detector's object types, and 12 scenes ("a dog on a beach at
+  sunset"), 2 seeds each.
   - found: the detector finds that thing (score >= 0.5).
 The detector is a proxy judge (it can be fooled by an object-shaped smudge, and can miss a real but odd-looking one),
 so a contact sheet is written for a visual check too.
@@ -44,6 +45,12 @@ SWAP = {"dog": "cat", "cat": "dog", "horse": "cow", "cow": "horse", "sheep": "do
         "backpack": "suitcase", "handbag": "backpack", "teddy bear": "dog", "person": "dog"}
 WORDS = {"pottedplant": "potted plant", "tvmonitor": "TV", "aeroplane": "airplane", "motorbike": "motorcycle",
          "sofa": "sofa"}
+SCENES = [("dog", "a dog on a beach at sunset"), ("cat", "a cat sleeping on a sofa"),
+          ("car", "a red car on a city street at night"), ("bird", "a bird on a tree branch"),
+          ("horse", "a horse in a snowy field"), ("boat", "a boat on a lake with mountains behind"),
+          ("cup", "a cup of coffee on a wooden table"), ("bicycle", "a bicycle leaning against a brick wall"),
+          ("pizza", "a pizza on a picnic table in a park"), ("umbrella", "a person with an umbrella on a rainy street"),
+          ("sheep", "sheep on a green hill"), ("bus", "a bus in the rain")]
 GENERATE = ["dog", "cat", "horse", "bird", "cow", "sheep", "elephant", "car", "bus", "bicycle", "motorbike", "boat",
             "aeroplane", "train", "pizza", "cake", "banana", "apple", "cup", "bottle", "chair", "laptop", "clock",
             "umbrella"]
@@ -124,25 +131,28 @@ def replace(a) -> None:
 def generate(a) -> None:
     det = RTDetrDetector(a.device)
     t = time.perf_counter()
-    painter = Painter(a.device)
+    painter = Painter(a.device, mode=a.model)
     load_s = time.perf_counter() - t
     sheet = OUT / f"create_{a.tag}_sheet"
     if a.sheet:
         sheet.mkdir(parents=True, exist_ok=True)
     rows = []
-    for label in GENERATE:
+    prompts = [(lab, word(lab)) for lab in GENERATE] + SCENES
+    for label, prompt in prompts:
         for seed in range(a.seeds):
             painter.seed = seed
             t = time.perf_counter()
-            im = painter.generate(word(label))
+            im = painter.generate(prompt)
             s = time.perf_counter() - t
             got = [sc for sc, _ in det.detect(im).get(label, [])]
-            row = {"label": label, "seed": seed, "found": bool(got), "score": max(got, default=0.0), "seconds": round(s, 2)}
+            row = {"label": label, "prompt": prompt, "scene": (label, prompt) in SCENES, "seed": seed, "found": bool(got), "score": max(got, default=0.0), "seconds": round(s, 2)}
             rows.append(row)
             print(json.dumps(row), flush=True)
             if a.sheet:
-                im.save(sheet / f"{label.replace(' ', '-')}_{seed}_{'ok' if got else 'MISS'}.jpg", quality=85)
-    summary = {"images": len(rows), "found_rate": round(np.mean([r["found"] for r in rows]), 3),
+                im.save(sheet / f"{prompt.replace(' ', '-')}_{seed}_{'ok' if got else 'MISS'}.jpg", quality=85)
+    summary = {"model": a.model, "images": len(rows), "found_rate": round(np.mean([r["found"] for r in rows]), 3),
+               "single_found_rate": round(np.mean([r["found"] for r in rows if not r["scene"]]), 3),
+               "scene_found_rate": round(np.mean([r["found"] for r in rows if r["scene"]]), 3),
                "seconds_median": round(float(np.median([r["seconds"] for r in rows])), 2), "load_seconds": round(load_s, 1)}
     (OUT / f"create_{a.tag}.json").write_text(json.dumps({"summary": summary, "rows": rows}, indent=1))
     print(json.dumps(summary, indent=1))
@@ -156,6 +166,9 @@ def main() -> int:
     ap.add_argument("--seeds", type=int, default=2)
     ap.add_argument("--device", default="mps")
     ap.add_argument("--sheet", action="store_true")
+    ap.add_argument("--model", choices=["generate", "paint"], default="paint",
+                    help="paint: the inpainting model on a blank canvas (the app's choice); generate: text-to-image UNet "
+                         "(download it with: python -m mediaindex.creative --download --base)")
     ap.add_argument("--tag", default=None)
     a = ap.parse_args()
     a.tag = a.tag or a.mode

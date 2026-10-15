@@ -81,7 +81,7 @@ class FakePainter:
         pass
 
 
-def fake_painter():
+def fake_painter(mode="paint"):
     return FakePainter()
 
 

@@ -1,8 +1,10 @@
 """Image model for the Ask tab: paint a new object into a photo ("replace the dog with a cat"), or make a new image.
 
-One model does both, so only one is downloaded: Stable Diffusion 1.5 inpainting (CreativeML OpenRAIL-M licence, which
-forbids some uses; see docs/create.md), in half precision, with the LCM-LoRA adapter (openrail++) so it needs about
-6 steps instead of 50. A new image is the same model inpainting a blank canvas.
+Stable Diffusion 1.5 (CreativeML OpenRAIL-M licence, which forbids some uses; see docs/edit.md), in half precision,
+with the LCM-LoRA adapter (openrail++) so it needs 6 steps instead of 50. The inpainting UNet both replaces objects and
+makes new images (painting a blank canvas). The original text-to-image UNet ("generate" mode, optional extra 1.7 GB) was
+measured too: it finds the asked-for thing as often and is twice as fast, but with LCM its pictures are harsh and
+oversaturated whatever the prompt, so it isn't the default (docs/edit.md).
 
 Optional: needs `uv sync --extra create` and a one-time download. Loads on first use and is freed afterwards.
 """
@@ -23,7 +25,11 @@ SD_FILES = ["model_index.json", "scheduler/*", "tokenizer/*", "text_encoder/conf
 LCM_ID = "latent-consistency/lcm-lora-sdv1-5"
 LCM_REVISION = "cf2fced511dbe7e26c8d1d397e728fbab875db4b"
 LCM_FILE = "pytorch_lora_weights.safetensors"
+BASE_ID = "stable-diffusion-v1-5/stable-diffusion-v1-5"  # the text-to-image UNet; text encoder and VAE are shared
+BASE_REVISION = "451f4fe16113bff5a5d2269ed5ad43b0592e9a14"
+BASE_FILES = ["unet/config.json", "unet/diffusion_pytorch_model.fp16.safetensors"]
 MODEL_NAME = f"{SD_ID}@{SD_REVISION[:12]} + {LCM_ID}@{LCM_REVISION[:12]}"
+BASE_MODEL_NAME = f"{BASE_ID}@{BASE_REVISION[:12]} + {LCM_ID}@{LCM_REVISION[:12]}"
 DOWNLOAD_HINT = "uv sync --extra create && MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.creative --download"
 
 STEPS = 6
@@ -47,22 +53,29 @@ class Painter:
     model_name = MODEL_NAME
     max_side = 768  # the crop around the object is scaled to this before painting
 
-    def __init__(self, device: str = "cpu", seed: int = 0):
+    def __init__(self, device: str = "cpu", seed: int = 0, mode: str = "paint"):
+        """mode "paint": the inpainting model (replace objects); "generate": the text-to-image UNet for new images."""
         import torch
-        from diffusers import LCMScheduler, StableDiffusionInpaintPipeline
+        from diffusers import LCMScheduler, StableDiffusionInpaintPipeline, StableDiffusionPipeline, UNet2DConditionModel
 
         self._torch = torch
         self.device = device
         self.seed = seed
+        self.mode = mode
         dtype = torch.float16 if device != "cpu" else torch.float32
-        pipe = StableDiffusionInpaintPipeline.from_pretrained(
-            SD_ID, revision=SD_REVISION, variant="fp16", torch_dtype=dtype, safety_checker=None,
-            requires_safety_checker=False, feature_extractor=None)
+        common = dict(torch_dtype=dtype, safety_checker=None, requires_safety_checker=False, feature_extractor=None)
+        if mode == "generate":
+            unet = UNet2DConditionModel.from_pretrained(BASE_ID, subfolder="unet", revision=BASE_REVISION,
+                                                        variant="fp16", torch_dtype=dtype)
+            pipe = StableDiffusionPipeline.from_pretrained(SD_ID, revision=SD_REVISION, variant="fp16", unet=unet,
+                                                           **common)
+        else:
+            pipe = StableDiffusionInpaintPipeline.from_pretrained(SD_ID, revision=SD_REVISION, variant="fp16", **common)
         pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
         pipe.load_lora_weights(LCM_ID, weight_name=LCM_FILE, revision=LCM_REVISION)
         pipe.fuse_lora()
-        pipe.vae.to(torch.float32)  # the fp16 VAE can overflow to black images on MPS
         self.pipe = pipe.to(device)
+        self.pipe.enable_attention_slicing()  # 8 GB Macs: ~12 s per image instead of minutes of swapping
         self.pipe.set_progress_bar_config(disable=True)
 
     def _run(self, image: Image.Image, mask: np.ndarray, prompt: str, size: tuple[int, int]) -> Image.Image:
@@ -83,8 +96,14 @@ class Painter:
         return out.resize(image.size, Image.Resampling.LANCZOS)
 
     def generate(self, prompt: str, width: int = NATIVE, height: int = NATIVE) -> Image.Image:
-        blank = Image.new("RGB", (width, height), (127, 127, 127))
-        return self._run(blank, np.ones((height, width), dtype=bool), prompt, (width, height))
+        if self.mode != "generate":  # the inpainting model on a blank canvas
+            blank = Image.new("RGB", (width, height), (127, 127, 127))
+            return self._run(blank, np.ones((height, width), dtype=bool), prompt, (width, height))
+        torch = self._torch
+        g = torch.Generator("cpu").manual_seed(self.seed)
+        with torch.inference_mode():
+            return self.pipe(prompt=STYLE.format(prompt), negative_prompt=NEGATIVE, height=height, width=width,
+                             num_inference_steps=STEPS, guidance_scale=GUIDANCE, generator=g).images[0]
 
     def close(self) -> None:
         self.pipe = None
@@ -92,7 +111,7 @@ class Painter:
             self._torch.mps.empty_cache()
 
 
-def available() -> tuple[bool, str]:
+def available(mode: str = "paint") -> tuple[bool, str]:
     """Whether the optional package and the model files are present (filesystem only)."""
     try:
         import diffusers  # noqa: F401
@@ -103,6 +122,8 @@ def available() -> tuple[bool, str]:
 
     files = [(SD_ID, f, SD_REVISION) for f in SD_FILES if "*" not in f]
     files.append((LCM_ID, LCM_FILE, LCM_REVISION))
+    if mode == "generate":
+        files += [(BASE_ID, f, BASE_REVISION) for f in BASE_FILES]
     for r, f, v in files:
         p = try_to_load_from_cache(r, f, revision=v)
         if not (isinstance(p, str) and Path(p).exists()):
@@ -110,21 +131,26 @@ def available() -> tuple[bool, str]:
     return True, ""
 
 
-def download() -> None:
+def download(base: bool = False) -> None:
+    """base: also the text-to-image UNet (only for comparing in evaluation/bench_create.py)."""
     from huggingface_hub import hf_hub_download, snapshot_download
 
     snapshot_download(SD_ID, revision=SD_REVISION, allow_patterns=SD_FILES)
+    if base:
+        snapshot_download(BASE_ID, revision=BASE_REVISION, allow_patterns=BASE_FILES)
     hf_hub_download(LCM_ID, LCM_FILE, revision=LCM_REVISION)
 
 
 def painter_factory(device: str):
-    def make() -> Painter:
-        ok, why = available()
+    """make(mode): "paint" (the inpainting model, used for everything) or "generate" (text-to-image UNet)."""
+    def make(mode: str = "paint") -> Painter:
+        ok, why = available(mode)
         if not ok:
             raise RuntimeError(f"{why}. Run this once in the MediaIndex folder: {DOWNLOAD_HINT}")
-        return Painter(device)
+        return Painter(device, mode=mode)
 
     make.model_name = MODEL_NAME  # type: ignore[attr-defined]
+    make.generate_model_name = BASE_MODEL_NAME  # type: ignore[attr-defined]
     return make
 
 
@@ -134,12 +160,13 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description="Download and check the image model used by the Ask tab.")
     ap.add_argument("--download", action="store_true", help="download it (needs MEDIAINDEX_ALLOW_DOWNLOAD=1)")
+    ap.add_argument("--base", action="store_true", help="also the text-to-image UNet (for the benchmark only)")
     ap.add_argument("--device", default="mps")
     a = ap.parse_args()
     if a.download:
         if os.environ.get("MEDIAINDEX_ALLOW_DOWNLOAD") != "1":
             raise SystemExit("downloads are off by default; run with MEDIAINDEX_ALLOW_DOWNLOAD=1")
-        download()
+        download(a.base)
     ok, why = available()
     if not ok:
         raise SystemExit(f"{why}; run: {DOWNLOAD_HINT}")
