@@ -92,7 +92,8 @@ detector (at 0.3) no longer finds the old thing there **and** finds the new thin
 | … same, without the retry | 25 / 40 | — |
 
 Pixels outside the painted area were unchanged in every edit. Median time **35 s** per replacement with the model already
-loaded (about 25 s more in the app, which loads it for each edit); 13 of 40 edits needed the retry.
+loaded; 13 of 40 edits needed the retry. In the app, which loads the models for each edit, a replacement took 89 s end
+to end (a car → a believable white van in a car park; "now remove the truck" then edited that copy in 14 s).
 
 **Caveat:** the retry uses the same detector that scores the benchmark, so its +3 is an upper bound. **Looked at by eye**
 (12 random successes): all 12 show the asked-for thing, 11 believably (a fluffy dog where a baby was, a bus, a pick-up truck,
@@ -120,6 +121,8 @@ Results in `evaluation/bench/create_generate-paint.json` and `create_generate-ba
 - **Only the 80 object types the detector knows** can be removed or replaced (people, cars, dogs, cats, birds, bikes,
   boats, cups…), not "the tree" or "the sign".
 - **Shadows and reflections stay** unless the detector's outline covers them.
+- **Crowded scenes fill badly.** Removing one car from a full car park (11% of the photo, no warning) left a dark,
+  blocky patch: there is no clean background nearby to copy from.
 - **Large objects leave smudges.** Anything over about 12% of the photo gets a warning; over about 35% is declined.
 - **Replacing and new images are made up** by a small image model (Stable Diffusion 1.5): faces, hands and text are often
   wrong. Its licence (CreativeML OpenRAIL-M) forbids some uses; read it before publishing results.
