@@ -83,7 +83,7 @@ PROVENANCE_FILE = "mediaindex-provenance.json"
 
 
 def load_provenance(root: Path) -> dict[str, dict]:
-    """Optional per-file source records written by scripts/download_demo.py (or by the user).
+    """Optional per-file source records written next to the files (by a download script or by the user).
 
     Records are stored as asset metadata for display/export. Tags are inspection metadata only
     and are never passed to the embedding model.

@@ -44,11 +44,36 @@ OUT = HERE / "bench"
 MACS_RECORD, TAU_RECORD = "5114771", "2589280"
 
 
-def _fetch(url: str, dest: Path) -> None:
+def _fetch(url: str, dest: Path, size: int | None = None, md5: str | None = None, tries: int = 8) -> None:
+    """Download with resume (HTTP Range) and retries; checks the size and MD5 that Zenodo lists."""
+    import hashlib
+
     tmp = dest.with_suffix(dest.suffix + ".part")
-    with urllib.request.urlopen(url) as r, open(tmp, "wb") as f:
-        while chunk := r.read(1 << 22):
-            f.write(chunk)
+    for attempt in range(tries):
+        have = tmp.stat().st_size if tmp.exists() else 0
+        if size is not None and have >= size:
+            break
+        req = urllib.request.Request(url, headers={"Range": f"bytes={have}-"} if have else {})
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r, open(tmp, "ab" if have and r.status == 206 else "wb") as f:
+                while chunk := r.read(1 << 22):
+                    f.write(chunk)
+        except OSError as e:
+            print(f"  {dest.name}: interrupted at {have / 1e9:.2f} GB ({type(e).__name__}), resuming", flush=True)
+            time.sleep(min(60, 5 * (attempt + 1)))
+            continue
+        if size is None or tmp.stat().st_size >= size:
+            break
+    if size is not None and tmp.stat().st_size != size:
+        raise RuntimeError(f"{dest.name}: got {tmp.stat().st_size} bytes, expected {size}")
+    if md5:
+        h = hashlib.md5()
+        with open(tmp, "rb") as f:
+            while chunk := f.read(1 << 22):
+                h.update(chunk)
+        if h.hexdigest() != md5:
+            tmp.unlink()
+            raise RuntimeError(f"{dest.name}: checksum mismatch; deleted, run --download again")
     tmp.rename(dest)
 
 
@@ -67,13 +92,21 @@ def download() -> None:
     print(f"MACS: {len(wanted)} clips", flush=True)
     tau = json.load(urllib.request.urlopen(f"https://zenodo.org/api/records/{TAU_RECORD}"))["files"]
     zips = sorted((f for f in tau if ".audio." in f["key"]), key=lambda f: int(f["key"].split(".")[-2]))
+    done_file = DATA / "zips_done.txt"  # zips already converted: never downloaded again
+    done = set(done_file.read_text().split()) if done_file.exists() else set()
     for z in zips:
         have = {p.stem for p in AUDIO.glob("*.flac")}
         if len(have) >= len(wanted):
             break
+        if z["key"] in done:
+            continue
         dest = DATA / z["key"]
-        print(f"{z['key']}: downloading {z['size'] / 1e9:.1f} GB", flush=True)
-        _fetch(z["links"]["self"], dest)
+        if dest.exists() and dest.stat().st_size != z["size"]:  # a truncated zip from an earlier run
+            dest.rename(dest.with_suffix(dest.suffix + ".part"))
+        if not dest.exists():
+            print(f"{z['key']}: downloading {z['size'] / 1e9:.1f} GB", flush=True)
+            md5 = z.get("checksum", "").removeprefix("md5:") or None
+            _fetch(z["links"]["self"], dest, z["size"], md5)
         n = 0
         with zipfile.ZipFile(dest) as zf:
             for info in zf.infolist():
@@ -84,6 +117,8 @@ def download() -> None:
                                         str(AUDIO / f"{Path(name).stem}.flac")], input=src.read(), check=True)
                     n += 1
         dest.unlink()
+        with open(done_file, "a") as f:
+            f.write(z["key"] + "\n")
         print(f"{z['key']}: kept {n} clips ({len(have) + n}/{len(wanted)})", flush=True)
     print(f"done: {len(list(AUDIO.glob('*.flac')))} clips in {AUDIO}")
 

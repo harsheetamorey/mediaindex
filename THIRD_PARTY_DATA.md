@@ -5,9 +5,8 @@ to `data/demo/`, which is git-ignored.
 
 ## Optional demo image pack: KoalaAI/StockImages-CC0
 - Source: https://huggingface.co/datasets/KoalaAI/StockImages-CC0, pinned revision `206f3575579f1187548c6f47042ae9174c0a51fc`.
-- Download: `uv run --extra demo python scripts/download_demo.py` gets 500 images and transfers about 115 MB using HTTP range reads of 5 parquet row groups.
 - Selection: deterministic (fixed seed, pinned revision). The committed manifest `manifests/stockimages-cc0-500.json` lists
-  row IDs and SHA-256 hashes, and the script verifies every run against it.
+  row IDs and SHA-256 hashes, and every download is verified against it.
 - License: the **publisher declares CC0-1.0** for the dataset as a whole. The dataset card says the images were "compiled from various
   sources" but does **not** include per-image provenance (original photographer, source URL or license evidence).
 - MediaIndex records, per image, the dataset, revision, row number, SHA-256, publisher-declared license and dataset URL in
@@ -20,10 +19,7 @@ to `data/demo/`, which is git-ignored.
 
 ## Optional demo sound pack: quinnlue/FSD50K-16k (CC0 clips only)
 - Source: https://huggingface.co/datasets/quinnlue/FSD50K-16k, pinned revision `2a60d475f4e2f0db624a902881af2df79d656145`.
-  This is a 16 kHz mono FLAC repack of FSD50K (Fonseca et al., 2020). (The build guide's Phase 11 link reads "F50K-16k". That repository does not
-  exist, and the guide's source list gives FSD50K-16k.)
-- Download: `uv run --extra demo python scripts/download_demo_audio.py` gets 60 clips, about 17 MB transferred (2 parquet row groups of the
-  `validation` split).
+  This is a 16 kHz mono FLAC repack of FSD50K (Fonseca et al., 2020).
 - **Only clips whose own `license` field is CC0 1.0 are selected.** In the 128 rows read, 64 non-CC0 clips (CC BY, CC BY-NC, Sampling+) were skipped.
   The committed manifest `manifests/fsd50k-cc0.json` lists rows, Freesound IDs and SHA-256 hashes.
 - Each clip's Freesound ID, URL, uploader, title and declared licence are kept in `mediaindex-provenance.json`.
@@ -32,8 +28,3 @@ to `data/demo/`, which is git-ignored.
 - Licence declarations come from Freesound uploaders through the dataset. **No independent rights audit has been performed.**
 - FSD50K labels are kept as inspection metadata only and are never embedded.
 
-## Generated demo video (no third-party video downloaded)
-`uv run python scripts/make_demo_video.py` builds `data/demo/videos/scenes.mp4` (40 s: four 10 s scenes, each a slow zoom over one CC0-declared
-stock photo with one CC0 FSD50K clip as audio) and `scenes-silent.mp4` (the same video without audio). Each scene's source image and sound,
-with their declared licences, are listed in `data/demo/videos/mediaindex-provenance.json`. It needs both optional demo packs. No video from any
-website is redistributed.

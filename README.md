@@ -5,10 +5,10 @@ describing what you want, by example, or by example plus text. You can preview r
 Everything runs on your computer. There is no cloud account, nothing is uploaded, and there is no telemetry.
 
 Embeddings come from [google/embeddinggemma-2](https://huggingface.co/google/embeddinggemma-2), one model for text, images, audio and video,
-running locally. MediaIndex is an independent project. It is not a fork of Oxford's WISE.
+running locally. MediaIndex is an independent project.
 
-> **Status:** Version 1 (image search) plus audio, cross-media and video-moment search. Verification evidence for every phase is in
-> [`docs/progress.md`](docs/progress.md). Text→image search: Hit@1 0.90 and nDCG@10 0.92 on 20 human-labelled queries. Other image modes are only partly labelled (see [Evaluation](#evaluation)).
+> **Status:** Version 1 (image search) plus audio, cross-media and video-moment search.
+> Text→image search: Hit@1 0.90 and nDCG@10 0.92 on 20 human-labelled queries. Other image modes are only partly labelled (see [Evaluation](#evaluation)).
 
 ![MediaIndex searching the CC0 demo pack](docs/assets/screenshot-search.png)
 
@@ -54,24 +54,6 @@ those into a reel" make **new files**; your originals never change.
 - Videos are slideshows of exactly the photos you asked for.
 
 Setup, measurements and limits: [`docs/edit.md`](docs/edit.md).
-
-### Optional demo data (traceable, publisher-declared CC0)
-```bash
-uv run --extra demo python scripts/download_demo.py         # 500 stock photos, ~115 MB  -> data/demo/stockimages-cc0
-uv run --extra demo python scripts/download_demo_audio.py   # 60 CC0 FSD50K sounds, ~17 MB -> data/demo/fsd50k-cc0
-uv run python scripts/make_demo_video.py                    # 40 s demo MP4 built from the two packs -> data/demo/videos
-```
-Each item keeps its source record. Publisher declarations are **not** a rights audit. See [`THIRD_PARTY_DATA.md`](THIRD_PARTY_DATA.md).
-
-### Demo
-`scripts/demo.sh reset`, then `scripts/demo.sh start` and, in a second terminal, `scripts/demo.sh setup`. This indexes the demo packs into a separate
-`data/demo-app` state directory. The storyboard, the automatic walkthrough and the recording checklist are in [`docs/demo.md`](docs/demo.md).
-
-| Image + text: "at sunset" | Honest miss: "without any flowers" |
-|---|---|
-| ![reference plus "at sunset"](docs/assets/demo-refine.jpg) | ![negation is not understood](docs/assets/demo-honest-miss.jpg) |
-| **Text → sounds: "a dog barking"** | **Text → video moment: "a dog"** |
-| ![sound results with waveforms](docs/assets/demo-sounds.jpg) | ![matched 8 s video window](docs/assets/demo-video-moment.jpg) |
 
 ## Offline use
 After setup, `python -m mediaindex` forces offline model loading (`HF_HUB_OFFLINE=1` and `local_files_only`) and disables library telemetry.
@@ -160,8 +142,7 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 
 ## Documentation
 [Architecture](docs/architecture.md) · [Environment](docs/environment.md) · [Model compatibility](docs/model-compatibility.md) ·
-[Progress & gates](docs/progress.md) · [Offline & robustness](docs/offline-and-robustness.md) · [Evaluation](docs/evaluation.md) ·
-[Release checklist](docs/release-checklist.md) · [Demo](docs/demo.md) · [Release draft & handoff](docs/release-draft.md) ·
+[Offline & robustness](docs/offline-and-robustness.md) · [Evaluation](docs/evaluation.md) ·
 [Model comparison](docs/model-comparison.md) · [Desktop app](docs/desktop-app.md) · [Ask](docs/ask.md) · [Edit & create](docs/edit.md) · [Contributing](CONTRIBUTING.md)
 
 ## Licence
