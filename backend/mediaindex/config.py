@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+
+def setup_step(command: str) -> str:
+    """How to download optional models: a menu item in the Mac app, a terminal command otherwise."""
+    if getattr(sys, "frozen", False):
+        return "In the menu bar, choose Models → Download photo editing models…"
+    return f"Run this once in the MediaIndex folder: {command}"
 
 
 def _default_data_dir() -> Path:

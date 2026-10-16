@@ -17,6 +17,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from .config import setup_step
+
 SD_ID = "stable-diffusion-v1-5/stable-diffusion-inpainting"
 SD_REVISION = "8a4288a76071f7280aedbdb3253bdb9e9d5d84bb"
 SD_FILES = ["model_index.json", "scheduler/*", "tokenizer/*", "text_encoder/config.json",
@@ -167,7 +169,7 @@ def painter_factory(device: str):
     def make(mode: str = "paint") -> Painter:
         ok, why = available(mode)
         if not ok:
-            raise RuntimeError(f"{why}. Run this once in the MediaIndex folder: {DOWNLOAD_HINT}")
+            raise RuntimeError(f"{why}. {setup_step(DOWNLOAD_HINT)}")
         return Painter(device, mode=mode)
 
     make.model_name = MODEL_NAME  # type: ignore[attr-defined]

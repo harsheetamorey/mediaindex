@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from .api_search import embed_query, run_search
 from .assistant import Assistant, Turn, display, resolve_label, same_kind
+from .config import setup_step
 from .detect import DETECTOR_ID, DETECTOR_KEY, SURE, DetectorHost, run_detection
 from .edit import DOWNLOAD_HINT as EDIT_DOWNLOAD_HINT
 from .edit import MAX_CHANGE, MAX_CHANGE_ASKED, EditRefused, Editor, EditStore
@@ -227,8 +228,7 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
                                   f"believably ({e}). Filling that much would mean making up most of the picture. "
                                   f"Say “go ahead” if that's fine.", "edit": None}
             except OSError as e:  # model files missing
-                raise RuntimeError(f"the editing models aren't downloaded yet. Run this once in the MediaIndex "
-                                   f"folder: {EDIT_DOWNLOAD_HINT}") from e
+                raise RuntimeError(f"the editing models aren't downloaded yet. {setup_step(EDIT_DOWNLOAD_HINT)}") from e
         finally:
             detector_host.unload()
         ctx.progress(3, message="Saving a copy")

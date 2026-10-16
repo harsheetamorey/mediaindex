@@ -1,18 +1,49 @@
 # MediaIndex
 
-**Local media search for creators.** Point MediaIndex at your folders of images, sounds and MP4 videos, then search them by
-describing what you want, by example, or by example plus text. You can preview results, collect selections, and export copies, clips and manifests.
-Everything runs on your computer. There is no cloud account, nothing is uploaded, and there is no telemetry.
+**Chat with your photos. Edit them. Offline.**
 
-Embeddings come from [google/embeddinggemma-2](https://huggingface.co/google/embeddinggemma-2), one model for text, images, audio and video,
-running locally. MediaIndex is an independent project.
+Ask your photo library questions, find what you describe, and remove or replace things in a photo, all on your Mac.
+Nothing is uploaded: no account, no cloud, no telemetry.
 
-> **Status:** Version 1 (image search) plus audio, cross-media and video-moment search.
-> Text→image search: Hit@1 0.90 and nDCG@10 0.92 on 20 human-labelled queries. Other image modes are only partly labelled (see [Evaluation](#evaluation)).
+**[⬇ Download for Mac (Apple silicon)](https://github.com/harsheetamorey/mediaindex/releases/latest)** · free and open source
 
-![MediaIndex searching the CC0 demo pack](docs/assets/screenshot-search.png)
+![MediaIndex counting dogs, finding red cars, then removing four benches and replacing them with a table](docs/assets/demo.gif)
 
-## Quick start (macOS on Apple silicon; Linux expected to work but untested)
+Try asking:
+- "how many dogs do I have?" counts them with an object detector and outlines each one
+- "show me red cars" finds the cars, then checks the colour inside each one
+- "remove the benches from photo 4" fills the space in from the photo around them
+- "now replace them with one table instead" paints a new one, as a new file (your original never changes)
+
+It also searches sounds and videos by description, and opens a video at the matching moment.
+
+### Install
+1. Download `MediaIndex-…-macos-arm64.zip` from [Releases](https://github.com/harsheetamorey/mediaindex/releases/latest),
+   unzip it, and drag **MediaIndex** to Applications.
+2. The first time, **right-click it → Open → Open**. (It isn't signed by Apple yet. On macOS 15, if that doesn't offer
+   Open, go to System Settings → Privacy & Security and click **Open Anyway**.)
+3. Choose whether to include photo editing, and it downloads the AI models once (1.6 GB, plus 2.7 GB for editing).
+   After that it works offline.
+4. Click **+ Add folder** and pick a folder of photos. You can search as soon as the first ones are indexed.
+
+Needs an Apple silicon Mac (M1 or later) with macOS 13+. 8 GB of memory works; editing is faster with 16 GB.
+For free-form chat and photo descriptions in Ask, also install [Ollama](https://ollama.com) and run `ollama pull gemma4:e2b-it-qat`
+(optional: counting, finding and editing work without it).
+
+### What runs on your Mac
+| Job | Model |
+|---|---|
+| Search text, images, sounds and video | [EmbeddingGemma 2](https://huggingface.co/google/embeddinggemma-2) (Google DeepMind) |
+| Count and find objects | [RT-DETR v2](https://huggingface.co/PekingU/rtdetr_v2_r50vd) |
+| Understand questions, describe photos (optional) | Gemma 4 E2B through Ollama |
+| Outline an object | [SAM](https://huggingface.co/facebook/sam-vit-base) (Meta) |
+| Remove it | [LaMa](https://github.com/advimman/lama) |
+| Replace it, make new images | [Stable Diffusion 1.5 inpainting](https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-inpainting) + LCM-LoRA |
+
+> Text→image search: Hit@1 0.90 and nDCG@10 0.92 on 20 human-labelled queries. Counting: 0.96 precision on 300 COCO photos.
+> Removal: the object was gone in 92 of 100 COCO photos. Details in [Evaluation](#evaluation), [`docs/ask.md`](docs/ask.md) and [`docs/edit.md`](docs/edit.md).
+
+## Run from source (macOS on Apple silicon; Linux expected to work but untested)
 
 Requirements: Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+ (to build the UI once), and FFmpeg (`brew install ffmpeg`).
 The first setup downloads about 1.6 GB of model weights. After that, MediaIndex runs offline.
@@ -30,10 +61,9 @@ uv run python -m mediaindex                     # open http://127.0.0.1:8765
 In the app, click **+ Add folder** → **Choose folder…** (or paste a path). Indexing runs in the background with progress, a time
 estimate and cancel. You can search as soon as items are indexed. Tick **Watch for changes** to re-index a folder automatically.
 
-### Mac app (double-click)
-`scripts/build_mac_app.sh` builds `dist-app/MediaIndex.app` (about 813 MB, Apple silicon). Open it like any app: no Terminal needed
-afterwards. On first launch it asks before downloading the model once. It is unsigned, so on other Macs open it with right-click → Open.
-Details, including watched folders, low-priority indexing and Finder tags on exports: [`docs/desktop-app.md`](docs/desktop-app.md).
+### Build the Mac app yourself
+`scripts/build_mac_app.sh` builds `dist-app/MediaIndex.app` and the release zip (Apple silicon, FFmpeg included, model weights
+downloaded on first launch). Details: [`docs/desktop-app.md`](docs/desktop-app.md).
 
 ### Ask: chat with your photos
 The **Ask** tab answers questions like "how many dogs do I have?", "show me a city street at night", "which of those have cars?" and

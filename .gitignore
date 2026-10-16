@@ -34,6 +34,7 @@ data/
 *.mov
 *.mkv
 !docs/assets/*.png
+!docs/assets/*.gif
 
 # Model caches / weights
 .cache/

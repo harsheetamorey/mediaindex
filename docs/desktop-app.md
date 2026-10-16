@@ -2,7 +2,7 @@
 
 ## MediaIndex.app (double-click, macOS on Apple silicon)
 ```bash
-scripts/build_mac_app.sh        # → dist-app/MediaIndex.app (about 813 MB; model weights not included)
+scripts/build_mac_app.sh        # → dist-app/MediaIndex.app and MediaIndex-<version>-macos-arm64.zip (model weights not included)
 open dist-app/MediaIndex.app    # or double-click it in Finder; drag it to /Applications to keep it
 ```
 - **What it is:** the same local server, started inside the app and shown in a native window (pywebview, WebKit).
@@ -11,12 +11,14 @@ open dist-app/MediaIndex.app    # or double-click it in Finder; drag it to /Appl
 - **Your data:** stored in `~/Library/Application Support/MediaIndex` (database, thumbnails). Your media stays where it is.
 - **Opening:** the window appears at once with "Starting MediaIndex…", and the app loads behind it (about 2–3 s on an M1).
 - **First launch:** if the models aren't in the local Hugging Face cache, the window explains and asks before downloading them
-  once: EmbeddingGemma for search and the object detector for Ask, about 1.6 GB, at pinned revisions. After that the app runs
-  offline. The Ask tab's optional chat model needs Ollama (see [`ask.md`](ask.md)).
-- **FFmpeg:** needed for sounds and video, but not for images. Apps opened from Finder don't see Homebrew's folder, so the app adds
-  `/opt/homebrew/bin` and `/usr/local/bin` itself. Install FFmpeg with `brew install ffmpeg`.
-- **Not signed or notarized.** It runs on the Mac that built it. Copied to another Mac, it must be opened with right-click → Open,
-  or signed with a Developer ID first.
+  once, at pinned revisions: EmbeddingGemma for search and the object detector for Ask (about 1.6 GB), and, unless unticked,
+  the photo editing models SAM, LaMa and Stable Diffusion 1.5 inpainting with LCM-LoRA (about 2.7 GB more). Editing can be
+  added later with **Models → Download photo editing models…** in the menu bar. After that the app runs offline. The Ask
+  tab's optional chat model needs Ollama (see [`ask.md`](ask.md)).
+- **FFmpeg:** included in the app (static FFmpeg 9.0.2 for arm64 by [Martin Riedl](https://ffmpeg.martin-riedl.de), GPL-3.0,
+  pinned by checksum in the build script). It runs as a separate program; its licence is in `Contents/Resources/ffmpeg_bin`.
+- **Not signed or notarized** (ad-hoc signature only). On another Mac, open it the first time with right-click → Open, or on
+  macOS 15 with System Settings → Privacy & Security → Open Anyway. Signing with a Developer ID and notarizing removes that step.
 - **Self-test:** `MEDIAINDEX_DESKTOP_SELFTEST="a dog" dist-app/MediaIndex.app/Contents/MacOS/MediaIndex` waits for the window to load
   the UI, then:
   - runs one real search;
