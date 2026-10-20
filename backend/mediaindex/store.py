@@ -17,6 +17,7 @@ INDEXED = "indexed"
 PENDING = "pending"
 FAILED = "failed"
 MISSING = "missing"
+BROWSABLE = (INDEXED, PENDING)  # dates, places and thumbnails are ready before the search vectors are
 
 
 def new_id() -> str:
@@ -313,9 +314,10 @@ class Store:
 
     @staticmethod
     def _scope(library_ids: list[str] | None, when: PhotoFilter | None = None,
-               media: tuple[str, ...] = ("image",)) -> tuple[str, list]:
-        sql, params = (f"a.media_type IN ({','.join('?' * len(media))}) AND a.status='indexed' "
-                       "AND a.live_photo IS NULL", list(media))  # a Live Photo's video comes with its photo
+               media: tuple[str, ...] = ("image",), statuses: tuple[str, ...] = (INDEXED,)) -> tuple[str, list]:
+        sql = (f"a.media_type IN ({','.join('?' * len(media))}) AND a.status IN ({','.join('?' * len(statuses))}) "
+               "AND a.live_photo IS NULL")  # a Live Photo's video comes with its photo
+        params = [*media, *statuses]
         if library_ids:
             sql += f" AND a.library_id IN ({','.join('?' * len(library_ids))})"
             params += list(library_ids)
@@ -452,20 +454,20 @@ class Store:
     def filtered_photos(self, library_ids: list[str] | None, when: PhotoFilter,
                         media: tuple[str, ...] = ("image",)) -> list[str]:
         """Indexed photos (and videos, if asked) matching `when`, oldest first (undated ones last)."""
-        where, params = self._scope(library_ids, when, media)
+        where, params = self._scope(library_ids, when, media, BROWSABLE)
         return [r["id"] for r in self.db.query(f"""SELECT a.id FROM assets a WHERE {where}
                                                    ORDER BY a.taken_at IS NULL, a.taken_at, a.rel_path""", params)]
 
     def photo_meta_gaps(self, library_ids: list[str] | None = None, media: tuple[str, ...] = ("image",)) -> dict:
         """How many indexed photos (or videos) have no date, and no place."""
-        where, params = self._scope(library_ids, media=media)
+        where, params = self._scope(library_ids, media=media, statuses=BROWSABLE)
         r = self.db.one(f"""SELECT COUNT(*) AS photos, SUM(a.taken_at IS NULL) AS undated,
                             SUM(a.place IS NULL) AS unplaced FROM assets a WHERE {where}""", params)
         return {"photos": r["photos"], "undated": r["undated"] or 0, "unplaced": r["unplaced"] or 0}
 
     def taken_months(self, library_ids: list[str] | None = None) -> tuple[list[dict], int]:
-        """[{"month": "2024-07", "count": n}, …] newest first, for indexed photos and videos, and how many have no date."""
-        where, params = self._scope(library_ids, media=("image", "video"))
+        """[{"month": "2024-07", "count": n}, …] newest first, for photos and videos, and how many have no date."""
+        where, params = self._scope(library_ids, media=("image", "video"), statuses=BROWSABLE)
         rows = self.db.query(f"""SELECT substr(a.taken_at, 1, 7) AS month, COUNT(*) AS n FROM assets a WHERE {where}
                                  GROUP BY month ORDER BY month IS NULL, month DESC""", params)
         months = [{"month": r["month"], "count": r["n"]} for r in rows if r["month"]]
@@ -476,15 +478,15 @@ class Store:
 
     def place_points(self, library_ids: list[str] | None = None) -> list[dict]:
         """One map point per stored place: where its photos and videos were taken (average position) and how many."""
-        where, params = self._scope(library_ids, media=("image", "video"))
+        where, params = self._scope(library_ids, media=("image", "video"), statuses=BROWSABLE)
         rows = self.db.query(f"""SELECT a.place, AVG(a.gps_lat) AS lat, AVG(a.gps_lon) AS lon, COUNT(*) AS n FROM assets a
                                  WHERE {where} AND a.place IS NOT NULL AND a.gps_lat IS NOT NULL
                                  GROUP BY a.place ORDER BY n DESC""", params)
         return [{"place": r["place"], "lat": round(r["lat"], 4), "lon": round(r["lon"], 4), "count": r["n"]} for r in rows]
 
     def place_counts(self, library_ids: list[str] | None = None) -> dict[str, int]:
-        """Stored place name ("Calangute, Goa, India") -> indexed photos and videos taken there."""
-        where, params = self._scope(library_ids, media=("image", "video"))
+        """Stored place name ("Calangute, Goa, India") -> photos and videos taken there."""
+        where, params = self._scope(library_ids, media=("image", "video"), statuses=BROWSABLE)
         return {r["place"]: r["n"] for r in self.db.query(f"SELECT a.place, COUNT(*) AS n FROM assets a WHERE {where} "
                                                           "AND a.place IS NOT NULL GROUP BY a.place", params)}
 
