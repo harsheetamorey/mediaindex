@@ -314,7 +314,8 @@ class Store:
     @staticmethod
     def _scope(library_ids: list[str] | None, when: PhotoFilter | None = None,
                media: tuple[str, ...] = ("image",)) -> tuple[str, list]:
-        sql, params = f"a.media_type IN ({','.join('?' * len(media))}) AND a.status='indexed'", list(media)
+        sql, params = (f"a.media_type IN ({','.join('?' * len(media))}) AND a.status='indexed' "
+                       "AND a.live_photo IS NULL", list(media))  # a Live Photo's video comes with its photo
         if library_ids:
             sql += f" AND a.library_id IN ({','.join('?' * len(library_ids))})"
             params += list(library_ids)
@@ -413,6 +414,25 @@ class Store:
                 a[1] += n
         return [{"label": k, "photos": v[0], "objects": v[1]}
                 for k, v in sorted(agg.items(), key=lambda kv: (-kv[1][0], kv[0]))]
+
+    # ---- Live Photos ------------------------------------------------------------------
+    def set_live_photo(self, asset_id: str, photo_rel: str | None) -> None:
+        """Mark a video as the Live Photo part of the photo at `photo_rel` (no search vectors of its own: it is shown
+        with the photo), or None to make it a normal video again (it is then indexed at the next import)."""
+        with self.db.tx() as c:
+            if photo_rel is None:
+                c.execute("UPDATE assets SET live_photo=NULL, status=? WHERE id=?", (PENDING, asset_id))
+            else:
+                c.execute("DELETE FROM embeddings WHERE asset_id=?", (asset_id,))
+                c.execute("UPDATE assets SET live_photo=?, status=?, error=NULL WHERE id=?", (photo_rel, INDEXED, asset_id))
+            lib = c.execute("SELECT library_id FROM assets WHERE id=?", (asset_id,)).fetchone()
+            if lib:
+                self.bump_generation(c, lib["library_id"])
+
+    def live_video_for(self, library_id: str, photo_rel: str) -> str | None:
+        r = self.db.one("SELECT id FROM assets WHERE library_id=? AND live_photo=? AND status != 'missing'",
+                        (library_id, photo_rel))
+        return r["id"] if r else None
 
     # ---- when and where photos were taken (EXIF) ------------------------------------
     def set_photo_meta(self, asset_id: str, taken_at: str | None, gps: tuple[float, float] | None,

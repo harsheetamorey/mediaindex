@@ -150,6 +150,12 @@ MIGRATIONS: list[str] = [
     ALTER TABLE assets ADD COLUMN photo_meta_read INTEGER NOT NULL DEFAULT 0;
     CREATE INDEX assets_taken ON assets(taken_at);
     """,
+    # v8: Live Photos: the short video an iPhone saves next to a photo (IMG_1234.HEIC + IMG_1234.MOV) points to that
+    # photo's rel_path, and is shown with the photo instead of as a separate result
+    """
+    ALTER TABLE assets ADD COLUMN live_photo TEXT;
+    CREATE INDEX assets_live ON assets(library_id, live_photo);
+    """,
 ]
 
 

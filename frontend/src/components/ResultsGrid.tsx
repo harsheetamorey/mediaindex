@@ -98,6 +98,7 @@ export default function ResultsGrid(props: Props) {
             </button>
           )}
           {r.asset.media_type === 'video' && <span className="cell-video" aria-hidden="true">▶ video</span>}
+          {r.asset.live_video_url && <span className="cell-video" title="Live Photo: open it to play">LIVE</span>}
           {r.start_s != null && (
             <span className="cell-span">
               {fmtSpan(r.start_s, r.end_s)}
