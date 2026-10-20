@@ -362,7 +362,20 @@ def serve_check(out: str) -> None:
     Path(out).write_text(json.dumps(result, indent=2))
 
 
+def _console_or_log() -> None:
+    """A windowed Windows app has no console: sys.stdout is None, and the web server's logging fails on it. Send
+    output to <data>/mediaindex.log instead (also handy for support)."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    folder = Path(os.environ.get("MEDIAINDEX_DATA_DIR") or APP_SUPPORT)
+    folder.mkdir(parents=True, exist_ok=True)
+    log = open(folder / "mediaindex.log", "a", encoding="utf-8", buffering=1)
+    sys.stdout = sys.stdout or log
+    sys.stderr = sys.stderr or log
+
+
 def main() -> None:
+    _console_or_log()
     if "--serve-check" in sys.argv:
         out = sys.argv[sys.argv.index("--serve-check") + 1]
         try:
