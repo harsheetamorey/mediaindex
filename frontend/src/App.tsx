@@ -525,7 +525,7 @@ export default function App() {
 
         <main className="main">
           {view === 'ask' ? (
-            <AskView libraryIds={libraryIds} />
+            <AskView libraryIds={libraryIds} onSaved={refreshSelections} />
           ) : view === 'selection' && activeSel ? (
             <section className="results">
               <SelectionView

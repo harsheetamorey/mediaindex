@@ -109,7 +109,7 @@ function EditView({ edit, source }: { edit: EditInfo; source?: Asset }) {
 const SUGGESTIONS = ['How many dogs do I have?', 'Show me a city street at night', 'Which of those have cars?', "What's in my library?"]
 const SHOWN = 24
 
-export default function AskView({ libraryIds }: { libraryIds: string[] | null }) {
+export default function AskView({ libraryIds, onSaved }: { libraryIds: string[] | null; onSaved?: () => void }) {
   const [status, setStatus] = useState<AskStatus | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [text, setText] = useState('')
@@ -160,6 +160,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
     setBusy(true)
     try {
       const r = await api.ask(q, history, libs, asset?.id)
+      if (r.action === 'save') onSaved?.() // "save these as Goa trip": show the new selection on the left
       const via = r.described_by === 'chat model' || r.routed_by === 'chat model' || (r.action === 'chat' && r.chat_model.available)
       setMessages((ms) => [
         ...ms,

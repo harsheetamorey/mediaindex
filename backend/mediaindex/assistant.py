@@ -13,6 +13,7 @@
   the original is never changed. The edit itself runs as a background job (api_ask.py).
 - "Make an image of a red bicycle"  -> a new, made-up image from the local image model (creative.py), labelled as such
 - "Make a video of those" / "turn my beach photos into a reel" -> a slideshow video of exactly those photos (slideshow.py)
+- "Save these as Goa trip"   -> the photos of the last answer go into that selection (made if needed), ready to export
 - anything else              -> the local chat model replies, given only facts from the library
 
 Numbers always come from the database, never from the chat model: factual answers are fixed sentences, and a free
@@ -200,6 +201,13 @@ COLOURS = ("white black red blue green yellow orange purple pink brown grey gray
 VEHICLES = {"car", "truck", "bus"}
 VEHICLE_WORDS = re.compile(r"\b(car|cars|van|vans|minivan|suv|jeep|truck|trucks|lorry|lorries|pickup|pick-up|bus|buses|"
                            r"taxi|cab|coach|limo|limousine|sedan|hatchback|wagon|ambulance|camper)\b", re.I)
+# "save these as Goa trip", "put those in my Goa album", "add them to a selection called Beach": explicit words only
+SAVE_RE = re.compile(r"^\s*(?:please\s+|can you\s+|could you\s+)*(?:save|put|add|collect|store|copy)\s+"
+                     r"(?:all\s+(?:of\s+)?)?(?:these|those|them|it|this|that|this one|that one|everything|the photos|"
+                     r"these photos|those photos|the pictures|these pictures|those pictures)\b"
+                     r"(?:\s+(?:as|to|into|in|under|for)\s+(?P<name>.+?))?\s*[.!]?\s*$", re.I)
+SAVE_NAME_JUNK = re.compile(r"^(?:(?:a|an|the|my|our|new|selection|album|collection|folder|list|called|named)\s+)+|"
+                            r"\s+(?:selection|album|collection|folder|list)$", re.I)
 CHAT_RE = re.compile(r"^\s*(hi|hello|hey|thanks|thank you|help|who are you|what can you do)\b", re.I)
 
 
@@ -305,6 +313,8 @@ def rule_plan(message: str, has_previous: bool, has_focus: bool | None = None) -
     m = message.strip()
     if (has_previous if has_focus is None else has_focus) and EXPLAIN_RE.search(m) and not COUNT_RE.search(m):
         return Plan("explain", _strip(m))  # "why did you say it's a dog?", "that's not a cat", "where is the dog?"
+    if (has_previous if has_focus is None else has_focus) and (sv := SAVE_RE.match(m)):
+        return Plan("save", SAVE_NAME_JUNK.sub("", (sv.group("name") or "").strip(" \"'“”‘’")).strip(" \"'“”‘’"))
     if (c := create_plan(m)) is not None:  # "make an image of…", "make a video of those"
         return c
     e = edit_plan(m)  # only ever routed by these rules, never by the chat model: edits must be asked for in words
@@ -820,6 +830,24 @@ class Assistant:
             if (r := REDO_WITH_RE.match(part) or REDO_RE.match(part)):
                 return clean_new(r.group("new"))
         return ""
+
+    def _save(self, plan, message, history, library_ids, use_chat, asset_id):
+        """Put the photos the conversation is about into a selection (made if needed); nothing is copied or moved."""
+        from .selections import add_item, create_selection, list_selections
+
+        ids = self._focus(history)
+        asked = next((t.text for t in reversed(history) if t.role == "user"), "")
+        name = plan.subject or (asked.strip(" ?.!")[:60] or "Saved from Ask")
+        name = name[:1].upper() + name[1:]
+        existing = next((s for s in list_selections(self.store) if s["name"].lower() == name.lower()), None)
+        sel = existing or create_selection(self.store, name)
+        added = sum(add_item(self.store, sel["id"], aid, {"mode": "ask", "text": asked})["added"] for aid in ids)
+        n, had = len(ids), len(ids) - added
+        what = f"{n} {'photo' if n == 1 else 'photos'}" if not had else \
+            f"{added} new {'photo' if added == 1 else 'photos'} ({had} {'was' if had == 1 else 'were'} already in it)"
+        return {"answer": f"Saved {what} to “{sel['name']}”. It's under Selections on the left, ready to export; "
+                          f"your files stay where they are.", "asset_ids": ids,
+                "facts": {"selection": sel["id"], "name": sel["name"], "added": added, "already": had}}
 
     def _generate(self, plan, message, history, library_ids, use_chat, asset_id):
         """A new image from words; made up by the image model, so the answer says it isn't one of your photos."""
