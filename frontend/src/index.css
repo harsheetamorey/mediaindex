@@ -194,6 +194,9 @@ button { font: inherit; }
 .section { margin-bottom: 18px; }
 .section-title { font-size: 15px; margin: 6px 0 8px; }
 
+.detail-photo { position: relative; }
+.detail-photo video { max-width: 100%; max-height: 80vh; display: block; }
+.live-btn { position: absolute; left: 10px; top: 10px; }
 .cell-video { position: absolute; left: 8px; top: 8px; font-size: 11px; background: rgba(0,0,0,0.6); color: #fff; padding: 1px 7px; border-radius: 8px; }
 .video-moment { width: 100%; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: #111; color: #eee; max-height: 88vh; overflow-y: auto; }
 .video-moment video { width: 100%; max-height: 52vh; background: #000; border-radius: 6px; }

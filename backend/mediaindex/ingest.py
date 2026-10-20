@@ -66,6 +66,7 @@ class ImportSummary:
     audio_segments: int = 0
     video_files: int = 0
     video_windows: int = 0
+    live_photos: int = 0  # short videos shown with their photo (iPhone Live Photos)
     reused_vectors: int = 0
     failed: list[tuple[str, str]] = field(default_factory=list)
     skipped: list[tuple[str, str]] = field(default_factory=list)
@@ -139,6 +140,8 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
     provenance = load_provenance(root)
     seen: set[str] = set()
     batch: list[PendingImage] = []
+    photos_by_stem = {(str(Path(r).parent), Path(r).stem.lower()): r for _, r in files
+                      if Path(r).suffix.lower() in IMAGE_EXTENSIONS}  # for Live Photos: IMG_1.HEIC + IMG_1.MOV
 
     def flush():
         if not batch or embed_batch is None:
@@ -171,7 +174,7 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
                 before = s.unchanged
                 if path.suffix.lower() in VIDEO_EXTENSIONS:
                     _import_video(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_video, has_vectors,
-                                  provenance)
+                                  provenance, photos_by_stem.get((str(Path(rel).parent), Path(rel).stem.lower())))
                 else:
                     _import_audio(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_audio, has_vectors,
                                   provenance)
@@ -316,9 +319,22 @@ def window_thumb_path(thumbs_dir: Path, content_hash: str, start: float) -> Path
     return thumbs_dir / content_hash[:2] / f"{content_hash}-w{start:.3f}.jpg"
 
 
+LIVE_PHOTO_MAX_S = 5.0  # an iPhone Live Photo's video is about 3 s
+
+
 def _import_video(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Path, rel: str, st, ex, s: ImportSummary,
-                  embed_video: EmbedVideo | None, has_vectors, provenance: dict) -> None:
+                  embed_video: EmbedVideo | None, has_vectors, provenance: dict, partner: str | None = None) -> None:
     s.video_files += 1
+    same_file = bool(ex and ex["size"] == st.st_size and ex["mtime_ns"] == st.st_mtime_ns and ex["content_hash"])
+    if same_file and ex["status"] != FAILED:
+        live = partner if partner and (ex["duration"] or 0) <= LIVE_PHOTO_MAX_S else None
+        if ex["live_photo"] != live:  # the photo next to it appeared or went away
+            store.set_live_photo(ex["id"], live)
+            ex = store.get_asset(ex["id"])
+        if live:
+            s.unchanged += 1
+            s.live_photos += 1
+            return
     if (ex and ex["size"] == st.st_size and ex["mtime_ns"] == st.st_mtime_ns and ex["content_hash"]
             and (ex["status"] == FAILED or (thumb_path(thumbs_dir, ex["content_hash"]).exists()
                                             and ex["status"] in (INDEXED, PENDING if embed_video is None else INDEXED)
@@ -354,6 +370,10 @@ def _import_video(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Pa
         s.changed += 1
     else:
         s.unchanged += 1
+    if partner and info.duration <= LIVE_PHOTO_MAX_S:  # shown with its photo; no search vectors of its own
+        store.set_live_photo(aid, partner)
+        s.live_photos += 1
+        return
     if embed_video is not None and (changed or not has_vectors(aid, "video-visual")):
         try:
             r = embed_video(PendingVideo(aid, h, path, info, rel), ctx)

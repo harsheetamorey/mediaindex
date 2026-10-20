@@ -36,6 +36,8 @@ export type Asset = {
   file_url: string
   taken_at?: string | null // EXIF date taken, camera-local time
   place?: string | null // named offline from EXIF GPS
+  live_video_url?: string // an iPhone Live Photo: its few seconds of video
+  live_photo?: string | null // on that video: the photo it belongs to
 }
 
 /** Photos and videos taken between these days (YYYY-MM-DD, both included) and in this place; '' = any. */

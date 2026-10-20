@@ -31,6 +31,25 @@ function fmtBytes(n: number | null) {
   return `${v.toFixed(i ? 1 : 0)} ${u[i]}`
 }
 
+/** The photo; for an iPhone Live Photo, a button plays its few seconds of video in place. */
+function Photo({ asset: a }: { asset: Result['asset'] }) {
+  const [live, setLive] = useState(false)
+  return (
+    <div className="detail-photo">
+      {live ? (
+        <video src={a.live_video_url} poster={a.file_url} autoPlay playsInline controls onEnded={() => setLive(false)} />
+      ) : (
+        <img src={a.file_url} alt={a.rel_path} />
+      )}
+      {a.live_video_url && (
+        <button className="btn small live-btn" onClick={() => setLive(!live)}>
+          {live ? 'Photo' : '▶ Live'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 /** EXIF time is the camera's local time with no zone: show it as written, not converted. */
 function fmtTaken(iso: string): string {
   const [d, t] = iso.split('T')
@@ -57,7 +76,7 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
       <div className="detail" onClick={(e) => e.stopPropagation()}>
         <div className="detail-media">
           {a.media_type === 'image' ? (
-            <img src={a.file_url} alt={a.rel_path} />
+            <Photo key={a.id} asset={a} />
           ) : a.media_type === 'video' ? (
             <VideoMoment result={result} queryContext={queryContext} onFindSounds={onFindSounds} onFindSimilarMoments={onFindSimilarMoments} />
           ) : (

@@ -246,6 +246,9 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
         out["source"] = meta.get("source")
         out["thumbnail_url"] = f"/api/assets/{a['id']}/thumbnail"
         out["file_url"] = f"/api/assets/{a['id']}/file"
+        if a["media_type"] == "image" and (live := store.live_video_for(a["library_id"], a["rel_path"])):
+            out["live_video_url"] = f"/api/assets/{live}/file"  # an iPhone Live Photo: its few seconds of video
+        out["live_photo"] = a.get("live_photo")
         return out
 
     def _asset_path(asset_id: str) -> tuple[dict, Path]:
