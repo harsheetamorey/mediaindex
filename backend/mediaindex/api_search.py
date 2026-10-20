@@ -15,7 +15,7 @@ from .media.images import IMAGE_EXTENSIONS, ImageRejected, load_image
 from .uploads import temp_upload
 from .model.backend import CapabilityUnavailable, ResourceError
 from .model.host import ModelBusy
-from .lookalikes import LEVELS, group_lookalikes
+from .lookalikes import LEVELS, best_shot, group_lookalikes, sharpness
 from .photofilter import PhotoFilter
 from .places import place_levels, places_within
 from .search import MatrixCache, rank
@@ -603,10 +603,14 @@ def register_lookalikes(app: FastAPI) -> None:
             if len(results) + len(members) > max(2, min(limit, 5000)):
                 break
             assets = [a for aid in members if (a := store.get_asset(aid)) is not None]
-            info.append({"group": g, "size": len(assets),
+            sharp = {a["id"]: _thumb_sharpness(app, a) for a in assets}
+            best = best_shot([(a["id"], sharp[a["id"]], (a["width"] or 0) * (a["height"] or 0)) for a in assets])
+            info.append({"group": g, "size": len(assets), "best": best,
                          "identical": len({a["content_hash"] for a in assets}) == 1})
+            assets.sort(key=lambda a: a["id"] != best)  # the suggested keeper first
             results += [{"rank": len(results) + 1, "similarity": None, "modality": "image", "start_s": None,
-                         "end_s": None, "asset": app.state.public_asset(a), "other_segments": [], "group": g}
+                         "end_s": None, "asset": app.state.public_asset(a), "other_segments": [], "group": g,
+                         "sharpness": round(sharp[a["id"]], 1), "best": a["id"] == best}
                         for a in assets]
         return {"mode": "lookalikes", "media_types": ["image"], "grouping": "single",
                 "query": {"level": level, "threshold": LEVELS[level], "groups": len(groups),
@@ -616,6 +620,19 @@ def register_lookalikes(app: FastAPI) -> None:
                 "index_state": index_state(store, app.state.profile.key, libs, ["image"]),
                 "note": "photos whose image vectors are very close (cosine similarity, not confidence); review only, "
                         "nothing is deleted"}
+
+
+def _thumb_sharpness(app: FastAPI, a: dict) -> float:
+    """Sharpness of the stored thumbnail (fast; same size for every photo, so comparable within a group)."""
+    from PIL import Image
+
+    from .ingest import thumb_path
+
+    try:
+        with Image.open(thumb_path(app.state.settings.thumbs_dir, a["content_hash"])) as im:
+            return sharpness(im)
+    except (OSError, TypeError):
+        return 0.0
 
 
 def register_modes(app: FastAPI) -> None:

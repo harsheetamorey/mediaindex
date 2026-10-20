@@ -161,6 +161,28 @@ export default function App() {
     [activeSel, response, selections, refreshSelections],
   )
 
+  /** Look-alikes: put the shots not suggested as keepers into one selection, to review (and delete, if you choose,
+   * in your own file manager). MediaIndex never deletes. */
+  const REVIEW = 'Look-alikes to review'
+  const addOthersToReview = useCallback(
+    async (items: Result[]) => {
+      try {
+        const sel = selections.find((s) => s.name === REVIEW) ?? (await api.createSelection(REVIEW))
+        let added = 0
+        for (const r of items) {
+          const res = await api.addToSelection(sel.id, r.asset.id, { mode: 'lookalikes', group: r.group ?? null }, null, null)
+          if (res.added) added++
+          if (sel.id === activeSel) setAddedKeys((s) => new Set(s).add(resultKey(r)))
+        }
+        setToast(`Added ${added} ${added === 1 ? 'photo' : 'photos'} to “${REVIEW}”`)
+        refreshSelections()
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : String(e))
+      }
+    },
+    [selections, activeSel, refreshSelections],
+  )
+
   const refreshLibraries = useCallback(async () => {
     try {
       setLibraries(await api.libraries())
@@ -606,6 +628,15 @@ export default function App() {
                 {st && (st.state === 'empty' || st.state === 'not_indexed') && (
                   <div className="banner warn">Nothing is indexed in this selection yet. Import a folder first.</div>
                 )}
+                {lookalikes && lookalikes.length > 0 && (
+                  <p className="muted small">
+                    ★ marks the sharpest shot in each group (then the biggest). MediaIndex never deletes:{' '}
+                    <button type="button" className="btn small" onClick={() => addOthersToReview(results.filter((r) => !r.best))}>
+                      Add all the others to “{REVIEW}”
+                    </button>{' '}
+                    to look through them, then remove what you don't want in your own file manager.
+                  </p>
+                )}
                 {lookalikes && lookalikes.length === 0 && (
                   <p className="muted small">No look-alikes found at this level. Try “similar” for a looser match.</p>
                 )}
@@ -633,6 +664,11 @@ export default function App() {
                     {(grouped || objectCheck || lookGroups) && (
                       <h2 className="section-title">
                         {sec.label} <span className="muted small">({sec.items.length})</span>
+                        {lookGroups && (
+                          <button type="button" className="btn small" onClick={() => addOthersToReview(sec.items.filter((r) => !r.best))}>
+                            Add the others to “{REVIEW}”
+                          </button>
+                        )}
                       </h2>
                     )}
                     {grouped && sec.items.length === 0 && <p className="muted small">No indexed {sec.label.toLowerCase()} in this selection.</p>}
