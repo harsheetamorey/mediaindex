@@ -241,6 +241,7 @@ export default function App() {
   const [places, setPlaces] = useState<PlaceOption[]>([])
   const libKey = libraryIds?.join(',') ?? ''
   const indexedTotal = libraries.reduce((n, l) => n + l.indexed_count, 0)
+  const assetTotal = libraries.reduce((n, l) => n + l.asset_count, 0) // dates and places arrive before indexing
   const [timeline, setTimeline] = useState<{ months: TimelineMonth[]; undated: number }>({ months: [], undated: 0 })
   const [mapPoints, setMapPoints] = useState<{ points: MapPoint[]; unplaced: number }>({ points: [], unplaced: 0 })
   const [showMap, setShowMap] = useState(false)
@@ -249,7 +250,7 @@ export default function App() {
     api.places(libs).then(setPlaces).catch(() => setPlaces([]))
     api.placePoints(libs).then(setMapPoints).catch(() => setMapPoints({ points: [], unplaced: 0 }))
     api.timeline(libs).then(setTimeline).catch(() => setTimeline({ months: [], undated: 0 }))
-  }, [libKey, indexedTotal])
+  }, [libKey, indexedTotal, assetTotal])
 
   const runSearch = useCallback(async () => {
     const seq = ++searchSeq.current

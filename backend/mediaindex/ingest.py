@@ -1,5 +1,8 @@
 """Folder import pipeline for images: discover -> validate -> hash -> thumbnail -> (embed).
 
+Two passes: first every file's thumbnail, date and place (seconds for thousands of photos, so browsing by date, the
+map and the library view fill in at once), then the slow part, the search vectors, in the same order.
+
 Originals are only ever opened for reading. Re-import is idempotent: unchanged files
 (same size, mtime and an existing record) are skipped, changed content is re-processed under
 the same asset ID, and files that disappeared are marked 'missing' (never deleted).
@@ -15,7 +18,8 @@ from PIL import Image
 
 from .jobs import JobContext
 from .media.audio import AUDIO_EXTENSIONS, AudioInfo, AudioRejected, probe_audio, write_waveform
-from .media.images import IMAGE_EXTENSIONS, ImageRejected, probe_image, read_photo_meta, sha256_file, write_thumbnail
+from .media.images import (IMAGE_EXTENSIONS, ImageRejected, load_image, probe_image, read_photo_meta, sha256_file,
+                           write_thumbnail)
 from .media.video import VIDEO_EXTENSIONS, VideoInfo, VideoRejected, frame_at, probe_video
 from .paths import PathRejected, resolve_in_root, walk_files
 from .places import place_name
@@ -140,6 +144,8 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
     provenance = load_provenance(root)
     seen: set[str] = set()
     batch: list[PendingImage] = []
+    later: list[Callable[[], None]] = []  # pass 2: search vectors for sounds and videos, in file order
+    images_later: list[tuple[str, str, Path, str]] = []  # pass 2: (asset id, hash, path, rel) of photos to embed
     photos_by_stem = {(str(Path(r).parent), Path(r).stem.lower()): r for _, r in files
                       if Path(r).suffix.lower() in IMAGE_EXTENSIONS}  # for Live Photos: IMG_1.HEIC + IMG_1.MOV
 
@@ -174,10 +180,11 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
                 before = s.unchanged
                 if path.suffix.lower() in VIDEO_EXTENSIONS:
                     _import_video(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_video, has_vectors,
-                                  provenance, photos_by_stem.get((str(Path(rel).parent), Path(rel).stem.lower())))
+                                  provenance, photos_by_stem.get((str(Path(rel).parent), Path(rel).stem.lower())),
+                                  later)
                 else:
                     _import_audio(ctx, store, thumbs_dir, library_id, path, rel, st, ex, s, embed_audio, has_vectors,
-                                  provenance)
+                                  provenance, later)
                 ctx.progress(i + 1, message=f"processed {rel}", work=s.unchanged == before)
                 continue
             done_status = INDEXED if embed_batch else PENDING
@@ -218,11 +225,28 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
             else:
                 s.unchanged += 1
             if embed_batch is not None and (changed or not has_vectors(aid)):
-                batch.append(PendingImage(aid, h, im, rel))
-                if len(batch) >= batch_size:
-                    flush()
-            ctx.progress(i + 1, message=f"processed {rel}")
+                images_later.append((aid, h, path, rel))
+            ctx.progress(i + 1, message=f"read {rel}")
+        # pass 2: the search vectors (the slow part)
+        done, total = len(files), len(files) + len(images_later) + len(later)
+        ctx.progress(done, total, "indexing for search")
+        for aid, h, path, rel in images_later:
+            ctx.check_cancelled()
+            try:
+                batch.append(PendingImage(aid, h, load_image(path), rel))
+            except (ImageRejected, OSError) as e:
+                store.set_asset_status(aid, FAILED, str(e))
+                s.failed.append((rel, str(e)))
+            if len(batch) >= batch_size:
+                flush()
+            done += 1
+            ctx.progress(done, message=f"indexed {rel}")
         flush()
+        for step in later:
+            ctx.check_cancelled()
+            step()
+            done += 1
+            ctx.progress(done, message="indexed sounds and videos")
     except Exception as e:
         from .jobs import JobCancelled
 
@@ -273,7 +297,7 @@ def read_missing_photo_meta(ctx: JobContext, store: Store) -> dict:
 
 
 def _import_audio(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Path, rel: str, st, ex, s: ImportSummary,
-                  embed_audio: EmbedAudio | None, has_vectors, provenance: dict) -> None:
+                  embed_audio: EmbedAudio | None, has_vectors, provenance: dict, later: list) -> None:
     s.audio_files += 1
     if (ex and ex["size"] == st.st_size and ex["mtime_ns"] == st.st_mtime_ns and ex["content_hash"]
             and (ex["status"] == FAILED or (thumb_path(thumbs_dir, ex["content_hash"]).exists()
@@ -304,15 +328,18 @@ def _import_audio(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Pa
     else:
         s.unchanged += 1
     if embed_audio is not None and (changed or not has_vectors(aid, "audio")):
-        try:
-            r = embed_audio(PendingAudio(aid, h, path, info, rel), ctx)
-        except AudioRejected as e:
-            store.set_asset_status(aid, FAILED, str(e))
-            s.failed.append((rel, str(e)))
-            return
-        s.embedded += r.get("embedded", 0)
-        s.reused_vectors += r.get("reused", 0)
-        s.audio_segments += r.get("segments", 0)
+        def step() -> None:
+            try:
+                r = embed_audio(PendingAudio(aid, h, path, info, rel), ctx)
+            except AudioRejected as e:
+                store.set_asset_status(aid, FAILED, str(e))
+                s.failed.append((rel, str(e)))
+                return
+            s.embedded += r.get("embedded", 0)
+            s.reused_vectors += r.get("reused", 0)
+            s.audio_segments += r.get("segments", 0)
+
+        later.append(step)
 
 
 def window_thumb_path(thumbs_dir: Path, content_hash: str, start: float) -> Path:
@@ -323,7 +350,8 @@ LIVE_PHOTO_MAX_S = 5.0  # an iPhone Live Photo's video is about 3 s
 
 
 def _import_video(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Path, rel: str, st, ex, s: ImportSummary,
-                  embed_video: EmbedVideo | None, has_vectors, provenance: dict, partner: str | None = None) -> None:
+                  embed_video: EmbedVideo | None, has_vectors, provenance: dict, partner: str | None = None,
+                  later: list | None = None) -> None:
     s.video_files += 1
     same_file = bool(ex and ex["size"] == st.st_size and ex["mtime_ns"] == st.st_mtime_ns and ex["content_hash"])
     if same_file and ex["status"] != FAILED:
@@ -375,12 +403,18 @@ def _import_video(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Pa
         s.live_photos += 1
         return
     if embed_video is not None and (changed or not has_vectors(aid, "video-visual")):
-        try:
-            r = embed_video(PendingVideo(aid, h, path, info, rel), ctx)
-        except (VideoRejected, AudioRejected) as e:
-            store.set_asset_status(aid, FAILED, str(e))
-            s.failed.append((rel, str(e)))
-            return
-        s.embedded += r.get("embedded", 0)
-        s.reused_vectors += r.get("reused", 0)
-        s.video_windows += r.get("windows", 0)
+        def step() -> None:
+            try:
+                r = embed_video(PendingVideo(aid, h, path, info, rel), ctx)
+            except (VideoRejected, AudioRejected) as e:
+                store.set_asset_status(aid, FAILED, str(e))
+                s.failed.append((rel, str(e)))
+                return
+            s.embedded += r.get("embedded", 0)
+            s.reused_vectors += r.get("reused", 0)
+            s.video_windows += r.get("windows", 0)
+
+        if later is None:
+            step()
+        else:
+            later.append(step)

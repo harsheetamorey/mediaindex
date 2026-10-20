@@ -60,7 +60,8 @@ and loads the search model once to check it works. Running it again only fills i
 photo editing models (about 0.55 GB, plus 2.1 GB of Stable Diffusion after `uv sync --extra create`). For a deeper model
 check on your own photos, `scripts/model_smoke.py` is still there.
 
-In the app, click **+ Add folder** → **Choose folder…** (or paste a path). Indexing runs in the background with progress, a time
+In the app, click **+ Add folder** → **Choose folder…** (or paste a path). Thumbnails, dates and places are read first, in
+seconds (60 photos: 1.5 s), so browsing by date and the map work right away. Search indexing then runs in the background with progress, a time
 estimate and cancel. You can search as soon as items are indexed. Tick **Watch for changes** to re-index a folder automatically.
 
 ### Windows (run from source)

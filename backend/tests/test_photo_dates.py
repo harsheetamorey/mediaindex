@@ -282,3 +282,29 @@ def test_places_map_points_and_items(trip):
     r = c.get("/api/places/items", params={"place": "India"}).json()
     assert r["mode"] == "place" and [x["asset"]["rel_path"] for x in r["results"]] == ["goa-dog.jpg", "goa-cat.jpg"]
     assert c.get("/api/places/items", params={"place": "Atlantis"}).json()["results"] == []
+
+
+def test_dates_places_and_thumbnails_come_before_search_indexing(tmp_path):
+    from mediaindex.ingest import run_image_import, thumb_path
+    from mediaindex.jobs import Job, JobContext
+
+    root = tmp_path / "Trip"
+    for k in range(6):
+        photo(root / f"IMG_{k}.jpg", (40 * k, 0, 0), f"2024:07:1{k} 10:00:00", GOA)
+    st = Store(Database(tmp_path / "db.sqlite3"))
+    lib = st.create_library("t", root)
+    seen = []
+
+    def embed_batch(items):
+        if not seen:  # the first search vectors: everything else must already be browsable
+            assets = st.list_assets(lib["id"])
+            seen.append((len(assets), all(a["taken_at"] and a["place"] for a in assets),
+                         all(thumb_path(tmp_path / "thumbs", a["content_hash"]).exists() for a in assets),
+                         sum(m["count"] for m in st.taken_months()[0]), len(st.place_points())))
+        for it in items:
+            st.set_asset_status(it.asset_id, "indexed")
+        return {"embedded": len(items)}
+
+    r = run_image_import(JobContext(Job(id="j", kind="import"), None), st, tmp_path / "thumbs", lib["id"], embed_batch,
+                         batch_size=2)
+    assert r["embedded"] == 6 and seen == [(6, True, True, 6, 1)]
