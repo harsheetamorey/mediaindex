@@ -1,6 +1,6 @@
 # Third-party data
 
-MediaIndex does not bundle any third-party media in this repository. The only bundled third-party data is the place list below. Optional demo data is downloaded on request
+MediaIndex does not bundle any third-party media in this repository. The only bundled third-party data is the place list and the map outline below. Optional demo data is downloaded on request
 to `data/demo/`, which is git-ignored.
 
 ## Bundled place names: GeoNames cities15000
@@ -9,6 +9,11 @@ to `data/demo/`, which is git-ignored.
   **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/). Changes: only name, region, country, position and
   population are kept, sections of cities and historical places are removed, and positions are rounded to 4 decimals
   (`scripts/build_places.py`). It is used only to name photo GPS positions on this computer.
+
+## Bundled map outline: Natural Earth
+- `frontend/src/lib/worldLand.ts` is the Natural Earth 1:110m land outline (v5.1.2, https://www.naturalearthdata.com),
+  **public domain**, turned into one SVG path by `scripts/build_world_map.py`. It draws the offline places map; no map
+  tiles are fetched.
 
 ## Optional demo image pack: KoalaAI/StockImages-CC0
 - Source: https://huggingface.co/datasets/KoalaAI/StockImages-CC0, pinned revision `206f3575579f1187548c6f47042ae9174c0a51fc`.

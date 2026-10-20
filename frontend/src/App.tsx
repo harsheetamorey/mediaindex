@@ -13,6 +13,7 @@ import {
   type Target,
   type PlaceOption,
   type TimelineMonth,
+  type MapPoint,
   type LookalikeLevel,
   type Taken,
 } from './api'
@@ -20,6 +21,7 @@ import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
 import ResultsGrid, { resultKey } from './components/ResultsGrid'
 import SearchBar, { type Reference } from './components/SearchBar'
+import PlacesMap from './components/PlacesMap'
 import Timeline from './components/Timeline'
 import { monthLabel } from './lib/time'
 import { isFocusShortcut } from './lib/shortcut'
@@ -218,9 +220,12 @@ export default function App() {
   const libKey = libraryIds?.join(',') ?? ''
   const indexedTotal = libraries.reduce((n, l) => n + l.indexed_count, 0)
   const [timeline, setTimeline] = useState<{ months: TimelineMonth[]; undated: number }>({ months: [], undated: 0 })
+  const [mapPoints, setMapPoints] = useState<{ points: MapPoint[]; unplaced: number }>({ points: [], unplaced: 0 })
+  const [showMap, setShowMap] = useState(false)
   useEffect(() => {
     const libs = libKey ? libKey.split(',') : null
     api.places(libs).then(setPlaces).catch(() => setPlaces([]))
+    api.placePoints(libs).then(setMapPoints).catch(() => setMapPoints({ points: [], unplaced: 0 }))
     api.timeline(libs).then(setTimeline).catch(() => setTimeline({ months: [], undated: 0 }))
   }, [libKey, indexedTotal])
 
@@ -289,7 +294,9 @@ export default function App() {
     (level: LookalikeLevel) => browse(() => api.lookalikes(level, libraryIds)),
     [browse, libraryIds],
   )
+  const browsePlace = useCallback((place: string) => browse(() => api.placeItems(place, libraryIds)), [browse, libraryIds])
   const browsing = response?.mode === 'timeline' ? String(response.query.month) : null
+  const browsingPlace = response?.mode === 'place' ? String(response.query.place) : null
   const lookalikes = response?.mode === 'lookalikes' ? (response.lookalike_groups ?? []) : null
 
   const results = useMemo(() => {
@@ -548,7 +555,15 @@ export default function App() {
                 <option value="loose">similar</option>
               </select>
               <span className="muted">Burst shots and copies, grouped for you to review. Nothing is deleted.</span>
+              {mapPoints.points.length > 0 && (
+                <button type="button" className={showMap ? 'chip on' : 'chip'} aria-pressed={showMap} onClick={() => setShowMap(!showMap)}>
+                  Map of places
+                </button>
+              )}
             </div>
+          )}
+          {showMap && mapPoints.points.length > 0 && (
+            <PlacesMap points={mapPoints.points} unplaced={mapPoints.unplaced} levels={places} active={browsingPlace} onPick={browsePlace} />
           )}
 
           <section className="results" aria-busy={searching}>
@@ -568,14 +583,14 @@ export default function App() {
               <>
                 <div className="results-head small">
                   <span>
-                    {browsing
-                      ? `${monthLabel(browsing)}: ${results.length} ${results.length === 1 ? 'photo or video' : 'photos and videos'}, oldest first`
+                    {browsing || browsingPlace
+                      ? `${browsing ? monthLabel(browsing) : browsingPlace}: ${results.length} ${results.length === 1 ? 'photo or video' : 'photos and videos'}, oldest first`
                       : lookalikes
                         ? `${lookalikes.length} ${lookalikes.length === 1 ? 'group' : 'groups'} of look-alike photos (${results.length} photos)`
                         : `${results.length} closest matches`}
                     {selected.size ? ` in ${selected.size} selected ${selected.size === 1 ? 'library' : 'libraries'}` : ''}
                   </span>
-                  {showScores && !browsing && !lookalikes && (
+                  {showScores && !browsing && !browsingPlace && !lookalikes && (
                     <span className="muted">
                       {response.mode} · query {response.timing_ms.query_embedding.toFixed(0)} ms · ranking{' '}
                       {response.timing_ms.ranking.toFixed(1)} ms · {response.candidates_searched} candidates
@@ -594,7 +609,7 @@ export default function App() {
                 {lookalikes && lookalikes.length === 0 && (
                   <p className="muted small">No look-alikes found at this level. Try “similar” for a looser match.</p>
                 )}
-                {results.length > 0 && !browsing && !lookalikes && (
+                {results.length > 0 && !browsing && !browsingPlace && !lookalikes && (
                   <p className="muted small">
                     {objectCheck
                       ? `Photos where the object detector found ${objectCheck.name} come first; each part is ranked by similarity.`

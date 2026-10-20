@@ -550,19 +550,40 @@ def register_timeline(app: FastAPI) -> None:
             raise HTTPException(422, "month must look like 2024-07")
         start = date(int(m.group(1)), int(m.group(2)), 1)
         end = date(start.year + start.month // 12, start.month % 12 + 1, 1)
+        return _listing(app, "timeline", _parse_libs(library_ids), PhotoFilter([(start.isoformat(), end.isoformat())]),
+                        {"month": month}, limit, "photos and videos taken this month (EXIF and video metadata), "
+                                                 "oldest first; not a search")
+
+    @app.get("/api/places/points")
+    def place_points(library_ids: str | None = None) -> dict:
+        """Map dots: each place where indexed photos and videos were taken, and how many have no place."""
         libs = _parse_libs(library_ids)
         store = app.state.store
-        ids = store.filtered_photos(libs, PhotoFilter([(start.isoformat(), end.isoformat())]), ("image", "video"))
-        results = []
-        for aid in ids[:max(1, min(limit, 2000))]:
-            a = store.get_asset(aid)
-            results.append({"rank": len(results) + 1, "similarity": None, "modality": a["media_type"], "start_s": None,
-                            "end_s": None, "asset": app.state.public_asset(a), "other_segments": []})
-        return {"mode": "timeline", "media_types": ["image", "video"], "grouping": "single",
-                "query": {"month": month, "items": len(ids)}, "profile_key": app.state.profile.key, "results": results,
-                "candidates_searched": len(ids), "timing_ms": {"query_embedding": 0, "ranking": 0},
-                "index_state": index_state(store, app.state.profile.key, libs, ["image", "video"]),
-                "note": "photos and videos taken this month (EXIF and video metadata), oldest first; not a search"}
+        return {"points": store.place_points(libs),
+                "unplaced": store.photo_meta_gaps(libs, ("image", "video"))["unplaced"]}
+
+    @app.get("/api/places/items")
+    def place_items(place: str, library_ids: str | None = None, limit: int = 500) -> dict:
+        """The photos and videos taken in a town, region or country (a name from /api/places), oldest first."""
+        libs = _parse_libs(library_ids)
+        within = places_within(place.strip(), app.state.store.known_places(libs)) or [place]
+        return _listing(app, "place", libs, PhotoFilter(places=within), {"place": place.strip()}, limit,
+                        "photos and videos taken here (named offline from GPS), oldest first; not a search")
+
+
+def _listing(app: FastAPI, mode: str, libs, when: PhotoFilter, query: dict, limit: int, note: str) -> dict:
+    """Items matching `when`, oldest first, in the shape of a search result (similarity None: not a search)."""
+    store = app.state.store
+    ids = store.filtered_photos(libs, when, ("image", "video"))
+    results = []
+    for aid in ids[:max(1, min(limit, 2000))]:
+        a = store.get_asset(aid)
+        results.append({"rank": len(results) + 1, "similarity": None, "modality": a["media_type"], "start_s": None,
+                        "end_s": None, "asset": app.state.public_asset(a), "other_segments": []})
+    return {"mode": mode, "media_types": ["image", "video"], "grouping": "single",
+            "query": {**query, "items": len(ids)}, "profile_key": app.state.profile.key, "results": results,
+            "candidates_searched": len(ids), "timing_ms": {"query_embedding": 0, "ranking": 0},
+            "index_state": index_state(store, app.state.profile.key, libs, ["image", "video"]), "note": note}
 
 
 def register_lookalikes(app: FastAPI) -> None:

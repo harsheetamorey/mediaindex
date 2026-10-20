@@ -454,6 +454,14 @@ class Store:
     def known_places(self, library_ids: list[str] | None = None) -> list[str]:
         return list(self.place_counts(library_ids))
 
+    def place_points(self, library_ids: list[str] | None = None) -> list[dict]:
+        """One map point per stored place: where its photos and videos were taken (average position) and how many."""
+        where, params = self._scope(library_ids, media=("image", "video"))
+        rows = self.db.query(f"""SELECT a.place, AVG(a.gps_lat) AS lat, AVG(a.gps_lon) AS lon, COUNT(*) AS n FROM assets a
+                                 WHERE {where} AND a.place IS NOT NULL AND a.gps_lat IS NOT NULL
+                                 GROUP BY a.place ORDER BY n DESC""", params)
+        return [{"place": r["place"], "lat": round(r["lat"], 4), "lon": round(r["lon"], 4), "count": r["n"]} for r in rows]
+
     def place_counts(self, library_ids: list[str] | None = None) -> dict[str, int]:
         """Stored place name ("Calangute, Goa, India") -> indexed photos and videos taken there."""
         where, params = self._scope(library_ids, media=("image", "video"))

@@ -270,3 +270,15 @@ def test_ask_search_shows_video_moments_in_their_own_row(tmp_path):
         assert m["start_s"] is not None and "window-thumbnail" in m["thumbnail_url"]
         assert c.get(m["thumbnail_url"]).status_code == 200 and "closest video moment" in r["answer"]
         assert ask(c, "how many dogs?")["video_moments"] == []  # only searches show them
+
+
+def test_places_map_points_and_items(trip):
+    c, *_ = trip
+    m = c.get("/api/places/points").json()
+    assert m["unplaced"] == 1
+    pts = {p["place"]: p for p in m["points"]}
+    assert pts["Calangute, Goa, India"]["count"] == 2 and abs(pts["Calangute, Goa, India"]["lat"] - GOA[0]) < 0.01
+    assert pts["Paris, Île-de-France, France"]["count"] == 1
+    r = c.get("/api/places/items", params={"place": "India"}).json()
+    assert r["mode"] == "place" and [x["asset"]["rel_path"] for x in r["results"]] == ["goa-dog.jpg", "goa-cat.jpg"]
+    assert c.get("/api/places/items", params={"place": "Atlantis"}).json()["results"] == []
