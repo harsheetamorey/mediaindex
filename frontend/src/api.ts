@@ -41,6 +41,8 @@ export type Asset = {
 /** Photos and videos taken between these days (YYYY-MM-DD, both included) and in this place; '' = any. */
 export type Taken = { from: string; to: string; place: string }
 
+export type MapPoint = { place: string; lat: number; lon: number; count: number }
+
 export type TimelineMonth = { month: string; count: number } // "2024-07"
 
 /** A country, region or town where indexed items were taken ("Goa, India"), with how many. */
@@ -296,6 +298,12 @@ export const api = {
     request<SearchResponse>(`/api/timeline/${month}${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   lookalikes: (level: LookalikeLevel, libraryIds: string[] | null) =>
     request<SearchResponse>(`/api/lookalikes?level=${level}${libraryIds?.length ? `&library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
+  placePoints: (libraryIds: string[] | null) =>
+    request<{ points: MapPoint[]; unplaced: number }>(`/api/places/points${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
+  placeItems: (place: string, libraryIds: string[] | null) =>
+    request<SearchResponse>(
+      `/api/places/items?place=${encodeURIComponent(place)}${libraryIds?.length ? `&library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`,
+    ),
   places: (libraryIds: string[] | null) =>
     request<PlaceOption[]>(`/api/places${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   videoWindow: (assetId: string, startS: number, target: MediaType, libraryIds: string[] | null, includeSameVideo = false) =>

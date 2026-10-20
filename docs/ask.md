@@ -117,6 +117,12 @@ and `/api/search/image-text`. The response's `query.taken` says how many items m
 items each. Picking a month lists its items oldest first in the normal results grid (not a search: no similarity).
 API: `GET /api/timeline` (months, newest first, and how many items have no date) and `GET /api/timeline/2024-07`.
 
+**Map of places** (under the search box): a world map drawn from a bundled Natural Earth outline (public domain), so it
+works offline and fetches no map tiles. Each place in your library is a dot (bigger = more items); it zooms to your
+places, with a **Whole world** button. Countries, then their regions and towns, are listed under it too. Clicking a dot
+or a name lists that place's photos and videos, oldest first. API: `GET /api/places/points` and
+`GET /api/places/items?place=Goa, India`.
+
 ## Setup
 
 1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.

@@ -96,7 +96,8 @@ The **Ask** tab answers questions like "how many dogs do I have?", "show me a ci
 - Time and place narrow any question: "beach photos from 2024", "photos from last December", "everything from Goa". Dates
   and places come from the photos' EXIF and the videos' metadata, and places are named offline from a bundled city list.
   Search has date and place filters too, and **Browse by date** (under the search box) shows a year's months; pick one to
-  see its photos and videos in order. **Find look-alikes** groups burst shots and copies for review (nothing is deleted).
+  see its photos and videos in order. **Find look-alikes** groups burst shots and copies for review (nothing is deleted). **Map of places** shows where
+  photos and videos were taken on an offline world map (Natural Earth outline, no map tiles); click a dot or a country.
 
 Nothing is uploaded. Setup, measured accuracy and limits: [`docs/ask.md`](docs/ask.md).
 
