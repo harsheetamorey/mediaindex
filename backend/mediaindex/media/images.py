@@ -1,16 +1,21 @@
-"""Image validation, orientation and thumbnails (Pillow; JPEG/PNG/WebP verified in Phase 4)."""
+"""Image validation, orientation and thumbnails (Pillow; JPEG/PNG/WebP verified in Phase 4, HEIC/HEIF via pillow-heif)."""
 
 from __future__ import annotations
 
 import hashlib
+import io
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
 from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO"}  # MPO = multi-picture JPEG from some cameras
+register_heif_opener()
+
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+BROWSER_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}  # others are shown as a JPEG copy
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP", "MPO", "HEIF"}  # MPO = multi-picture JPEG from some cameras
 MAX_FILE_BYTES = 200 * 1024 * 1024
 MAX_PIXELS = 80_000_000
 THUMB_SIZE = 384
@@ -79,6 +84,12 @@ def probe_image(path: Path) -> tuple[ImageInfo, Image.Image]:
         pass
     im = load_image(path)
     return ImageInfo(fmt, im.width, im.height, orientation), im
+
+
+def jpeg_bytes(im: Image.Image, quality: int = 90) -> bytes:
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=quality)
+    return buf.getvalue()
 
 
 def write_thumbnail(im: Image.Image, dest: Path) -> None:

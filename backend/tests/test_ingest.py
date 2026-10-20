@@ -156,3 +156,41 @@ def test_provenance_sidecar_attached_as_metadata(tmp_path):
     meta = json.loads(a["meta_json"])
     assert meta["source"]["license_declared"] == "CC0-1.0" and meta["source"]["row"] == 1
     assert meta["source"]["inspection_tags"] == "cat, sofa"
+
+
+def test_heic_import_thumbnail_and_jpeg_copy(tmp_path):
+    import io
+
+    from PIL import Image
+
+    from mediaindex.ingest import thumb_path
+
+    root = tmp_path / "iphone"
+    make_image(root / "IMG_0001.HEIC", (220, 20, 20), size=(80, 40), fmt="HEIF")
+    before = tree_digest(root)
+    st, lib, thumbs = setup(tmp_path, root)
+    r = run_image_import(Ctx(), st, thumbs, lib["id"])
+    assert r["new"] == 1 and r["failed"] == []
+    a = st.list_assets(lib["id"])[0]
+    assert a["media_type"] == "image" and (a["width"], a["height"]) == (80, 40)
+    assert thumb_path(thumbs, a["content_hash"]).is_file()
+    assert tree_digest(root) == before
+
+    app = create_app(Settings(data_dir=tmp_path / "data", precision="float32"), backend_factory=FakeBackend)
+    with TestClient(app) as c:
+        lib = c.post("/api/libraries", json={"path": str(root)}).json()
+        job = c.post(f"/api/libraries/{lib['id']}/import").json()
+        for _ in range(200):
+            if c.get(f"/api/jobs/{job['id']}").json()["status"] in ("done", "failed"):
+                break
+            time.sleep(0.02)
+        asset = c.get(f"/api/libraries/{lib['id']}/assets").json()[0]
+        assert asset["status"] == "indexed"
+        r = c.get(asset["file_url"])
+        assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+        im = Image.open(io.BytesIO(r.content))
+        assert im.format == "JPEG" and im.size == (80, 40)
+        assert im.convert("RGB").getpixel((40, 20))[0] > 150
+        hits = c.post("/api/search/text", json={"text": "red"}).json()["results"]
+        assert [h["asset"]["id"] for h in hits] == [asset["id"]]
+    assert tree_digest(root) == before

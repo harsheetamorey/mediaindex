@@ -12,7 +12,7 @@ datas += [(str(FFMPEG / "LICENSE-ffmpeg.txt"), "ffmpeg_bin")]
 hiddenimports = ["mediaindex.desktop", "webview.platforms.cocoa"]
 for pkg in ("mediaindex", "sentence_transformers", "transformers", "tokenizers", "safetensors", "huggingface_hub",
             "torchvision", "torchcodec", "webview", "uvicorn", "fastapi", "starlette", "multipart", "soundfile",
-            "_soundfile_data", "diffusers", "peft"):
+            "_soundfile_data", "diffusers", "peft", "pillow_heif"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b

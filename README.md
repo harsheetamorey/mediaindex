@@ -105,7 +105,7 @@ Results are nearest neighbours by cosine similarity, so the closest items are **
 Scores are hidden by default and are never shown as percentages. Searching several media types at once groups results by type, because similarity
 scales are not comparable across types.
 
-**Supported formats:** JPEG, PNG and WebP images; WAV, FLAC and MP3 audio; MP4 video (H.264 tested). Audio is indexed in 10 s windows (5 s stride).
+**Supported formats:** JPEG, PNG, WebP and HEIC/HEIF (iPhone) images; WAV, FLAC and MP3 audio; MP4 video (H.264 tested). Audio is indexed in 10 s windows (5 s stride).
 Video is indexed in 8 s windows (4 s stride) of frames sampled at 1 frame/s plus the window's soundtrack. Timestamps are only as precise as these windows.
 
 **Creator outputs:** persistent ordered selections, a JSON manifest (source paths, hashes, source and licence records, how each item was found),

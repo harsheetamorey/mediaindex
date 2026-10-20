@@ -18,6 +18,7 @@ dependencies = [
     # Media / numerics
     "numpy==2.5.3",
     "pillow==12.3.0",
+    "pillow-heif==1.8.1",
     "soundfile==0.14.0",
 ]
 
