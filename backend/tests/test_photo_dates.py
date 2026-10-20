@@ -98,11 +98,11 @@ def test_search_date_range(trip):
     c, root, lib = trip
     r = c.post("/api/search/text", json={"text": "a photo", "date_from": "2024-01-01", "date_to": "2024-12-31"}).json()
     assert sorted(x["asset"]["rel_path"] for x in r["results"]) == ["goa-cat.jpg", "goa-dog.jpg"]
-    assert r["query"]["dates"]["photos"] == 2 and r["query"]["dates"]["undated_photos"] == 1
+    assert r["query"]["taken"]["photos"] == 2 and r["query"]["taken"]["undated_photos"] == 1
     r = c.post("/api/search/text", json={"text": "a photo", "date_to": "2023-12-02"}).json()
     assert [x["asset"]["rel_path"] for x in r["results"]] == ["paris-dog.jpg"]  # the end day is included
     r = c.post("/api/search/text", json={"text": "a photo"}).json()
-    assert len(r["results"]) == 4 and "dates" not in r["query"]
+    assert len(r["results"]) == 4 and "taken" not in r["query"]
     assert c.post("/api/search/text", json={"text": "x", "date_from": "2025-01-02", "date_to": "2025-01-01"}).status_code == 422
     assert c.post("/api/search/text", json={"text": "x", "date_from": "last year"}).status_code == 422
     paris = by_name(c, lib)["paris-dog.jpg"]["id"]
@@ -218,3 +218,21 @@ def test_videos_get_dates_and_places_too(tmp_path):
         assert r["answer"].startswith("1 photo and 1 video from July 2024, oldest first.")
     assert video_date({"creation_time": "1904-01-01T00:00:00.000000Z"}) is None  # the container's zero date
     assert video_date({"creation_time": "2024-07-14T12:33:22.000000Z"})[:4] == "2024"  # UTC, shown in local time
+
+
+def test_search_by_place(trip):
+    c, root, lib = trip
+    levels = c.get("/api/places").json()
+    assert [(p["name"], p["count"], p["depth"]) for p in levels] == [
+        ("France", 1, 0), ("Île-de-France, France", 1, 1), ("Paris, Île-de-France, France", 1, 2),
+        ("India", 2, 0), ("Goa, India", 2, 1), ("Calangute, Goa, India", 2, 2)]
+    r = c.post("/api/search/text", json={"text": "a photo", "place": "Goa, India"}).json()
+    assert sorted(x["asset"]["rel_path"] for x in r["results"]) == ["goa-cat.jpg", "goa-dog.jpg"]
+    assert r["query"]["taken"]["unplaced_photos"] == 1 and r["query"]["taken"]["undated_photos"] == 0
+    r = c.post("/api/search/text", json={"text": "a photo", "place": "India", "date_from": "2024-12-01"}).json()
+    assert [x["asset"]["rel_path"] for x in r["results"]] == ["goa-cat.jpg"]
+    assert c.post("/api/search/text", json={"text": "a photo", "place": "Lisbon"}).json()["results"] == []
+    assert c.post("/api/search/text", json={"text": "a photo", "place": "India, Goa"}).json()["results"] == []
+    paris = by_name(c, lib)["paris-dog.jpg"]["id"]
+    r = c.post("/api/search/image", data={"asset_id": paris, "place": "France", "include_identical": "true"}).json()
+    assert [x["asset"]["rel_path"] for x in r["results"]] == ["paris-dog.jpg"]

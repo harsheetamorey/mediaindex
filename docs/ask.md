@@ -99,9 +99,11 @@ never match a place; the answer says how many ("12 photos have no date, so they 
 camera's clock, with no time zone. Photos imported before this was added are read once, in the background, when the app
 starts (only the file header is read).
 
-The **Search** tab has the same filter as two date fields ("Taken from … to …"). It applies to photos and videos; sounds
-are left out while it is set. API: `date_from` / `date_to` (`YYYY-MM-DD`, both days included) on
-`/api/search/text`, `/api/search/image` and `/api/search/image-text`.
+The **Search** tab has the same filters: two date fields ("Taken from … to …") and a place list ("in: India › Goa ›
+Calangute"), filled from the places in your library with how many items each. They apply to photos and videos; sounds
+are left out while one is set. API: `date_from` / `date_to` (`YYYY-MM-DD`, both days included) and `place` (a name
+from `GET /api/places`, e.g. `Goa, India`, which includes every town in it) on `/api/search/text`, `/api/search/image`
+and `/api/search/image-text`. The response's `query.taken` says how many items matched and how many have no date or place.
 
 ## Setup
 

@@ -95,7 +95,7 @@ The **Ask** tab answers questions like "how many dogs do I have?", "show me a ci
 - An optional local chat model (Gemma 4 E2B through Ollama) understands free-form questions and describes photos.
 - Time and place narrow any question: "beach photos from 2024", "photos from last December", "everything from Goa". Dates
   and places come from the photos' EXIF and the videos' metadata, and places are named offline from a bundled city list.
-  Search has a date filter too.
+  Search has date and place filters too.
 
 Nothing is uploaded. Setup, measured accuracy and limits: [`docs/ask.md`](docs/ask.md).
 

@@ -11,7 +11,8 @@ import {
   type SearchResponse,
   type Selection,
   type Target,
-  type DateRange,
+  type PlaceOption,
+  type Taken,
 } from './api'
 import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
@@ -208,7 +209,13 @@ export default function App() {
   }, [activeIds, refreshLibraries])
 
   const libraryIds = selected.size ? Array.from(selected) : null
-  const [dates, setDates] = useState<DateRange>({ from: '', to: '' })
+  const [taken, setTaken] = useState<Taken>({ from: '', to: '', place: '' })
+  const [places, setPlaces] = useState<PlaceOption[]>([])
+  const libKey = libraryIds?.join(',') ?? ''
+  const indexedTotal = libraries.reduce((n, l) => n + l.indexed_count, 0)
+  useEffect(() => {
+    api.places(libKey ? libKey.split(',') : null).then(setPlaces).catch(() => setPlaces([]))
+  }, [libKey, indexedTotal])
 
   const runSearch = useCallback(async () => {
     const seq = ++searchSeq.current
@@ -217,7 +224,7 @@ export default function App() {
     try {
       player.stop()
       const single: MediaType = target === 'all' ? (reference?.media ?? 'image') : target
-      const when = target !== 'audio' ? dates : undefined // photos and videos have a date taken; sounds don't
+      const when = target !== 'audio' ? taken : undefined // photos and videos have a date and place; sounds don't
       const r = reference
         ? reference.media === 'audio'
           ? await api.searchAudioReference(
@@ -247,7 +254,7 @@ export default function App() {
     } finally {
       if (seq === searchSeq.current) setSearching(false)
     }
-  }, [reference, text, libraryIds, includeIdentical, target, player, globalRank, dates])
+  }, [reference, text, libraryIds, includeIdentical, target, player, globalRank, taken])
 
   const results = useMemo(() => {
     const rs = response?.results ?? []
@@ -264,11 +271,17 @@ export default function App() {
           Object.values(rawState as Record<string, IndexState>)[0])
         : undefined
   const grouped = response?.grouping === 'by_modality'
-  const dq = response?.query.dates as { from: string | null; to: string | null; photos: number; undated_photos: number } | undefined
+  const dq = response?.query.taken as
+    | { from: string | null; to: string | null; place: string | null; photos: number; undated_photos: number; unplaced_photos: number }
+    | undefined
+  const missing = (n: number, what: string) => (n ? ` ${n} ${n === 1 ? 'item has' : 'items have'} no ${what} and ${n === 1 ? 'is' : 'are'} left out.` : '')
   const dateNote = dq
-    ? `Only photos and videos taken ${dq.from && dq.to ? `from ${dq.from} to ${dq.to}` : dq.from ? `on or after ${dq.from}` : `on or before ${dq.to}`} ` +
-      `(${dq.photos} ${dq.photos === 1 ? 'item' : 'items'}).` +
-      (dq.undated_photos ? ` ${dq.undated_photos} ${dq.undated_photos === 1 ? 'item has' : 'items have'} no date and ${dq.undated_photos === 1 ? 'is' : 'are'} left out.` : '')
+    ? 'Only photos and videos taken' +
+      (dq.from && dq.to ? ` from ${dq.from} to ${dq.to}` : dq.from ? ` on or after ${dq.from}` : dq.to ? ` on or before ${dq.to}` : '') +
+      (dq.place ? ` in ${dq.place}` : '') +
+      ` (${dq.photos} ${dq.photos === 1 ? 'item' : 'items'}).` +
+      missing(dq.undated_photos, 'date') +
+      missing(dq.unplaced_photos, 'place')
     : null
   const objectCheck = response?.object_check
   const sections: { label: string; offset: number; items: Result[] }[] = grouped
@@ -468,8 +481,9 @@ export default function App() {
             modes={modes}
             onSearch={runSearch}
             searching={searching}
-            dates={dates}
-            onDates={setDates}
+            taken={taken}
+            onTaken={setTaken}
+            places={places}
           />
 
           <section className="results" aria-busy={searching}>

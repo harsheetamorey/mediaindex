@@ -38,8 +38,11 @@ export type Asset = {
   place?: string | null // named offline from EXIF GPS
 }
 
-/** Photos taken between these days (YYYY-MM-DD, both included); '' = open-ended. */
-export type DateRange = { from: string; to: string }
+/** Photos and videos taken between these days (YYYY-MM-DD, both included) and in this place; '' = any. */
+export type Taken = { from: string; to: string; place: string }
+
+/** A country, region or town where indexed items were taken ("Goa, India"), with how many. */
+export type PlaceOption = { name: string; count: number; depth: number }
 
 export type Segment = { start_s: number | null; end_s: number | null; similarity: number; window_thumbnail_url?: string }
 
@@ -270,11 +273,16 @@ export const api = {
   assetPath: (id: string) => request<{ path: string }>(`/api/assets/${id}/path`),
   reveal: (id: string) => request<{ revealed: boolean }>(`/api/assets/${id}/reveal`, { method: 'POST' }),
 
-  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48, globalRank = false, dates?: DateRange) =>
+  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48, globalRank = false, taken?: Taken) =>
     request<SearchResponse>(
       '/api/search/text',
-      json({ text, library_ids: libraryIds, media_types: mediaTypes, limit, global_rank: globalRank, date_from: dates?.from || null, date_to: dates?.to || null }),
+      json({
+        text, library_ids: libraryIds, media_types: mediaTypes, limit, global_rank: globalRank,
+        date_from: taken?.from || null, date_to: taken?.to || null, place: taken?.place || null,
+      }),
     ),
+  places: (libraryIds: string[] | null) =>
+    request<PlaceOption[]>(`/api/places${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   videoWindow: (assetId: string, startS: number, target: MediaType, libraryIds: string[] | null, includeSameVideo = false) =>
     request<SearchResponse>(
       '/api/search/video-window',
@@ -315,13 +323,14 @@ export const api = {
     includeIdentical: boolean,
     target: MediaType = 'image',
     limit = 48,
-    dates?: DateRange,
+    taken?: Taken,
   ) => {
     const form = new FormData()
     if (ref.file) form.append('file', ref.file)
     if (ref.assetId) form.append('asset_id', ref.assetId)
-    if (dates?.from) form.append('date_from', dates.from)
-    if (dates?.to) form.append('date_to', dates.to)
+    if (taken?.from) form.append('date_from', taken.from)
+    if (taken?.to) form.append('date_to', taken.to)
+    if (taken?.place) form.append('place', taken.place)
     form.append('target', target)
     if (libraryIds?.length) form.append('library_ids', libraryIds.join(','))
     form.append('limit', String(limit))
