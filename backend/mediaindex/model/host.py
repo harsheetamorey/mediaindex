@@ -63,11 +63,25 @@ class ModelHost:
         return self._backend.capabilities() if self._backend else None
 
     def memory(self) -> dict:
-        import resource
         import sys
 
-        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-        out = {"process_peak_rss_mb": round(peak / (1024 * 1024 if sys.platform == "darwin" else 1024), 1)}
+        try:
+            import resource
+
+            peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            out = {"process_peak_rss_mb": round(peak / (1024 * 1024 if sys.platform == "darwin" else 1024), 1)}
+        except ImportError:  # Windows
+            out = {}
+            try:
+                import psutil
+
+                out["process_peak_rss_mb"] = round(psutil.Process().memory_info().peak_wset / 2**20, 1)
+            except (ImportError, AttributeError):
+                pass
+        if getattr(self._backend, "device", None) == "cuda":
+            import torch
+
+            out["cuda_allocated_mb"] = round(torch.cuda.memory_allocated() / 2**20, 1)
         if getattr(self._backend, "device", None) == "mps":
             import torch
 

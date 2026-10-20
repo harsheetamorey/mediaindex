@@ -14,6 +14,7 @@ import threading
 from pathlib import Path
 from typing import Callable, Protocol
 
+from .config import free_device_memory
 from .jobs import JobContext
 from .media.images import ImageRejected, load_image
 from .paths import PathRejected, resolve_in_root
@@ -74,8 +75,7 @@ class RTDetrDetector:
 
     def close(self) -> None:
         self.model = None
-        if self.device == "mps":
-            self._torch.mps.empty_cache()
+        free_device_memory(self._torch, self.device)
 
 
 class DetectorHost:

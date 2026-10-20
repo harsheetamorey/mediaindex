@@ -43,7 +43,7 @@ For free-form chat and photo descriptions in Ask, also install [Ollama](https://
 > Text→image search: Hit@1 0.90 and nDCG@10 0.92 on 20 human-labelled queries. Counting: 0.96 precision on 300 COCO photos.
 > Removal: the object was gone in 92 of 100 COCO photos. Details in [Evaluation](#evaluation), [`docs/ask.md`](docs/ask.md) and [`docs/edit.md`](docs/edit.md).
 
-## Run from source (macOS on Apple silicon; Linux expected to work but untested)
+## Run from source (macOS on Apple silicon; Windows: see below; Linux expected to work but untested)
 
 Requirements: Python 3.12 with [uv](https://docs.astral.sh/uv/), Node 20+ (to build the UI once), and FFmpeg (`brew install ffmpeg`).
 The first setup downloads about 1.6 GB of model weights. After that, MediaIndex runs offline.
@@ -60,6 +60,31 @@ uv run python -m mediaindex                     # open http://127.0.0.1:8765
 
 In the app, click **+ Add folder** → **Choose folder…** (or paste a path). Indexing runs in the background with progress, a time
 estimate and cancel. You can search as soon as items are indexed. Tick **Watch for changes** to re-index a folder automatically.
+
+### Windows (run from source)
+The same steps work in **PowerShell** on Windows 10/11 (x64). Install [uv](https://docs.astral.sh/uv/), Node 20+, Git and FFmpeg
+(`winget install Gyan.FFmpeg`, then open a new terminal so `ffmpeg` is on PATH). Environment variables are set differently:
+
+```powershell
+git clone https://github.com/harsheetamorey/mediaindex.git; cd mediaindex
+uv sync
+cd frontend; npm ci; npm run build; cd ..
+mkdir data\samples\smoke                      # put 3+ of your own JPEGs here, then:
+$env:MEDIAINDEX_ALLOW_DOWNLOAD = "1"
+uv run python scripts/model_smoke.py --images data/samples/smoke
+uv run python -m mediaindex.detect --download
+Remove-Item Env:MEDIAINDEX_ALLOW_DOWNLOAD
+uv run python -m mediaindex                     # open http://127.0.0.1:8765
+```
+
+- **Choose folder…** opens the Windows folder picker. Pasting a path from File Explorer's **Copy as path** works too.
+- `uv sync` installs the CPU build of PyTorch. With an NVIDIA GPU, install a CUDA build of the same torch version
+  (see [pytorch.org](https://pytorch.org/get-started/locally/)). MediaIndex then picks `cuda` on its own; `MEDIAINDEX_DEVICE=cpu`
+  forces the CPU.
+- Finder tags on exported files are a macOS feature and are skipped. There is no Windows desktop app yet: open the
+  address above in your browser.
+- The unit tests run on Windows in CI. The real models haven't been checked on a Windows PC yet; please report how it goes
+  in [issue #7](https://github.com/harsheetamorey/mediaindex/issues/7).
 
 ### Build the Mac app yourself
 `scripts/build_mac_app.sh` builds `dist-app/MediaIndex.app` and the release zip (Apple silicon, FFmpeg included, model weights
@@ -147,9 +172,10 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 
 ## Known limits
 **Where it runs**
-- **Tested only on macOS 14 with an Apple M1 (8 GB).** Linux, Windows and Intel Macs are untested. The reveal-in-folder
-  command has untested Linux and Windows variants.
-- **The folder chooser and Finder tags are macOS only.** On other systems, paste the folder path.
+- **Tested only on macOS 14 with an Apple M1 (8 GB).** On Windows, the unit tests pass in CI, but the real models and
+  the UI haven't been tried on a Windows PC. Linux and Intel Macs are untested. The reveal-in-folder command has untested
+  Linux and Windows variants.
+- **The folder chooser works on macOS and Windows; Finder tags are macOS only.** On Linux, paste the folder path.
 - **The Mac app is unsigned and not notarized.** On another Mac, open it with right-click → Open.
 
 **Speed**

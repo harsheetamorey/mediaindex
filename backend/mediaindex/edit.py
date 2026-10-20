@@ -25,6 +25,8 @@ from typing import Callable, Protocol
 import numpy as np
 from PIL import Image, ImageFilter
 
+from .config import free_device_memory
+
 SAM_ID = "facebook/sam-vit-base"
 SAM_REVISION = "70c1a07f894ebb5b307fd9eaaee97b9dfc16068f"
 LAMA_REPO = "fashn-ai/LaMa"  # the original big-lama weights (advimman/lama, Apache-2.0) as TorchScript
@@ -65,8 +67,7 @@ class Filler(Protocol):
 
 
 def _empty_cache(torch, device: str) -> None:
-    if device == "mps":
-        torch.mps.empty_cache()
+    free_device_memory(torch, device)
 
 
 class SamSegmenter:

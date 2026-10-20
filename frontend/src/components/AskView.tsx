@@ -204,7 +204,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
         <div>
           <strong>Chat:</strong>{' '}
           {chat?.available ? (
-            <span>{chat.model} on this Mac</span>
+            <span>{chat.model} on this computer</span>
           ) : (
             <span className="muted" title={chat?.reason}>basic answers only ({chat?.reason ?? 'checking…'})</span>
           )}

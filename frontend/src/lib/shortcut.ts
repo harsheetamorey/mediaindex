@@ -1,6 +1,7 @@
 /** Keyboard shortcut to jump to the search or message box: ⌘K (Ctrl+K off the Mac), or / when not typing. */
 
-export const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+import { IS_MAC } from './platform'
+
 export const FOCUS_HINT = IS_MAC ? '⌘K' : 'Ctrl+K'
 
 /** True while the user is typing somewhere, so a bare "/" must be left alone. */

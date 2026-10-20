@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from .config import setup_step
+from .config import free_device_memory, setup_step
 
 SD_ID = "stable-diffusion-v1-5/stable-diffusion-inpainting"
 SD_REVISION = "8a4288a76071f7280aedbdb3253bdb9e9d5d84bb"
@@ -130,8 +130,7 @@ class Painter:
 
     def close(self) -> None:
         self.pipe = None
-        if self.device == "mps":
-            self._torch.mps.empty_cache()
+        free_device_memory(self._torch, self.device)
 
 
 def available(mode: str = "paint") -> tuple[bool, str]:

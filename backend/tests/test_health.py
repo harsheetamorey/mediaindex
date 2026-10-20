@@ -66,3 +66,21 @@ def test_allowed_origins_follow_configured_port(tmp_path):
     c = TestClient(create_app(s))
     assert c.post("/api/libraries", json={"path": str(tmp_path)}, headers={"origin": "http://127.0.0.1:8800"}).status_code == 200
     assert c.post("/api/libraries", json={"path": str(tmp_path)}, headers={"origin": "http://127.0.0.1:8765"}).status_code == 403
+
+
+def test_device_choice_and_pasted_windows_paths(tmp_path):
+    from types import SimpleNamespace
+
+    from mediaindex.config import auto_device
+    from mediaindex.paths import validate_root
+
+    def fake_torch(mps, cuda):
+        return SimpleNamespace(backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: mps)),
+                               cuda=SimpleNamespace(is_available=lambda: cuda))
+
+    assert auto_device(fake_torch(True, False)) == "mps"
+    assert auto_device(fake_torch(False, True)) == "cuda"
+    assert auto_device(fake_torch(False, False)) == "cpu"
+    (tmp_path / "pics").mkdir()
+    assert validate_root(f'"{tmp_path / "pics"}"') == (tmp_path / "pics").resolve()  # "Copy as path" adds quotes
+

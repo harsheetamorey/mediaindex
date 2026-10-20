@@ -39,6 +39,22 @@ jobs:
           npm run build
           npx oxlint src
 
+  tests-windows:
+    # Run from source on Windows (GitHub issue #7): the same mocked-model unit tests, CPU torch from PyPI.
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install FFmpeg
+        run: choco install ffmpeg -y --no-progress
+      - name: Python deps (locked)
+        run: uv sync --frozen
+      - name: Unit tests (mocked model)
+        run: uv run pytest -q
+
   real-model:
     if: github.event_name == 'workflow_dispatch' && inputs.real_model
     needs: tests

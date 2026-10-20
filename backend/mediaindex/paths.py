@@ -12,6 +12,7 @@ class PathRejected(ValueError):
 
 def validate_root(path: str) -> Path:
     """Validate a user-selected library root. Refuses '/', the home directory itself and non-directories."""
+    path = (path or "").strip().strip('"')  # Windows "Copy as path" adds quotes
     if not path or not os.path.isabs(os.path.expanduser(path)):
         raise PathRejected("library folder must be an absolute path")
     p = Path(os.path.expanduser(path)).resolve()
@@ -56,7 +57,7 @@ def walk_files(root: Path, extensions: set[str], skipped: list[tuple[str, str]] 
             if Path(name).suffix.lower() not in extensions:
                 continue
             p = Path(dirpath) / name
-            rel = str(p.relative_to(root))
+            rel = p.relative_to(root).as_posix()  # stored with "/" on every system
             if p.is_symlink():
                 target = p.resolve()
                 if not is_within(target, root):

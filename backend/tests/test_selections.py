@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -81,7 +82,7 @@ def test_missing_and_removed_status_and_manifest(env):
     man = m.json()
     assert man["format"] == "mediaindex-selection-manifest" and len(man["items"]) == 3
     first = man["items"][0]
-    assert first["source_path"].endswith("Lib A/photo one.jpg") and first["sha256"]
+    assert Path(first["source_path"]).parts[-2:] == ("Lib A", "photo one.jpg") and first["sha256"]
     assert first["query_context"] == {"mode": "text", "text": "test"}
 
 
@@ -151,7 +152,7 @@ def test_interrupted_copy_leaves_no_partials(env, monkeypatch):
 def test_copy_path_and_reveal_use_ids_only(env, monkeypatch):
     c, app, tmp, assets, *_ = env
     aid = assets["Lib A/photo one.jpg"]["id"]
-    assert c.get(f"/api/assets/{aid}/path").json()["path"].endswith("Lib A/photo one.jpg")
+    assert Path(c.get(f"/api/assets/{aid}/path").json()["path"]).parts[-2:] == ("Lib A", "photo one.jpg")
     calls = []
     import mediaindex.api_selections as api
 
