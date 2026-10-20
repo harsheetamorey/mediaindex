@@ -12,12 +12,15 @@ import {
   type Selection,
   type Target,
   type PlaceOption,
+  type TimelineMonth,
   type Taken,
 } from './api'
 import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
 import ResultsGrid, { resultKey } from './components/ResultsGrid'
 import SearchBar, { type Reference } from './components/SearchBar'
+import Timeline from './components/Timeline'
+import { monthLabel } from './lib/time'
 import { isFocusShortcut } from './lib/shortcut'
 import AskView from './components/AskView'
 import SelectionView from './components/SelectionView'
@@ -213,8 +216,11 @@ export default function App() {
   const [places, setPlaces] = useState<PlaceOption[]>([])
   const libKey = libraryIds?.join(',') ?? ''
   const indexedTotal = libraries.reduce((n, l) => n + l.indexed_count, 0)
+  const [timeline, setTimeline] = useState<{ months: TimelineMonth[]; undated: number }>({ months: [], undated: 0 })
   useEffect(() => {
-    api.places(libKey ? libKey.split(',') : null).then(setPlaces).catch(() => setPlaces([]))
+    const libs = libKey ? libKey.split(',') : null
+    api.places(libs).then(setPlaces).catch(() => setPlaces([]))
+    api.timeline(libs).then(setTimeline).catch(() => setTimeline({ months: [], undated: 0 }))
   }, [libKey, indexedTotal])
 
   const runSearch = useCallback(async () => {
@@ -255,6 +261,28 @@ export default function App() {
       if (seq === searchSeq.current) setSearching(false)
     }
   }, [reference, text, libraryIds, includeIdentical, target, player, globalRank, taken])
+
+  const browseMonth = useCallback(
+    async (month: string) => {
+      const seq = ++searchSeq.current
+      setSearching(true)
+      setSearchError(null)
+      try {
+        player.stop()
+        const r = await api.timelineMonth(month, libraryIds)
+        if (seq !== searchSeq.current) return
+        setResponse(r)
+        setFocused(0)
+        setOpen(null)
+      } catch (e) {
+        if (seq === searchSeq.current) setSearchError(e instanceof ApiError ? e.message : String(e))
+      } finally {
+        if (seq === searchSeq.current) setSearching(false)
+      }
+    },
+    [libraryIds, player],
+  )
+  const browsing = response?.mode === 'timeline' ? String(response.query.month) : null
 
   const results = useMemo(() => {
     const rs = response?.results ?? []
@@ -485,6 +513,7 @@ export default function App() {
             onTaken={setTaken}
             places={places}
           />
+          <Timeline months={timeline.months} undated={timeline.undated} active={browsing} onPick={browseMonth} />
 
           <section className="results" aria-busy={searching}>
             {searchError && <div className="banner error" role="alert">{searchError}</div>}
@@ -503,10 +532,12 @@ export default function App() {
               <>
                 <div className="results-head small">
                   <span>
-                    {results.length} closest matches
+                    {browsing
+                      ? `${monthLabel(browsing)}: ${results.length} ${results.length === 1 ? 'photo or video' : 'photos and videos'}, oldest first`
+                      : `${results.length} closest matches`}
                     {selected.size ? ` in ${selected.size} selected ${selected.size === 1 ? 'library' : 'libraries'}` : ''}
                   </span>
-                  {showScores && (
+                  {showScores && !browsing && (
                     <span className="muted">
                       {response.mode} · query {response.timing_ms.query_embedding.toFixed(0)} ms · ranking{' '}
                       {response.timing_ms.ranking.toFixed(1)} ms · {response.candidates_searched} candidates
@@ -522,7 +553,7 @@ export default function App() {
                 {st && (st.state === 'empty' || st.state === 'not_indexed') && (
                   <div className="banner warn">Nothing is indexed in this selection yet. Import a folder first.</div>
                 )}
-                {results.length > 0 && (
+                {results.length > 0 && !browsing && (
                   <p className="muted small">
                     {objectCheck
                       ? `Photos where the object detector found ${objectCheck.name} come first; each part is ranked by similarity.`

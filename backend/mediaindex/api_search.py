@@ -253,6 +253,7 @@ def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: flo
 
 
 def register(app: FastAPI) -> None:
+    register_timeline(app)
     register_reference(app)
     register_mixed(app)
     register_audio(app)
@@ -531,6 +532,35 @@ def _mark_cross(info: dict, query: str, target: str) -> None:
     info["mode_status"] = m["status"] if m else "unsupported"
     if m and m["status"] == "experimental":
         info["experimental"] = True
+
+
+def register_timeline(app: FastAPI) -> None:
+    """Browse by date: which months have photos and videos, and a month's items in the shape of a search result."""
+    @app.get("/api/timeline")
+    def timeline(library_ids: str | None = None) -> dict:
+        months, undated = app.state.store.taken_months(_parse_libs(library_ids))
+        return {"months": months, "undated": undated}
+
+    @app.get("/api/timeline/{month}")
+    def timeline_month(month: str, library_ids: str | None = None, limit: int = 500) -> dict:
+        m = re.fullmatch(r"(\d{4})-(\d{2})", month)
+        if m is None or not 1 <= int(m.group(2)) <= 12:
+            raise HTTPException(422, "month must look like 2024-07")
+        start = date(int(m.group(1)), int(m.group(2)), 1)
+        end = date(start.year + start.month // 12, start.month % 12 + 1, 1)
+        libs = _parse_libs(library_ids)
+        store = app.state.store
+        ids = store.filtered_photos(libs, PhotoFilter([(start.isoformat(), end.isoformat())]), ("image", "video"))
+        results = []
+        for aid in ids[:max(1, min(limit, 2000))]:
+            a = store.get_asset(aid)
+            results.append({"rank": len(results) + 1, "similarity": None, "modality": a["media_type"], "start_s": None,
+                            "end_s": None, "asset": app.state.public_asset(a), "other_segments": []})
+        return {"mode": "timeline", "media_types": ["image", "video"], "grouping": "single",
+                "query": {"month": month, "items": len(ids)}, "profile_key": app.state.profile.key, "results": results,
+                "candidates_searched": len(ids), "timing_ms": {"query_embedding": 0, "ranking": 0},
+                "index_state": index_state(store, app.state.profile.key, libs, ["image", "video"]),
+                "note": "photos and videos taken this month (EXIF and video metadata), oldest first; not a search"}
 
 
 def register_modes(app: FastAPI) -> None:

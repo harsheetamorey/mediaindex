@@ -105,6 +105,10 @@ are left out while one is set. API: `date_from` / `date_to` (`YYYY-MM-DD`, both 
 from `GET /api/places`, e.g. `Goa, India`, which includes every town in it) on `/api/search/text`, `/api/search/image`
 and `/api/search/image-text`. The response's `query.taken` says how many items matched and how many have no date or place.
 
+**Browse by date** (under the search box): the years that have photos or videos, then that year's months with how many
+items each. Picking a month lists its items oldest first in the normal results grid (not a search: no similarity).
+API: `GET /api/timeline` (months, newest first, and how many items have no date) and `GET /api/timeline/2024-07`.
+
 ## Setup
 
 1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.

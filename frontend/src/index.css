@@ -93,6 +93,11 @@ button { font: inherit; }
 .query-row { display: flex; gap: 8px; }
 .date-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 6px; }
 .date-row input { font-size: 12px; padding: 2px 4px; }
+.timeline { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+.timeline-years, .timeline-months { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { border: 1px solid var(--border); background: transparent; color: inherit; border-radius: 999px; padding: 2px 10px; font: inherit; cursor: pointer; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.chip.on .muted { color: inherit; opacity: 0.8; }
 .query-row input { font-size: 16px; }
 .check { display: flex; gap: 6px; align-items: center; cursor: pointer; }
 

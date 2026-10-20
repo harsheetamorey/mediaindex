@@ -41,6 +41,8 @@ export type Asset = {
 /** Photos and videos taken between these days (YYYY-MM-DD, both included) and in this place; '' = any. */
 export type Taken = { from: string; to: string; place: string }
 
+export type TimelineMonth = { month: string; count: number } // "2024-07"
+
 /** A country, region or town where indexed items were taken ("Goa, India"), with how many. */
 export type PlaceOption = { name: string; count: number; depth: number }
 
@@ -48,7 +50,7 @@ export type Segment = { start_s: number | null; end_s: number | null; similarity
 
 export type Result = {
   rank: number
-  similarity: number
+  similarity: number | null // null when browsing by date (not a search)
   modality: string
   start_s: number | null
   end_s: number | null
@@ -281,6 +283,10 @@ export const api = {
         date_from: taken?.from || null, date_to: taken?.to || null, place: taken?.place || null,
       }),
     ),
+  timeline: (libraryIds: string[] | null) =>
+    request<{ months: TimelineMonth[]; undated: number }>(`/api/timeline${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
+  timelineMonth: (month: string, libraryIds: string[] | null) =>
+    request<SearchResponse>(`/api/timeline/${month}${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   places: (libraryIds: string[] | null) =>
     request<PlaceOption[]>(`/api/places${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   videoWindow: (assetId: string, startS: number, target: MediaType, libraryIds: string[] | null, includeSameVideo = false) =>
