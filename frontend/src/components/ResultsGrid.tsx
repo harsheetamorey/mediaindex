@@ -106,7 +106,7 @@ export default function ResultsGrid(props: Props) {
           )}
           <div className="cell-label">
             <span className="name">{r.asset.rel_path.split('/').pop()}</span>
-            {showScores && <span className="score" title="Raw cosine similarity (not a probability)">{r.similarity.toFixed(3)}</span>}
+            {showScores && r.similarity != null && <span className="score" title="Raw cosine similarity (not a probability)">{r.similarity.toFixed(3)}</span>}
           </div>
         </li>
       ))}

@@ -443,6 +443,14 @@ class Store:
                             SUM(a.place IS NULL) AS unplaced FROM assets a WHERE {where}""", params)
         return {"photos": r["photos"], "undated": r["undated"] or 0, "unplaced": r["unplaced"] or 0}
 
+    def taken_months(self, library_ids: list[str] | None = None) -> tuple[list[dict], int]:
+        """[{"month": "2024-07", "count": n}, …] newest first, for indexed photos and videos, and how many have no date."""
+        where, params = self._scope(library_ids, media=("image", "video"))
+        rows = self.db.query(f"""SELECT substr(a.taken_at, 1, 7) AS month, COUNT(*) AS n FROM assets a WHERE {where}
+                                 GROUP BY month ORDER BY month IS NULL, month DESC""", params)
+        months = [{"month": r["month"], "count": r["n"]} for r in rows if r["month"]]
+        return months, sum(r["n"] for r in rows if not r["month"])
+
     def known_places(self, library_ids: list[str] | None = None) -> list[str]:
         return list(self.place_counts(library_ids))
 

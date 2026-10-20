@@ -236,3 +236,16 @@ def test_search_by_place(trip):
     paris = by_name(c, lib)["paris-dog.jpg"]["id"]
     r = c.post("/api/search/image", data={"asset_id": paris, "place": "France", "include_identical": "true"}).json()
     assert [x["asset"]["rel_path"] for x in r["results"]] == ["paris-dog.jpg"]
+
+
+def test_browse_by_month(trip):
+    c, *_ = trip
+    t = c.get("/api/timeline").json()
+    assert t == {"months": [{"month": "2024-12", "count": 1}, {"month": "2024-07", "count": 1},
+                            {"month": "2023-12", "count": 1}], "undated": 1}
+    r = c.get("/api/timeline/2024-07").json()
+    assert r["mode"] == "timeline" and [x["asset"]["rel_path"] for x in r["results"]] == ["goa-dog.jpg"]
+    assert r["results"][0]["similarity"] is None and r["query"]["items"] == 1
+    assert c.get("/api/timeline/2025-01").json()["results"] == []
+    assert c.get("/api/timeline/2024-13").status_code == 422
+    assert c.get("/api/timeline/../etc").status_code in (404, 422)

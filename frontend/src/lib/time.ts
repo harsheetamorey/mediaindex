@@ -8,3 +8,11 @@ export function fmtTime(s: number | null | undefined): string {
 export function fmtSpan(start: number | null | undefined, end: number | null | undefined): string {
   return `${fmtTime(start)}–${fmtTime(end)}`
 }
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** "2024-07" -> "July 2024" */
+export function monthLabel(month: string): string {
+  const [y, m] = month.split('-')
+  return `${MONTH_NAMES[Number(m) - 1]} ${y}`
+}

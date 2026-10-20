@@ -136,7 +136,7 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
             <dd>{fmtBytes(a.size)}</dd>
             <dt>Result rank</dt>
             <dd>#{result.rank}</dd>
-            {showScores && (
+            {showScores && result.similarity != null && (
               <>
                 <dt>Raw similarity</dt>
                 <dd>{result.similarity.toFixed(4)} <span className="muted">(cosine; not a probability)</span></dd>
