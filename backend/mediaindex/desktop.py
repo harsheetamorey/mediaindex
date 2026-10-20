@@ -318,29 +318,45 @@ def serve_check(out: str) -> None:
     """Support and CI: start the packaged app's server without a window or models, check the API and the UI answer,
     and write the result as JSON to `out` (a windowed app has no console to print to)."""
     import json
+    import shutil
+    import traceback
+
+    prepare_environment(need_download=False)  # before importing settings: it picks the port and folders
 
     import uvicorn
 
     from .app import create_app
     from .config import Settings
 
-    prepare_environment(need_download=False)
     settings = Settings()
     settings.ensure_dirs()
     server = uvicorn.Server(uvicorn.Config(create_app(settings), host=settings.host, port=settings.port, workers=1,
                                            log_level="warning"))
-    threading.Thread(target=server.run, daemon=True).start()
-    url, result = f"http://{settings.host}:{settings.port}/", {"ok": False}
+    failed: list[str] = []
+
+    def run() -> None:
+        try:
+            server.run()
+        except BaseException:  # noqa: BLE001
+            failed.append(traceback.format_exc())
+
+    threading.Thread(target=run, daemon=True).start()
+    url = f"http://{settings.host}:{settings.port}/"
+    result: dict = {"ok": False, "url": url, "data_dir": str(settings.data_dir)}
     for _ in range(600):
+        if failed:
+            result["server_error"] = failed[0]
+            break
         try:
             health = json.load(urllib.request.urlopen(url + "api/health", timeout=1))
             page = urllib.request.urlopen(url, timeout=5).read().decode()
-            ffmpeg = __import__("shutil").which("ffmpeg")
-            result = {"ok": "<div id=\"root\">" in page and bool(ffmpeg), "version": health["version"],
-                      "platform": health["platform"], "ui": "<div id=\"root\">" in page, "ffmpeg": ffmpeg,
-                      "data_dir": str(settings.data_dir)}
+            ffmpeg = shutil.which("ffmpeg")
+            ui = '<div id="root">' in page
+            result.update(ok=ui and bool(ffmpeg), version=health["version"], platform=health["platform"], ui=ui,
+                          ffmpeg=ffmpeg)
             break
-        except OSError:
+        except OSError as e:
+            result["last_error"] = repr(e)
             time.sleep(0.2)
     server.should_exit = True
     Path(out).write_text(json.dumps(result, indent=2))
