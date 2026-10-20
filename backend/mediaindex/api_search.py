@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import time
+from datetime import date, timedelta
 from typing import Literal
 
 import numpy as np
@@ -14,6 +15,7 @@ from .media.images import IMAGE_EXTENSIONS, ImageRejected, load_image
 from .uploads import temp_upload
 from .model.backend import CapabilityUnavailable, ResourceError
 from .model.host import ModelBusy
+from .photofilter import PhotoFilter
 from .search import MatrixCache, rank
 from .store import index_state
 
@@ -75,6 +77,23 @@ class TextSearchRequest(BaseModel):
     limit: int = Field(24, ge=1, le=200)
     group_segments: bool = True
     global_rank: bool = False  # experimental: one list across media types by raw cosine
+    date_from: date | None = None  # photos taken on or after this day (EXIF date); others are left out
+    date_to: date | None = None  # ... and on or before this day
+
+
+def date_filter(app: FastAPI, library_ids, date_from: date | None, date_to: date | None) -> tuple[set[str] | None, dict]:
+    """The photos taken in [date_from, date_to] (EXIF dates; photos without one never match), and a note on it."""
+    if date_from is None and date_to is None:
+        return None, {}
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(422, "date_from is after date_to")
+    end = (date_to + timedelta(days=1)).isoformat() if date_to else "9999-12-31"
+    when = PhotoFilter([(date_from.isoformat() if date_from else "0000-01-01", end)])
+    store = app.state.store
+    only = set(store.filtered_photos(library_ids, when))
+    return only, {"from": date_from.isoformat() if date_from else None, "to": date_to.isoformat() if date_to else None,
+                  "photos": len(only), "undated_photos": store.photo_meta_gaps(library_ids)["undated"],
+                  "note": "dates come from the photos' EXIF; photos without a date, sounds and videos are left out"}
 
 
 def embed_query(app: FastAPI, fn):
@@ -132,12 +151,14 @@ GLOBAL_RANK_NOTE = ("EXPERIMENTAL global ranking: images and sound windows are m
 
 def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: float, library_ids, media_types,
                limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True,
-               global_rank: bool = False, video_modality: str | None = None) -> dict:
+               global_rank: bool = False, video_modality: str | None = None,
+               only_assets: set[str] | None = None) -> dict:
     media_types = list(dict.fromkeys(media_types))
     if len(media_types) > 1:
         parts = [_search_one(app, mode=mode, query_info=query_info, vec=vec, embed_ms=embed_ms,
                              library_ids=library_ids, media_types=[t], limit=limit, exclude_assets=exclude_assets,
-                             group_segments=group_segments, video_modality=video_modality) for t in media_types]
+                             group_segments=group_segments, video_modality=video_modality, only_assets=only_assets)
+                 for t in media_types]
         out = dict(parts[0])
         out["candidates_searched"] = sum(p["candidates_searched"] for p in parts)
         out["timing_ms"] = {"query_embedding": parts[0]["timing_ms"]["query_embedding"],
@@ -158,12 +179,12 @@ def run_search(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: floa
         return out
     return _search_one(app, mode=mode, query_info=query_info, vec=vec, embed_ms=embed_ms, library_ids=library_ids,
                        media_types=media_types, limit=limit, exclude_assets=exclude_assets,
-                       group_segments=group_segments, video_modality=video_modality)
+                       group_segments=group_segments, video_modality=video_modality, only_assets=only_assets)
 
 
 def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: float, library_ids, media_types,
                 limit: int, exclude_assets: set[str] | None = None, group_segments: bool = True,
-                video_modality: str | None = None) -> dict:
+                video_modality: str | None = None, only_assets: set[str] | None = None) -> dict:
     store = app.state.store
     profile_key = app.state.profile.key
     if library_ids:
@@ -182,9 +203,9 @@ def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: flo
     vm = cache.get(profile_key, library_ids, modalities)
     segmented = any(m != "image" for m in modalities)
     if group_segments and segmented:
-        groups = group_hits(rank(vec, vm, max(limit * 12, 200), exclude_assets), limit)
+        groups = group_hits(rank(vec, vm, max(limit * 12, 200), exclude_assets, only_assets), limit)
     else:
-        groups = [{"hit": h, "others": []} for h in rank(vec, vm, limit, exclude_assets)]
+        groups = [{"hit": h, "others": []} for h in rank(vec, vm, limit, exclude_assets, only_assets)]
     rank_ms = (time.perf_counter() - t0) * 1000
     results = []
     for g in groups:
@@ -232,12 +253,15 @@ def register(app: FastAPI) -> None:
             info["searched_for"] = text
         if "video" in req.media_types:
             info["video_signal"] = req.video_signal
+        only, dates = date_filter(app, req.library_ids, req.date_from, req.date_to)
+        if dates:
+            info["dates"] = dates
         images_only = list(dict.fromkeys(req.media_types)) == ["image"]
         out = run_search(app, mode="text", query_info=info, vec=vec, embed_ms=ms,
                          library_ids=req.library_ids, media_types=req.media_types,
                          limit=max(req.limit * 4, 200) if images_only else req.limit,  # room to bring found ones up
                          group_segments=req.group_segments, global_rank=req.global_rank,
-                         video_modality=VIDEO_SIGNALS[req.video_signal])
+                         video_modality=VIDEO_SIGNALS[req.video_signal], only_assets=only)
         if images_only:
             out = object_first(app, out, text, req.library_ids, req.limit)
             out["results"] = out["results"][:req.limit]
@@ -296,7 +320,9 @@ def register_reference(app: FastAPI) -> None:
     def search_image(file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                      library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
                      include_identical: bool = Form(False),
-                     target: Literal["image", "audio", "video"] = Form("image")) -> dict:
+                     target: Literal["image", "audio", "video"] = Form("image"),
+                     date_from: date | None = Form(None), date_to: date | None = Form(None)) -> dict:
+        only, dates = date_filter(app, _parse_libs(library_ids), date_from, date_to)
         with _reference(app, file, asset_id) as (im, sha, ref_asset, info):
             stored = None
             if ref_asset is not None:
@@ -309,10 +335,12 @@ def register_reference(app: FastAPI) -> None:
                 info["embedding"] = "computed"
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
+        if dates:
+            info["dates"] = dates
         _mark_cross(info, "image", target)
         return run_search(app, mode="image" if target == "image" else f"image→{target}", query_info=info, vec=vec,
                           embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target], limit=limit,
-                          exclude_assets=excl)
+                          exclude_assets=excl, only_assets=only)
 
 
 MIXED_INTERFACE = ("single forward pass: SentenceTransformer.encode({'text': query_prompt + text, 'image': <PIL image>}); "
@@ -325,7 +353,8 @@ def register_mixed(app: FastAPI) -> None:
                           file: UploadFile | None = File(None), asset_id: str | None = Form(None),
                           library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
                           include_identical: bool = Form(False),
-                          target: Literal["image", "audio", "video"] = Form("image")) -> dict:
+                          target: Literal["image", "audio", "video"] = Form("image"),
+                          date_from: date | None = Form(None), date_to: date | None = Form(None)) -> dict:
         text = text.strip()
         if not text:
             raise HTTPException(422, "refinement text is empty; use /api/search/image for reference-only search")
@@ -347,10 +376,13 @@ def register_mixed(app: FastAPI) -> None:
         })
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
+        only, dates = date_filter(app, _parse_libs(library_ids), date_from, date_to)
+        if dates:
+            info["dates"] = dates
         _mark_cross(info, "image+text", target)
         return run_search(app, mode="image+text" if target == "image" else f"image+text→{target}", query_info=info,
                           vec=vec, embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target],
-                          limit=limit, exclude_assets=excl)
+                          limit=limit, exclude_assets=excl, only_assets=only)
 
 
 # ---- audio reference search (Phase 12) ------------------------------------------------

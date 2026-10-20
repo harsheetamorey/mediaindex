@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { MediaType, QueryMode, Target } from '../api'
+import type { DateRange, MediaType, QueryMode, Target } from '../api'
 
 import { FOCUS_HINT } from '../lib/shortcut'
 import { fmtSpan } from '../lib/time'
@@ -20,6 +20,8 @@ type Props = {
   modes: QueryMode[]
   onSearch: () => void
   searching: boolean
+  dates: DateRange
+  onDates: (d: DateRange) => void
 }
 
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
@@ -174,6 +176,23 @@ export default function SearchBar(p: Props) {
             {p.searching ? 'Searching…' : 'Search'}
           </button>
         </div>
+        {refMedia !== 'audio' && (p.target === 'image' || p.target === 'all') && (
+          <div className="date-row small">
+            <span className="muted">Taken</span>
+            <label>
+              from <input type="date" value={p.dates.from} max={p.dates.to || undefined} onChange={(e) => p.onDates({ ...p.dates, from: e.target.value })} />
+            </label>
+            <label>
+              to <input type="date" value={p.dates.to} min={p.dates.from || undefined} onChange={(e) => p.onDates({ ...p.dates, to: e.target.value })} />
+            </label>
+            {(p.dates.from || p.dates.to) && (
+              <button type="button" className="btn small" onClick={() => p.onDates({ from: '', to: '' })}>
+                Any date
+              </button>
+            )}
+            <span className="muted">Dates come from the photos’ camera data; photos without one are left out.</span>
+          </div>
+        )}
         {fileError && <p className="error small" role="alert">{fileError}</p>}
         {p.reference && (
           <label className="check small">

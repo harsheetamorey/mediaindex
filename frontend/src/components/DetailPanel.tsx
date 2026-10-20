@@ -31,6 +31,14 @@ function fmtBytes(n: number | null) {
   return `${v.toFixed(i ? 1 : 0)} ${u[i]}`
 }
 
+/** EXIF time is the camera's local time with no zone: show it as written, not converted. */
+function fmtTaken(iso: string): string {
+  const [d, t] = iso.split('T')
+  const [y, m, day] = d.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, day)).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })
+  return t ? `${date}, ${t.slice(0, 5)}` : date
+}
+
 export default function DetailPanel({ result, onClose, onUseAsReference, onPrev, onNext, showScores, onAdd, added, onPlaySegment, playing, queryContext, onFindSounds, onFindSimilarMoments }: Props) {
   const a = result.asset
   const [note, setNote] = useState<string | null>(null)
@@ -78,6 +86,18 @@ export default function DetailPanel({ result, onClose, onUseAsReference, onPrev,
           <dl>
             <dt>Path in library</dt>
             <dd><code>{a.rel_path}</code></dd>
+            {a.taken_at && (
+              <>
+                <dt>Taken</dt>
+                <dd>{fmtTaken(a.taken_at)}</dd>
+              </>
+            )}
+            {a.place && (
+              <>
+                <dt>Place</dt>
+                <dd title="Named on this computer from the photo’s GPS position: the nearest town">{a.place}</dd>
+              </>
+            )}
             {a.media_type === 'image' ? (
               <>
                 <dt>Dimensions</dt>

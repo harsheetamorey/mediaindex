@@ -26,6 +26,8 @@ data/
 *.jpeg
 *.png
 *.webp
+*.heic
+*.heif
 *.gif
 *.wav
 *.flac

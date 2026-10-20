@@ -71,6 +71,8 @@ The **Ask** tab answers questions like "how many dogs do I have?", "show me a ci
 - Counts come from a local object detector (RT-DETR, 80 common object types).
 - Photos are found with EmbeddingGemma.
 - An optional local chat model (Gemma 4 E2B through Ollama) understands free-form questions and describes photos.
+- Time and place narrow any question: "beach photos from 2024", "photos from last December", "everything from Goa". Dates
+  and places come from the photos' EXIF, and places are named offline from a bundled city list. Search has a date filter too.
 
 Nothing is uploaded. Setup, measured accuracy and limits: [`docs/ask.md`](docs/ask.md).
 

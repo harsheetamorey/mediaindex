@@ -20,8 +20,9 @@ class Hit:
     modality: str
 
 
-def rank(query: np.ndarray, vm: VectorMatrix, limit: int, exclude_assets: set[str] | None = None) -> list[Hit]:
-    """Top-`limit` by dot product. Query and matrix rows must be L2-normalized."""
+def rank(query: np.ndarray, vm: VectorMatrix, limit: int, exclude_assets: set[str] | None = None,
+         only_assets: set[str] | None = None) -> list[Hit]:
+    """Top-`limit` by dot product. Query and matrix rows must be L2-normalized. `only_assets`: rank just these."""
     if vm.matrix.size == 0:
         return []
     q = np.asarray(query, dtype=np.float32).reshape(-1)
@@ -31,6 +32,9 @@ def rank(query: np.ndarray, vm: VectorMatrix, limit: int, exclude_assets: set[st
     if exclude_assets:
         mask = np.fromiter((a in exclude_assets for a in vm.asset_ids), bool, len(vm.asset_ids))
         sims = np.where(mask, -np.inf, sims)
+    if only_assets is not None:
+        keep = np.fromiter((a in only_assets for a in vm.asset_ids), bool, len(vm.asset_ids))
+        sims = np.where(keep, sims, -np.inf)
     n = int(np.isfinite(sims).sum())
     k = min(limit, n)
     if k <= 0:

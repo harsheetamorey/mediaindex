@@ -15,9 +15,10 @@ from PIL import Image
 
 from .jobs import JobContext
 from .media.audio import AUDIO_EXTENSIONS, AudioInfo, AudioRejected, probe_audio, write_waveform
-from .media.images import IMAGE_EXTENSIONS, ImageRejected, probe_image, sha256_file, write_thumbnail
+from .media.images import IMAGE_EXTENSIONS, ImageRejected, probe_image, read_photo_meta, sha256_file, write_thumbnail
 from .media.video import VIDEO_EXTENSIONS, VideoInfo, VideoRejected, frame_at, probe_video
-from .paths import walk_files
+from .paths import PathRejected, resolve_in_root, walk_files
+from .places import place_name
 from .store import FAILED, INDEXED, MISSING, PENDING, Store
 
 
@@ -182,6 +183,8 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
                     and (ex["status"] == FAILED or (thumb_path(thumbs_dir, ex["content_hash"]).exists()
                                                     and has_vectors(ex["id"])))):
                 s.unchanged += 1
+                if not ex["photo_meta_read"] and ex["status"] != FAILED:  # imported before dates were stored
+                    _read_photo_meta(store, ex["id"], path)
                 ctx.progress(i + 1, message=f"unchanged {rel}", work=False)
                 continue
             h = None
@@ -203,6 +206,8 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
                 width=info.width, height=info.height,
                 meta={"format": info.format, "exif_orientation": info.exif_orientation,
                       "source": provenance.get(rel)})
+            gps = (info.lat, info.lon) if info.lat is not None else None
+            store.set_photo_meta(aid, info.taken_at, gps, place_name(*gps) if gps else None)
             if ex is None:
                 s.new += 1
             elif changed:
@@ -228,6 +233,30 @@ def run_image_import(ctx: JobContext, store: Store, thumbs_dir: Path, library_id
             store.set_asset_status(a["id"], MISSING, "file not found at last import")
             s.missing.append(rel)
     return s.to_dict()
+
+
+def _read_photo_meta(store: Store, asset_id: str, path: Path) -> None:
+    try:
+        taken, gps = read_photo_meta(path)
+    except (ImageRejected, OSError):
+        taken, gps = None, None
+    store.set_photo_meta(asset_id, taken, gps, place_name(*gps) if gps else None)
+
+
+def read_missing_photo_meta(ctx: JobContext, store: Store) -> dict:
+    """Read the date and place of photos imported before MediaIndex stored them (header only, fast)."""
+    rows = store.photos_without_meta()
+    ctx.progress(0, len(rows), "reading photo dates")
+    for i, r in enumerate(rows):
+        ctx.check_cancelled()
+        try:
+            path = resolve_in_root(r["root_path"], r["rel_path"])
+        except PathRejected:
+            continue
+        if path.is_file():
+            _read_photo_meta(store, r["id"], path)
+        ctx.progress(i + 1)
+    return {"photos": len(rows)}
 
 
 def _import_audio(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Path, rel: str, st, ex, s: ImportSummary,

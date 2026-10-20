@@ -63,6 +63,41 @@ Ask can also **edit photos, make images and make videos** ("remove the car from 
   ahead"** after a "too big" refusal and **"make it seamless"** after a removal re-run the last edit on the original
   photo with that change.
 
+## When and where: "beach photos from 2024", "everything from Goa" (2026-10-20)
+
+At import, MediaIndex reads when each photo was taken (EXIF `DateTimeOriginal`, else `DateTimeDigitized`) and where (EXIF
+GPS). The position is turned into a place name **on this computer** from a bundled list of the 31,772 places with 15,000+
+people (GeoNames cities15000, CC BY 4.0; `backend/mediaindex/resources/places.tsv.gz`, rebuilt by
+`scripts/build_places.py`). Nothing is looked up online. Within 30 km the town is named ("Calangute, Goa, India"; a big
+city a little further away wins over a small one next door, so the Eiffel Tower is in "Paris"); up to 150 km only its
+region and country; further out, no place.
+
+Ask takes the time or place out of the question and filters on it **before** ranking or counting:
+
+| You ask | Ask does |
+|---|---|
+| beach photos from 2024 | ranks only the photos taken in 2024 for “beach” |
+| photos from last December / last summer / yesterday | lists those photos, oldest first |
+| in December / in the summer | that month or season of **any** year |
+| how many dogs in 2024? | counts dogs in the 2024 photos only |
+| everything from Goa / sunsets in Paris | photos whose place includes that name (town, region or country) |
+| which of those are from 2024? | keeps the earlier answer's photos taken in 2024 |
+| make a video of my photos from last summer | a slideshow of those photos, oldest first |
+
+Also understood: `2019-2021`, `between 2019 and 2021`, `since March 2023`, `this/last year`, `this/last month`,
+`this/last week`, `today`. Seasons are the northern hemisphere's (summer = June–August; "winter 2024" = December 2024 to
+February 2025), and the answer always spells out the months it used. A place is only recognised if one of your photos was
+taken there.
+
+Photos without a date (scans, screenshots, edited copies that lost their EXIF) never match a time, and photos without GPS
+never match a place; the answer says how many ("12 photos have no date, so they aren't included"). EXIF time is the
+camera's clock, with no time zone. Photos imported before this was added are read once, in the background, when the app
+starts (only the file header is read).
+
+The **Search** tab has the same filter as two date fields ("Taken from … to …"); it applies to photos, so sounds and
+videos are left out while it is set. API: `date_from` / `date_to` (`YYYY-MM-DD`, both days included) on
+`/api/search/text`, `/api/search/image` and `/api/search/image-text`.
+
 ## Setup
 
 1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.
