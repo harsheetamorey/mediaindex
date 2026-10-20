@@ -21,7 +21,7 @@ type Props = {
   searching: boolean
 }
 
-const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp']
+const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
 const AUDIO_EXT = ['.wav', '.flac', '.mp3']
 const ACCEPT = [...IMAGE_EXT, ...AUDIO_EXT].join(',')
 

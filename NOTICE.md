@@ -34,6 +34,7 @@ Code, models and media each have their own terms, and they are kept separate bel
 | tokenizers / safetensors | 0.23.2 / 0.8.0 | Apache-2.0 |
 | numpy | 2.5.3 | BSD-3-Clause (plus bundled components) |
 | pillow | 12.3.0 | MIT-CMU |
+| pillow-heif (HEIC/HEIF photos) | 1.8.1 | BSD-3-Clause; its wheel bundles libheif (LGPL-3.0), libde265 (LGPL-3.0) and x265 (GPL-2.0) |
 | soundfile | 0.14.0 | BSD-3-Clause |
 | psutil | 7.2.2 | BSD-3-Clause |
 | diffusers / peft / accelerate (optional `create` extra) | 0.41.0 / 0.21.2 / 1.15.0 | Apache-2.0 |

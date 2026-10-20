@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from . import __version__
@@ -20,6 +20,7 @@ from .db import Database
 from . import api_ask, api_search, api_selections
 from .indexer import make_audio_embedder, make_image_embedder, make_video_embedder
 from .ingest import run_image_import, thumb_path, window_thumb_path
+from .media.images import BROWSER_EXTENSIONS, ImageRejected, jpeg_bytes, load_image
 from .search import MatrixCache
 from .uploads import cleanup_stale_uploads
 from .jobs import JobRunner, QueueFull
@@ -278,6 +279,11 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
     @app.get("/api/assets/{asset_id}/file")
     def asset_file(asset_id: str):
         a, p = _asset_path(asset_id)
+        if a["media_type"] == "image" and p.suffix.lower() not in BROWSER_EXTENSIONS:
+            try:  # HEIC: most browsers can't show it, so send a JPEG copy (the original is untouched)
+                return Response(jpeg_bytes(load_image(p)), media_type="image/jpeg")
+            except ImageRejected:
+                raise HTTPException(422, "cannot decode image")
         media = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
                  ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg", ".mp4": "video/mp4"}
         return FileResponse(p, media_type=media.get(p.suffix.lower(), "application/octet-stream"))
