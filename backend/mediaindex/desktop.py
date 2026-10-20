@@ -348,8 +348,14 @@ def serve_check(out: str) -> None:
 
 def main() -> None:
     if "--serve-check" in sys.argv:
-        serve_check(sys.argv[sys.argv.index("--serve-check") + 1])
-        sys.stdout and sys.stdout.flush()
+        out = sys.argv[sys.argv.index("--serve-check") + 1]
+        try:
+            serve_check(out)
+        except BaseException:  # noqa: BLE001 (a windowed app would show a blocking error dialog instead)
+            import json
+            import traceback
+
+            Path(out).write_text(json.dumps({"ok": False, "error": traceback.format_exc()}, indent=2))
         os._exit(0)
     if "--check-models" in sys.argv:  # support: which model groups this app sees as downloaded
         from . import creative, edit

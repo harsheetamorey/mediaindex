@@ -31,9 +31,11 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File scripts\build_windows_app.ps1
       - name: Start the packaged app (no window, no models)
         shell: pwsh
+        timeout-minutes: 8
         run: |
           $env:MEDIAINDEX_DATA_DIR = "$env:RUNNER_TEMP\mi-data"
-          Start-Process -Wait -FilePath dist-app\MediaIndex\MediaIndex.exe -ArgumentList "--serve-check", "$env:RUNNER_TEMP\check.json"
+          $p = Start-Process -PassThru -FilePath dist-app\MediaIndex\MediaIndex.exe -ArgumentList "--serve-check", "$env:RUNNER_TEMP\check.json"
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "the packaged app did not exit within 5 minutes" }
           Get-Content "$env:RUNNER_TEMP\check.json"
           if (-not (Get-Content "$env:RUNNER_TEMP\check.json" | ConvertFrom-Json).ok) { throw "the packaged app did not start" }
       - uses: actions/upload-artifact@v4
