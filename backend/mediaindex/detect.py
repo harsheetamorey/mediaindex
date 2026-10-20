@@ -26,7 +26,7 @@ SCORE_THRESHOLD = 0.5  # boxes kept at all (below: "maybe")
 SURE = 0.75  # boxes counted
 DETECTOR_KEY = f"rtdetr_v2_r50vd@{DETECTOR_REVISION[:12]}:t{SCORE_THRESHOLD}:boxes"
 # The server runs offline (model files from the local cache only), so the detector is downloaded in an explicit setup step.
-DOWNLOAD_HINT = "MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.detect --download"
+DOWNLOAD_HINT = "uv run python -m mediaindex setup"
 
 # The detector's own label names, as written in its config.
 LABELS = tuple(s.replace("_", " ") for s in (

@@ -51,29 +51,26 @@ The first setup downloads about 1.6 GB of model weights. After that, MediaIndex 
 ```bash
 git clone https://github.com/harsheetamorey/mediaindex.git && cd mediaindex
 uv sync                                         # Python deps, pinned in uv.lock
-(cd frontend && npm ci && npm run build)        # UI, served by the backend
-mkdir -p data/samples/smoke                     # put 3+ of your own JPEGs here, then:
-MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python scripts/model_smoke.py --images data/samples/smoke   # downloads + verifies the model
-MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.detect --download   # object detector for Ask (~170 MB)
+uv run python -m mediaindex setup               # builds the UI, downloads the models once, checks they work
 uv run python -m mediaindex                     # open http://127.0.0.1:8765
 ```
+
+`setup` checks for FFmpeg, builds the UI if needed, downloads the search model and the Ask object detector (about 1.6 GB),
+and loads the search model once to check it works. Running it again only fills in what is missing. Add `--editing` for the
+photo editing models (about 0.55 GB, plus 2.1 GB of Stable Diffusion after `uv sync --extra create`). For a deeper model
+check on your own photos, `scripts/model_smoke.py` is still there.
 
 In the app, click **+ Add folder** → **Choose folder…** (or paste a path). Indexing runs in the background with progress, a time
 estimate and cancel. You can search as soon as items are indexed. Tick **Watch for changes** to re-index a folder automatically.
 
 ### Windows (run from source)
 The same steps work in **PowerShell** on Windows 10/11 (x64). Install [uv](https://docs.astral.sh/uv/), Node 20+, Git and FFmpeg
-(`winget install Gyan.FFmpeg`, then open a new terminal so `ffmpeg` is on PATH). Environment variables are set differently:
+(`winget install Gyan.FFmpeg`, then open a new terminal so `ffmpeg` is on PATH):
 
 ```powershell
 git clone https://github.com/harsheetamorey/mediaindex.git; cd mediaindex
 uv sync
-cd frontend; npm ci; npm run build; cd ..
-mkdir data\samples\smoke                      # put 3+ of your own JPEGs here, then:
-$env:MEDIAINDEX_ALLOW_DOWNLOAD = "1"
-uv run python scripts/model_smoke.py --images data/samples/smoke
-uv run python -m mediaindex.detect --download
-Remove-Item Env:MEDIAINDEX_ALLOW_DOWNLOAD
+uv run python -m mediaindex setup
 uv run python -m mediaindex                     # open http://127.0.0.1:8765
 ```
 
@@ -162,7 +159,7 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 ## Troubleshooting
 | Symptom | Fix |
 |---|---|
-| "model could not be loaded" | Run the model-download step once with `MEDIAINDEX_ALLOW_DOWNLOAD=1` (it needs network). |
+| "model could not be loaded" | Run `uv run python -m mediaindex setup` once (it needs network). |
 | "another MediaIndex process is already using …" | Only one server per data directory. Stop the other one. |
 | 503 "model is busy" | A long indexing step holds the model. Retry, or raise `MEDIAINDEX_QUERY_WAIT` (seconds, default 30). |
 | Sounds or videos fail to import | Install FFmpeg 6+ and make sure `ffmpeg` and `ffprobe` are on PATH. Only MP4, MOV and M4V video is accepted. |

@@ -32,7 +32,7 @@ BASE_REVISION = "451f4fe16113bff5a5d2269ed5ad43b0592e9a14"
 BASE_FILES = ["unet/config.json", "unet/diffusion_pytorch_model.fp16.safetensors"]
 MODEL_NAME = f"{SD_ID}@{SD_REVISION[:12]} + {LCM_ID}@{LCM_REVISION[:12]}"
 BASE_MODEL_NAME = f"{BASE_ID}@{BASE_REVISION[:12]} + {LCM_ID}@{LCM_REVISION[:12]}"
-DOWNLOAD_HINT = "uv sync --extra create && MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.creative --download"
+DOWNLOAD_HINT = "uv sync --extra create, then uv run python -m mediaindex setup --editing"
 
 STEPS = 6
 GUIDANCE = 1.5  # LCM works with little or no guidance; a little keeps the picture closer to the words

@@ -33,7 +33,7 @@ LAMA_REPO = "fashn-ai/LaMa"  # the original big-lama weights (advimman/lama, Apa
 LAMA_REVISION = "da55aaf971ce271b42eddca79831e0f646c7711e"
 LAMA_FILE = "big-lama.pt"
 LAMA_SHA256 = "7ba7aa7ac37a4d41fdbbeba3a2af7ead18058552997e3a3cd1a3b2210c9e6b4c"
-DOWNLOAD_HINT = "MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.edit --download"
+DOWNLOAD_HINT = "uv run python -m mediaindex setup --editing"
 
 GROW = 0.012  # the outline is grown by this fraction of the photo's longer side, so edges and shadows go too
 FILL_MAX_SIDE = 1024  # LaMa works on a crop around the object, scaled to at most this size
