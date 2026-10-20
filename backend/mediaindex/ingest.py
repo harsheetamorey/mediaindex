@@ -243,6 +243,16 @@ def _read_photo_meta(store: Store, asset_id: str, path: Path) -> None:
     store.set_photo_meta(asset_id, taken, gps, place_name(*gps) if gps else None)
 
 
+def _read_video_meta(store: Store, asset_id: str, path: Path, info: VideoInfo | None = None) -> None:
+    try:
+        info = info or probe_video(path)
+    except (VideoRejected, AudioRejected, OSError):
+        store.set_photo_meta(asset_id, None, None, None)
+        return
+    gps = (info.lat, info.lon) if info.lat is not None else None
+    store.set_photo_meta(asset_id, info.taken_at, gps, place_name(*gps) if gps else None)
+
+
 def read_missing_photo_meta(ctx: JobContext, store: Store) -> dict:
     """Read the date and place of photos imported before MediaIndex stored them (header only, fast)."""
     rows = store.photos_without_meta()
@@ -254,7 +264,7 @@ def read_missing_photo_meta(ctx: JobContext, store: Store) -> dict:
         except PathRejected:
             continue
         if path.is_file():
-            _read_photo_meta(store, r["id"], path)
+            (_read_video_meta if r["media_type"] == "video" else _read_photo_meta)(store, r["id"], path)
         ctx.progress(i + 1)
     return {"photos": len(rows)}
 
@@ -314,6 +324,8 @@ def _import_video(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Pa
                                             and ex["status"] in (INDEXED, PENDING if embed_video is None else INDEXED)
                                             and has_vectors(ex["id"], "video-visual")))):
         s.unchanged += 1
+        if not ex["photo_meta_read"] and ex["status"] != FAILED:  # imported before dates were stored
+            _read_video_meta(store, ex["id"], path)
         return
     h = None
     try:
@@ -335,6 +347,7 @@ def _import_video(ctx, store: Store, thumbs_dir: Path, library_id: str, path: Pa
         width=info.width, height=info.height,
         meta={"codec": info.codec, "fps": info.fps, "has_audio": info.has_audio, "audio_codec": info.audio_codec,
               "source": provenance.get(rel)})
+    _read_video_meta(store, aid, path, info)
     if ex is None:
         s.new += 1
     elif changed:

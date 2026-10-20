@@ -8,8 +8,10 @@ separately by the audio encoder; passing frames does not include audio (verified
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +39,9 @@ class VideoInfo:
     duration: float
     has_audio: bool
     audio_codec: str | None
+    taken_at: str | None = None  # when it was recorded, local time: "2024-07-14T18:03:22"
+    lat: float | None = None  # where (phones write ISO 6709 location tags)
+    lon: float | None = None
 
 
 def probe_video(path: Path) -> VideoInfo:
@@ -47,7 +52,7 @@ def probe_video(path: Path) -> VideoInfo:
         raise VideoRejected(f"file too large ({size} bytes)")
     cmd = [ffmpeg_bin("ffprobe"), *SAFE_INPUT, "-v", "error", "-show_entries",
            "stream=codec_type,codec_name,width,height,avg_frame_rate:stream_side_data=rotation:stream_tags=rotate:"
-           "format=duration,format_name",
+           "format=duration,format_name:format_tags",
            "-of", "json", "--", str(path)]
     try:
         out = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
@@ -80,7 +85,41 @@ def probe_video(path: Path) -> VideoInfo:
     w, h = int(v.get("width") or 0), int(v.get("height") or 0)
     if _rotation(v) % 180 == 90:
         w, h = h, w
-    return VideoInfo(v["codec_name"], w, h, fps, duration, a is not None, a.get("codec_name") if a else None)
+    tags = {k.lower(): str(v) for k, v in (fmt.get("tags") or {}).items()}
+    gps = video_location(tags)
+    return VideoInfo(v["codec_name"], w, h, fps, duration, a is not None, a.get("codec_name") if a else None,
+                     video_date(tags), *(gps or (None, None)))
+
+
+def video_date(tags: dict[str, str]) -> str | None:
+    """Recording time as local time. Apple's creationdate already is ("2024-07-14T18:03:22+0530"); the standard
+    creation_time is UTC, so it is shown in this computer's time zone. Missing or placeholder dates give None."""
+    for key, utc in (("com.apple.quicktime.creationdate", False), ("creation_time", True)):
+        raw = tags.get(key, "").strip()
+        try:
+            t = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if t.year < 1971:  # 1904/1970: the container's zero time, written by tools that don't know the date
+            continue
+        if utc and t.tzinfo is not None:
+            t = t.astimezone()
+        return t.replace(tzinfo=None, microsecond=0).isoformat()
+    return None
+
+
+ISO6709_RE = re.compile(r"^\s*([+-]\d{1,2}(?:\.\d+)?)([+-]\d{1,3}(?:\.\d+)?)")
+
+
+def video_location(tags: dict[str, str]) -> tuple[float, float] | None:
+    """(latitude, longitude) from an ISO 6709 tag such as "+15.5439+073.7553+010.000/" (iPhone, Android)."""
+    for key in ("com.apple.quicktime.location.iso6709", "location", "location-eng"):
+        m = ISO6709_RE.match(tags.get(key, ""))
+        if m:
+            lat, lon = float(m.group(1)), float(m.group(2))
+            if abs(lat) <= 90 and abs(lon) <= 180 and (lat, lon) != (0, 0):
+                return round(lat, 6), round(lon, 6)
+    return None
 
 
 def _rotation(stream: dict) -> int:

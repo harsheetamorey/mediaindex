@@ -312,8 +312,9 @@ class Store:
                       (content_hash, detector, now()))
 
     @staticmethod
-    def _scope(library_ids: list[str] | None, when: PhotoFilter | None = None) -> tuple[str, list]:
-        sql, params = "a.media_type='image' AND a.status='indexed'", []
+    def _scope(library_ids: list[str] | None, when: PhotoFilter | None = None,
+               media: tuple[str, ...] = ("image",)) -> tuple[str, list]:
+        sql, params = f"a.media_type IN ({','.join('?' * len(media))}) AND a.status='indexed'", list(media)
         if library_ids:
             sql += f" AND a.library_id IN ({','.join('?' * len(library_ids))})"
             params += list(library_ids)
@@ -422,27 +423,28 @@ class Store:
                       (taken_at, lat, lon, place, asset_id))
 
     def photos_without_meta(self) -> list[dict]:
-        """Photos whose EXIF date and place haven't been read yet (imported before they were stored)."""
-        return [dict(r) for r in self.db.query("""SELECT a.id, a.rel_path, l.root_path FROM assets a
+        """Photos and videos whose date and place haven't been read yet (imported before they were stored)."""
+        return [dict(r) for r in self.db.query("""SELECT a.id, a.rel_path, a.media_type, l.root_path FROM assets a
                                                    JOIN libraries l ON l.id = a.library_id
-                                                   WHERE a.media_type='image' AND a.photo_meta_read=0
-                                                   AND a.status != 'missing'""")]
+                                                   WHERE a.media_type IN ('image', 'video') AND a.photo_meta_read=0
+                                                   AND a.status NOT IN ('missing', 'failed')""")]
 
-    def filtered_photos(self, library_ids: list[str] | None, when: PhotoFilter) -> list[str]:
-        """Indexed photos matching `when`, oldest first (undated ones last)."""
-        where, params = self._scope(library_ids, when)
+    def filtered_photos(self, library_ids: list[str] | None, when: PhotoFilter,
+                        media: tuple[str, ...] = ("image",)) -> list[str]:
+        """Indexed photos (and videos, if asked) matching `when`, oldest first (undated ones last)."""
+        where, params = self._scope(library_ids, when, media)
         return [r["id"] for r in self.db.query(f"""SELECT a.id FROM assets a WHERE {where}
                                                    ORDER BY a.taken_at IS NULL, a.taken_at, a.rel_path""", params)]
 
-    def photo_meta_gaps(self, library_ids: list[str] | None = None) -> dict:
-        """How many indexed photos have no date, and no place."""
-        where, params = self._scope(library_ids)
+    def photo_meta_gaps(self, library_ids: list[str] | None = None, media: tuple[str, ...] = ("image",)) -> dict:
+        """How many indexed photos (or videos) have no date, and no place."""
+        where, params = self._scope(library_ids, media=media)
         r = self.db.one(f"""SELECT COUNT(*) AS photos, SUM(a.taken_at IS NULL) AS undated,
                             SUM(a.place IS NULL) AS unplaced FROM assets a WHERE {where}""", params)
         return {"photos": r["photos"], "undated": r["undated"] or 0, "unplaced": r["unplaced"] or 0}
 
     def known_places(self, library_ids: list[str] | None = None) -> list[str]:
-        where, params = self._scope(library_ids)
+        where, params = self._scope(library_ids, media=("image", "video"))
         return [r["place"] for r in self.db.query(f"SELECT DISTINCT a.place FROM assets a WHERE {where} "
                                                   "AND a.place IS NOT NULL", params)]
 
