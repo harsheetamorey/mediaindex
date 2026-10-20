@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type Asset, type AskStatus, type AskTurn, type DetectedBox, type EditInfo } from '../api'
+import { FOCUS_HINT } from '../lib/shortcut'
 
 type Message = {
   role: 'user' | 'assistant'
@@ -298,7 +299,8 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Ask something, e.g. “how many cats?” or “describe the second one”"
+          id="ask-q"
+          placeholder={`Ask something, e.g. “how many cats?” or “describe the second one” (${FOCUS_HINT})`}
           aria-label="Ask about your photos"
           maxLength={2000}
           autoFocus
