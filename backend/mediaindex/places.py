@@ -65,3 +65,21 @@ def fold(text: str) -> str:
 
 def place_parts(place: str) -> list[str]:
     return [p.strip() for p in place.split(",") if p.strip()]
+
+
+def place_levels(counts: dict[str, int]) -> list[dict]:
+    """Every country, region and town in `counts` (stored place -> items), biggest area first:
+    [{"name": "India", "count": 14, "depth": 0}, {"name": "Goa, India", ...}, {"name": "Calangute, Goa, India", ...}]."""
+    agg: dict[str, int] = {}
+    for place, n in counts.items():
+        parts = place_parts(place)
+        for i in range(len(parts)):
+            key = ", ".join(parts[i:])
+            agg[key] = agg.get(key, 0) + n
+    order = sorted(agg, key=lambda k: [fold(p) for p in reversed(place_parts(k))])
+    return [{"name": k, "count": agg[k], "depth": len(place_parts(k)) - 1} for k in order]
+
+
+def places_within(name: str, known: list[str]) -> list[str]:
+    """The stored places in or equal to `name`: "Goa, India" -> ["Calangute, Goa, India", "Goa, India", ...]."""
+    return sorted(p for p in known if p == name or p.endswith(", " + name))

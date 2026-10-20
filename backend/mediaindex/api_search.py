@@ -16,6 +16,7 @@ from .uploads import temp_upload
 from .model.backend import CapabilityUnavailable, ResourceError
 from .model.host import ModelBusy
 from .photofilter import PhotoFilter
+from .places import place_levels, places_within
 from .search import MatrixCache, rank
 from .store import index_state
 
@@ -79,23 +80,34 @@ class TextSearchRequest(BaseModel):
     global_rank: bool = False  # experimental: one list across media types by raw cosine
     date_from: date | None = None  # photos taken on or after this day (EXIF date); others are left out
     date_to: date | None = None  # ... and on or before this day
+    place: str | None = Field(None, max_length=300)  # taken in this town, region or country (a name from /api/places)
 
 
-def date_filter(app: FastAPI, library_ids, date_from: date | None, date_to: date | None) -> tuple[set[str] | None, dict]:
-    """Photos and videos made in [date_from, date_to] (EXIF / video metadata; items without a date never match)."""
-    if date_from is None and date_to is None:
+def taken_filter(app: FastAPI, library_ids, date_from: date | None, date_to: date | None,
+                 place: str | None = None) -> tuple[set[str] | None, dict]:
+    """Photos and videos made in [date_from, date_to] and/or in `place` (a name from /api/places: a town, region or
+    country). Dates and places come from EXIF and video metadata; items without one never match."""
+    place = (place or "").strip() or None
+    if date_from is None and date_to is None and place is None:
         return None, {}
     if date_from and date_to and date_from > date_to:
         raise HTTPException(422, "date_from is after date_to")
-    end = (date_to + timedelta(days=1)).isoformat() if date_to else "9999-12-31"
-    when = PhotoFilter([(date_from.isoformat() if date_from else "0000-01-01", end)])
+    when = PhotoFilter()
+    if date_from or date_to:
+        end = (date_to + timedelta(days=1)).isoformat() if date_to else "9999-12-31"
+        when.ranges = [(date_from.isoformat() if date_from else "0000-01-01", end)]
     store = app.state.store
+    if place is not None:
+        when.places = places_within(place, store.known_places(library_ids)) or [place]  # unknown: matches nothing
     media = ("image", "video")
     only = set(store.filtered_photos(library_ids, when, media))
+    gaps = store.photo_meta_gaps(library_ids, media)
     return only, {"from": date_from.isoformat() if date_from else None, "to": date_to.isoformat() if date_to else None,
-                  "photos": len(only), "undated_photos": store.photo_meta_gaps(library_ids, media)["undated"],
-                  "note": "dates come from the photos' EXIF and the videos' metadata; items without a date, and sounds, "
-                          "are left out"}
+                  "place": place, "photos": len(only),
+                  "undated_photos": gaps["undated"] if when.dated else 0,
+                  "unplaced_photos": gaps["unplaced"] if place else 0,
+                  "note": "dates and places come from the photos' EXIF and the videos' metadata; items without one, "
+                          "and sounds, are left out"}
 
 
 def embed_query(app: FastAPI, fn):
@@ -256,9 +268,9 @@ def register(app: FastAPI) -> None:
             info["searched_for"] = text
         if "video" in req.media_types:
             info["video_signal"] = req.video_signal
-        only, dates = date_filter(app, req.library_ids, req.date_from, req.date_to)
-        if dates:
-            info["dates"] = dates
+        only, taken = taken_filter(app, req.library_ids, req.date_from, req.date_to, req.place)
+        if taken:
+            info["taken"] = taken
         images_only = list(dict.fromkeys(req.media_types)) == ["image"]
         out = run_search(app, mode="text", query_info=info, vec=vec, embed_ms=ms,
                          library_ids=req.library_ids, media_types=req.media_types,
@@ -324,8 +336,9 @@ def register_reference(app: FastAPI) -> None:
                      library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
                      include_identical: bool = Form(False),
                      target: Literal["image", "audio", "video"] = Form("image"),
-                     date_from: date | None = Form(None), date_to: date | None = Form(None)) -> dict:
-        only, dates = date_filter(app, _parse_libs(library_ids), date_from, date_to)
+                     date_from: date | None = Form(None), date_to: date | None = Form(None),
+                     place: str | None = Form(None, max_length=300)) -> dict:
+        only, taken = taken_filter(app, _parse_libs(library_ids), date_from, date_to, place)
         with _reference(app, file, asset_id) as (im, sha, ref_asset, info):
             stored = None
             if ref_asset is not None:
@@ -338,8 +351,8 @@ def register_reference(app: FastAPI) -> None:
                 info["embedding"] = "computed"
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
-        if dates:
-            info["dates"] = dates
+        if taken:
+            info["taken"] = taken
         _mark_cross(info, "image", target)
         return run_search(app, mode="image" if target == "image" else f"image→{target}", query_info=info, vec=vec,
                           embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target], limit=limit,
@@ -357,7 +370,8 @@ def register_mixed(app: FastAPI) -> None:
                           library_ids: str | None = Form(None), limit: int = Form(24, ge=1, le=200),
                           include_identical: bool = Form(False),
                           target: Literal["image", "audio", "video"] = Form("image"),
-                          date_from: date | None = Form(None), date_to: date | None = Form(None)) -> dict:
+                          date_from: date | None = Form(None), date_to: date | None = Form(None),
+                          place: str | None = Form(None, max_length=300)) -> dict:
         text = text.strip()
         if not text:
             raise HTTPException(422, "refinement text is empty; use /api/search/image for reference-only search")
@@ -379,9 +393,9 @@ def register_mixed(app: FastAPI) -> None:
         })
         excl = _exclusions(app, ref_asset, sha, include_identical)
         info["excluded_identical"] = len(excl)
-        only, dates = date_filter(app, _parse_libs(library_ids), date_from, date_to)
-        if dates:
-            info["dates"] = dates
+        only, taken = taken_filter(app, _parse_libs(library_ids), date_from, date_to, place)
+        if taken:
+            info["taken"] = taken
         _mark_cross(info, "image+text", target)
         return run_search(app, mode="image+text" if target == "image" else f"image+text→{target}", query_info=info,
                           vec=vec, embed_ms=ms, library_ids=_parse_libs(library_ids), media_types=[target],
@@ -520,6 +534,11 @@ def _mark_cross(info: dict, query: str, target: str) -> None:
 
 
 def register_modes(app: FastAPI) -> None:
+    @app.get("/api/places")
+    def places(library_ids: str | None = None) -> list[dict]:
+        """Where the indexed photos and videos were taken: each country, region and town, with how many items."""
+        return place_levels(app.state.store.place_counts(_parse_libs(library_ids)))
+
     @app.get("/api/capabilities")
     def capabilities() -> dict:
         enc = set(app.state.profile.encoders)

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { DateRange, MediaType, QueryMode, Target } from '../api'
+import type { MediaType, PlaceOption, QueryMode, Target, Taken } from '../api'
 
 import { FOCUS_HINT } from '../lib/shortcut'
 import { fmtSpan } from '../lib/time'
@@ -20,8 +20,9 @@ type Props = {
   modes: QueryMode[]
   onSearch: () => void
   searching: boolean
-  dates: DateRange
-  onDates: (d: DateRange) => void
+  taken: Taken
+  onTaken: (t: Taken) => void
+  places: PlaceOption[]
 }
 
 const IMAGE_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif']
@@ -180,17 +181,32 @@ export default function SearchBar(p: Props) {
           <div className="date-row small">
             <span className="muted">Taken</span>
             <label>
-              from <input type="date" value={p.dates.from} max={p.dates.to || undefined} onChange={(e) => p.onDates({ ...p.dates, from: e.target.value })} />
+              from <input type="date" value={p.taken.from} max={p.taken.to || undefined} onChange={(e) => p.onTaken({ ...p.taken, from: e.target.value })} />
             </label>
             <label>
-              to <input type="date" value={p.dates.to} min={p.dates.from || undefined} onChange={(e) => p.onDates({ ...p.dates, to: e.target.value })} />
+              to <input type="date" value={p.taken.to} min={p.taken.from || undefined} onChange={(e) => p.onTaken({ ...p.taken, to: e.target.value })} />
             </label>
-            {(p.dates.from || p.dates.to) && (
-              <button type="button" className="btn small" onClick={() => p.onDates({ from: '', to: '' })}>
-                Any date
+            {(p.places.length > 0 || p.taken.place) && (
+              <label>
+                in{' '}
+                <select value={p.taken.place} onChange={(e) => p.onTaken({ ...p.taken, place: e.target.value })} aria-label="Place taken">
+                  <option value="">anywhere</option>
+                  {p.taken.place && !p.places.some((pl) => pl.name === p.taken.place) && <option value={p.taken.place}>{p.taken.place}</option>}
+                  {p.places.map((pl) => (
+                    <option key={pl.name} value={pl.name}>
+                      {'\u00a0\u00a0'.repeat(pl.depth)}
+                      {pl.name.split(', ')[0]} ({pl.count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {(p.taken.from || p.taken.to || p.taken.place) && (
+              <button type="button" className="btn small" onClick={() => p.onTaken({ from: '', to: '', place: '' })}>
+                Any time or place
               </button>
             )}
-            <span className="muted">Dates come from the photos’ and videos’ camera data; items without one, and sounds, are left out.</span>
+            <span className="muted">From the photos’ and videos’ camera data; items without it, and sounds, are left out.</span>
           </div>
         )}
         {fileError && <p className="error small" role="alert">{fileError}</p>}

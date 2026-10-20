@@ -444,9 +444,13 @@ class Store:
         return {"photos": r["photos"], "undated": r["undated"] or 0, "unplaced": r["unplaced"] or 0}
 
     def known_places(self, library_ids: list[str] | None = None) -> list[str]:
+        return list(self.place_counts(library_ids))
+
+    def place_counts(self, library_ids: list[str] | None = None) -> dict[str, int]:
+        """Stored place name ("Calangute, Goa, India") -> indexed photos and videos taken there."""
         where, params = self._scope(library_ids, media=("image", "video"))
-        return [r["place"] for r in self.db.query(f"SELECT DISTINCT a.place FROM assets a WHERE {where} "
-                                                  "AND a.place IS NOT NULL", params)]
+        return {r["place"]: r["n"] for r in self.db.query(f"SELECT a.place, COUNT(*) AS n FROM assets a WHERE {where} "
+                                                          "AND a.place IS NOT NULL GROUP BY a.place", params)}
 
     # ---- jobs ------------------------------------------------------------------
     def save_job(self, job: dict, library_id: str | None = None) -> None:
