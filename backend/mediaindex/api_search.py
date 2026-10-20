@@ -82,7 +82,7 @@ class TextSearchRequest(BaseModel):
 
 
 def date_filter(app: FastAPI, library_ids, date_from: date | None, date_to: date | None) -> tuple[set[str] | None, dict]:
-    """The photos taken in [date_from, date_to] (EXIF dates; photos without one never match), and a note on it."""
+    """Photos and videos made in [date_from, date_to] (EXIF / video metadata; items without a date never match)."""
     if date_from is None and date_to is None:
         return None, {}
     if date_from and date_to and date_from > date_to:
@@ -90,10 +90,12 @@ def date_filter(app: FastAPI, library_ids, date_from: date | None, date_to: date
     end = (date_to + timedelta(days=1)).isoformat() if date_to else "9999-12-31"
     when = PhotoFilter([(date_from.isoformat() if date_from else "0000-01-01", end)])
     store = app.state.store
-    only = set(store.filtered_photos(library_ids, when))
+    media = ("image", "video")
+    only = set(store.filtered_photos(library_ids, when, media))
     return only, {"from": date_from.isoformat() if date_from else None, "to": date_to.isoformat() if date_to else None,
-                  "photos": len(only), "undated_photos": store.photo_meta_gaps(library_ids)["undated"],
-                  "note": "dates come from the photos' EXIF; photos without a date, sounds and videos are left out"}
+                  "photos": len(only), "undated_photos": store.photo_meta_gaps(library_ids, media)["undated"],
+                  "note": "dates come from the photos' EXIF and the videos' metadata; items without a date, and sounds, "
+                          "are left out"}
 
 
 def embed_query(app: FastAPI, fn):

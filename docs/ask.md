@@ -89,13 +89,18 @@ Also understood: `2019-2021`, `between 2019 and 2021`, `since March 2023`, `this
 February 2025), and the answer always spells out the months it used. A place is only recognised if one of your photos was
 taken there.
 
+**Videos** get a date and place too, from their metadata: Apple's `com.apple.quicktime.creationdate` (local time) or
+the standard `creation_time` (UTC, shown in this computer's time zone), and the ISO 6709 location tag that iPhones and
+Android phones write. "Photos from last summer" lists the videos from then as well. Counting and searching with a
+subject stay photos only.
+
 Photos without a date (scans, screenshots, edited copies that lost their EXIF) never match a time, and photos without GPS
 never match a place; the answer says how many ("12 photos have no date, so they aren't included"). EXIF time is the
 camera's clock, with no time zone. Photos imported before this was added are read once, in the background, when the app
 starts (only the file header is read).
 
-The **Search** tab has the same filter as two date fields ("Taken from … to …"); it applies to photos, so sounds and
-videos are left out while it is set. API: `date_from` / `date_to` (`YYYY-MM-DD`, both days included) on
+The **Search** tab has the same filter as two date fields ("Taken from … to …"). It applies to photos and videos; sounds
+are left out while it is set. API: `date_from` / `date_to` (`YYYY-MM-DD`, both days included) on
 `/api/search/text`, `/api/search/image` and `/api/search/image-text`.
 
 ## Setup

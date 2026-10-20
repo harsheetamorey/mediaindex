@@ -217,7 +217,7 @@ export default function App() {
     try {
       player.stop()
       const single: MediaType = target === 'all' ? (reference?.media ?? 'image') : target
-      const when = target === 'image' || target === 'all' ? dates : undefined // only photos have a date taken
+      const when = target !== 'audio' ? dates : undefined // photos and videos have a date taken; sounds don't
       const r = reference
         ? reference.media === 'audio'
           ? await api.searchAudioReference(
@@ -266,9 +266,9 @@ export default function App() {
   const grouped = response?.grouping === 'by_modality'
   const dq = response?.query.dates as { from: string | null; to: string | null; photos: number; undated_photos: number } | undefined
   const dateNote = dq
-    ? `Only photos taken ${dq.from && dq.to ? `from ${dq.from} to ${dq.to}` : dq.from ? `on or after ${dq.from}` : `on or before ${dq.to}`} ` +
-      `(${dq.photos} ${dq.photos === 1 ? 'photo' : 'photos'}).` +
-      (dq.undated_photos ? ` ${dq.undated_photos} ${dq.undated_photos === 1 ? 'photo has' : 'photos have'} no date and ${dq.undated_photos === 1 ? 'is' : 'are'} left out.` : '')
+    ? `Only photos and videos taken ${dq.from && dq.to ? `from ${dq.from} to ${dq.to}` : dq.from ? `on or after ${dq.from}` : `on or before ${dq.to}`} ` +
+      `(${dq.photos} ${dq.photos === 1 ? 'item' : 'items'}).` +
+      (dq.undated_photos ? ` ${dq.undated_photos} ${dq.undated_photos === 1 ? 'item has' : 'items have'} no date and ${dq.undated_photos === 1 ? 'is' : 'are'} left out.` : '')
     : null
   const objectCheck = response?.object_check
   const sections: { label: string; offset: number; items: Result[] }[] = grouped

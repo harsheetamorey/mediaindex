@@ -186,3 +186,35 @@ def test_overview_of_a_place_shows_its_photos(tmp_path, trip):
     r = ask(c, "what did I take in Goa?")
     assert r["action"] == "summary" and r["answer"].startswith("You have 2 photos in Goa. Most common in them:")
     assert names(r["results"]) == ["goa-dog.jpg", "goa-cat.jpg"] and "1 photo has no location" in r["answer"]
+
+
+@pytest.mark.skipif(__import__("shutil").which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_videos_get_dates_and_places_too(tmp_path):
+    import subprocess
+
+    from mediaindex.media.video import video_date
+
+    root = tmp_path / "Phone"
+    photo(root / "IMG_0001.jpg", (200, 0, 0), "2024:07:14 18:00:00", GOA)
+    root.mkdir(exist_ok=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=160x90:r=10:d=3",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "use_metadata_tags",
+                    "-metadata", "com.apple.quicktime.creationdate=2024-07-15T09:30:00+0530",
+                    "-metadata", "com.apple.quicktime.location.ISO6709=+15.5439+073.7553+010.000/",
+                    str(root / "IMG_0002.MOV")], check=True)
+    app = create_app(Settings(data_dir=tmp_path / "data", precision="float32", watch_interval=0),
+                     backend_factory=FakeBackend, detector_factory=FakeDetector, chat=None)
+    with TestClient(app) as c:
+        lib = c.post("/api/libraries", json={"path": str(root)}).json()
+        wait_job(c, c.post(f"/api/libraries/{lib['id']}/import").json()["id"])
+        v = by_name(c, lib)["IMG_0002.MOV"]
+        assert v["taken_at"] == "2024-07-15T09:30:00" and v["place"] == "Calangute, Goa, India"
+        r = c.post("/api/search/text", json={"text": "blue", "media_types": ["video"], "date_from": "2024-07-15"}).json()
+        assert [x["asset"]["rel_path"] for x in r["results"]] == ["IMG_0002.MOV"]
+        r = c.post("/api/search/text", json={"text": "blue", "media_types": ["video"], "date_to": "2024-07-14"}).json()
+        assert r["results"] == []
+        r = ask(c, "everything from July 2024")
+        assert names(r["results"]) == ["IMG_0001.jpg", "IMG_0002.MOV"]
+        assert r["answer"].startswith("1 photo and 1 video from July 2024, oldest first.")
+    assert video_date({"creation_time": "1904-01-01T00:00:00.000000Z"}) is None  # the container's zero date
+    assert video_date({"creation_time": "2024-07-14T12:33:22.000000Z"})[:4] == "2024"  # UTC, shown in local time

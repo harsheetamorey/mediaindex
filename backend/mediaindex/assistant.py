@@ -539,13 +539,19 @@ class Assistant:
         if when is None:
             return self._search_all(plan.subject or message, library_ids, None)
         scope, only = when.describe(), self._filtered(when, library_ids)
+        if not plan.subject:  # "photos from last December": the videos from then too
+            items = self.store.filtered_photos(library_ids, when, ("image", "video"))
+            if not items:
+                return {"answer": f"I found no photos {scope}." + self._gaps(when, library_ids),
+                        "facts": {"when": scope}}
+            videos = len(items) - len(only)
+            what = f"{len(only)} {'photo' if len(only) == 1 else 'photos'}" + \
+                (f" and {videos} {'video' if videos == 1 else 'videos'}" if videos else "")
+            more = f" (the first {SHOWN} are shown)" if len(items) > SHOWN else ""
+            return {"answer": f"{what} {scope}, oldest first{more}." + self._gaps(when, library_ids),
+                    "asset_ids": items[:SHOWN], "facts": {"when": scope, "photos": len(only), "videos": videos}}
         if not only:
             return {"answer": f"I found no photos {scope}." + self._gaps(when, library_ids), "facts": {"when": scope}}
-        if not plan.subject:  # "photos from last December"
-            more = f" (the first {SHOWN} are shown)" if len(only) > SHOWN else ""
-            return {"answer": f"{len(only)} {'photo' if len(only) == 1 else 'photos'} {scope}, oldest first{more}."
-                              + self._gaps(when, library_ids), "asset_ids": only[:SHOWN],
-                    "facts": {"when": scope, "photos": len(only)}}
         out = self._search_all(plan.subject, library_ids, when, set(only))
         out["answer"] += (f" I only looked at the {len(only)} {'photo' if len(only) == 1 else 'photos'} {scope}."
                           + self._gaps(when, library_ids))

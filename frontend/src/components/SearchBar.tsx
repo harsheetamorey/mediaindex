@@ -176,7 +176,7 @@ export default function SearchBar(p: Props) {
             {p.searching ? 'Searching…' : 'Search'}
           </button>
         </div>
-        {refMedia !== 'audio' && (p.target === 'image' || p.target === 'all') && (
+        {refMedia !== 'audio' && p.target !== 'audio' && (
           <div className="date-row small">
             <span className="muted">Taken</span>
             <label>
@@ -190,7 +190,7 @@ export default function SearchBar(p: Props) {
                 Any date
               </button>
             )}
-            <span className="muted">Dates come from the photos’ camera data; photos without one are left out.</span>
+            <span className="muted">Dates come from the photos’ and videos’ camera data; items without one, and sounds, are left out.</span>
           </div>
         )}
         {fileError && <p className="error small" role="alert">{fileError}</p>}
