@@ -15,6 +15,7 @@ from .media.images import IMAGE_EXTENSIONS, ImageRejected, load_image
 from .uploads import temp_upload
 from .model.backend import CapabilityUnavailable, ResourceError
 from .model.host import ModelBusy
+from .lookalikes import LEVELS, group_lookalikes
 from .photofilter import PhotoFilter
 from .places import place_levels, places_within
 from .search import MatrixCache, rank
@@ -254,6 +255,7 @@ def _search_one(app: FastAPI, *, mode: str, query_info: dict, vec, embed_ms: flo
 
 def register(app: FastAPI) -> None:
     register_timeline(app)
+    register_lookalikes(app)
     register_reference(app)
     register_mixed(app)
     register_audio(app)
@@ -561,6 +563,38 @@ def register_timeline(app: FastAPI) -> None:
                 "candidates_searched": len(ids), "timing_ms": {"query_embedding": 0, "ranking": 0},
                 "index_state": index_state(store, app.state.profile.key, libs, ["image", "video"]),
                 "note": "photos and videos taken this month (EXIF and video metadata), oldest first; not a search"}
+
+
+def register_lookalikes(app: FastAPI) -> None:
+    @app.get("/api/lookalikes")
+    def lookalikes(level: Literal["strict", "normal", "loose"] = "normal", library_ids: str | None = None,
+                   limit: int = 1000) -> dict:
+        """Groups of look-alike photos (lookalikes.py), shaped like a search result. For review only: nothing is
+        deleted, moved or changed."""
+        libs = _parse_libs(library_ids)
+        store = app.state.store
+        vm = app.state.matrix_cache.get(app.state.profile.key, libs, ["image"])
+        t0 = time.perf_counter()
+        groups = group_lookalikes(vm.asset_ids, vm.matrix, LEVELS[level])
+        ms = (time.perf_counter() - t0) * 1000
+        results, info = [], []
+        for g, members in enumerate(groups, 1):
+            if len(results) + len(members) > max(2, min(limit, 5000)):
+                break
+            assets = [a for aid in members if (a := store.get_asset(aid)) is not None]
+            info.append({"group": g, "size": len(assets),
+                         "identical": len({a["content_hash"] for a in assets}) == 1})
+            results += [{"rank": len(results) + 1, "similarity": None, "modality": "image", "start_s": None,
+                         "end_s": None, "asset": app.state.public_asset(a), "other_segments": [], "group": g}
+                        for a in assets]
+        return {"mode": "lookalikes", "media_types": ["image"], "grouping": "single",
+                "query": {"level": level, "threshold": LEVELS[level], "groups": len(groups),
+                          "photos": sum(len(g) for g in groups)},
+                "profile_key": app.state.profile.key, "results": results, "lookalike_groups": info,
+                "candidates_searched": len(vm.asset_ids), "timing_ms": {"query_embedding": 0, "ranking": round(ms, 1)},
+                "index_state": index_state(store, app.state.profile.key, libs, ["image"]),
+                "note": "photos whose image vectors are very close (cosine similarity, not confidence); review only, "
+                        "nothing is deleted"}
 
 
 def register_modes(app: FastAPI) -> None:

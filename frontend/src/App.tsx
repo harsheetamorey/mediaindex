@@ -13,6 +13,7 @@ import {
   type Target,
   type PlaceOption,
   type TimelineMonth,
+  type LookalikeLevel,
   type Taken,
 } from './api'
 import { useSegmentPlayer } from './lib/player'
@@ -262,14 +263,15 @@ export default function App() {
     }
   }, [reference, text, libraryIds, includeIdentical, target, player, globalRank, taken])
 
-  const browseMonth = useCallback(
-    async (month: string) => {
+  const [lookLevel, setLookLevel] = useState<LookalikeLevel>('normal')
+  const browse = useCallback(
+    async (load: () => Promise<SearchResponse>) => {
       const seq = ++searchSeq.current
       setSearching(true)
       setSearchError(null)
       try {
         player.stop()
-        const r = await api.timelineMonth(month, libraryIds)
+        const r = await load()
         if (seq !== searchSeq.current) return
         setResponse(r)
         setFocused(0)
@@ -280,9 +282,15 @@ export default function App() {
         if (seq === searchSeq.current) setSearching(false)
       }
     },
-    [libraryIds, player],
+    [player],
+  )
+  const browseMonth = useCallback((month: string) => browse(() => api.timelineMonth(month, libraryIds)), [browse, libraryIds])
+  const findLookalikes = useCallback(
+    (level: LookalikeLevel) => browse(() => api.lookalikes(level, libraryIds)),
+    [browse, libraryIds],
   )
   const browsing = response?.mode === 'timeline' ? String(response.query.month) : null
+  const lookalikes = response?.mode === 'lookalikes' ? (response.lookalike_groups ?? []) : null
 
   const results = useMemo(() => {
     const rs = response?.results ?? []
@@ -312,7 +320,14 @@ export default function App() {
       missing(dq.unplaced_photos, 'place')
     : null
   const objectCheck = response?.object_check
-  const sections: { label: string; offset: number; items: Result[] }[] = grouped
+  const lookGroups = response?.mode === 'lookalikes' ? (response.lookalike_groups ?? []) : null
+  const sections: { label: string; offset: number; items: Result[] }[] = lookGroups
+    ? lookGroups.map((g) => ({
+        label: `Group ${g.group}: ${g.identical ? 'identical copies' : 'look-alikes'}`,
+        offset: results.findIndex((r) => r.group === g.group),
+        items: results.filter((r) => r.group === g.group),
+      }))
+    : grouped
     ? (['image', 'audio', 'video'] as MediaType[])
         .filter((m) => response?.media_types?.includes(m) ?? true)
         .map((m) => ({ m, items: results.filter((r) => r.asset.media_type === m) }))
@@ -514,6 +529,27 @@ export default function App() {
             places={places}
           />
           <Timeline months={timeline.months} undated={timeline.undated} active={browsing} onPick={browseMonth} />
+          {indexedTotal > 1 && (
+            <div className="timeline-years small">
+              <button type="button" className={lookalikes ? 'chip on' : 'chip'} onClick={() => findLookalikes(lookLevel)}>
+                Find look-alikes
+              </button>
+              <select
+                aria-label="How alike"
+                value={lookLevel}
+                onChange={(e) => {
+                  const level = e.target.value as LookalikeLevel
+                  setLookLevel(level)
+                  if (lookalikes) findLookalikes(level)
+                }}
+              >
+                <option value="strict">nearly identical</option>
+                <option value="normal">very similar</option>
+                <option value="loose">similar</option>
+              </select>
+              <span className="muted">Burst shots and copies, grouped for you to review. Nothing is deleted.</span>
+            </div>
+          )}
 
           <section className="results" aria-busy={searching}>
             {searchError && <div className="banner error" role="alert">{searchError}</div>}
@@ -534,10 +570,12 @@ export default function App() {
                   <span>
                     {browsing
                       ? `${monthLabel(browsing)}: ${results.length} ${results.length === 1 ? 'photo or video' : 'photos and videos'}, oldest first`
-                      : `${results.length} closest matches`}
+                      : lookalikes
+                        ? `${lookalikes.length} ${lookalikes.length === 1 ? 'group' : 'groups'} of look-alike photos (${results.length} photos)`
+                        : `${results.length} closest matches`}
                     {selected.size ? ` in ${selected.size} selected ${selected.size === 1 ? 'library' : 'libraries'}` : ''}
                   </span>
-                  {showScores && !browsing && (
+                  {showScores && !browsing && !lookalikes && (
                     <span className="muted">
                       {response.mode} · query {response.timing_ms.query_embedding.toFixed(0)} ms · ranking{' '}
                       {response.timing_ms.ranking.toFixed(1)} ms · {response.candidates_searched} candidates
@@ -553,7 +591,10 @@ export default function App() {
                 {st && (st.state === 'empty' || st.state === 'not_indexed') && (
                   <div className="banner warn">Nothing is indexed in this selection yet. Import a folder first.</div>
                 )}
-                {results.length > 0 && !browsing && (
+                {lookalikes && lookalikes.length === 0 && (
+                  <p className="muted small">No look-alikes found at this level. Try “similar” for a looser match.</p>
+                )}
+                {results.length > 0 && !browsing && !lookalikes && (
                   <p className="muted small">
                     {objectCheck
                       ? `Photos where the object detector found ${objectCheck.name} come first; each part is ranked by similarity.`
@@ -574,7 +615,7 @@ export default function App() {
                 )}
                 {sections.map((sec) => (
                   <div key={sec.label} className="section">
-                    {(grouped || objectCheck) && (
+                    {(grouped || objectCheck || lookGroups) && (
                       <h2 className="section-title">
                         {sec.label} <span className="muted small">({sec.items.length})</span>
                       </h2>

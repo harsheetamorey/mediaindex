@@ -59,7 +59,10 @@ export type Result = {
   window_thumbnail_url?: string
   overlapping_windows_merged?: number
   object_check?: 'found' | 'not found' | 'not checked'
+  group?: number // look-alikes: which group this photo is in
 }
+
+export type LookalikeLevel = 'strict' | 'normal' | 'loose'
 
 export type MediaType = 'image' | 'audio' | 'video'
 export type Target = MediaType | 'all'
@@ -100,6 +103,7 @@ export type SearchResponse = {
   index_state: IndexState | Record<string, IndexState>
   note: string
   object_check?: { label: string; name: string; found: number; detector: string }
+  lookalike_groups?: { group: number; size: number; identical: boolean }[]
 }
 
 export type Job = {
@@ -287,6 +291,8 @@ export const api = {
     request<{ months: TimelineMonth[]; undated: number }>(`/api/timeline${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   timelineMonth: (month: string, libraryIds: string[] | null) =>
     request<SearchResponse>(`/api/timeline/${month}${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
+  lookalikes: (level: LookalikeLevel, libraryIds: string[] | null) =>
+    request<SearchResponse>(`/api/lookalikes?level=${level}${libraryIds?.length ? `&library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   places: (libraryIds: string[] | null) =>
     request<PlaceOption[]>(`/api/places${libraryIds?.length ? `?library_ids=${encodeURIComponent(libraryIds.join(','))}` : ''}`),
   videoWindow: (assetId: string, startS: number, target: MediaType, libraryIds: string[] | null, includeSameVideo = false) =>

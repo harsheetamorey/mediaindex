@@ -1,0 +1,59 @@
+{
+  "library": "stockimages-cc0",
+  "photos": 500,
+  "profile": "3e76b03f5fdbe69e",
+  "variants": {
+    "resave": {
+      "min": 0.9045,
+      "median": 0.937
+    },
+    "crop": {
+      "min": 0.8709,
+      "median": 0.9688
+    },
+    "brighter": {
+      "min": 0.8965,
+      "median": 0.9735
+    },
+    "tilt": {
+      "min": 0.9035,
+      "median": 0.964
+    }
+  },
+  "nearest_other_photo": {
+    "median": 0.814,
+    "p90": 0.884,
+    "p99": 0.9325,
+    "max": 0.9964
+  },
+  "thresholds": {
+    "0.88": {
+      "copies_found": 0.992,
+      "photos_with_a_false_match": 0.12
+    },
+    "0.90": {
+      "copies_found": 0.975,
+      "photos_with_a_false_match": 0.058
+    },
+    "0.92": {
+      "copies_found": 0.867,
+      "photos_with_a_false_match": 0.034
+    },
+    "0.93": {
+      "copies_found": 0.775,
+      "photos_with_a_false_match": 0.018
+    },
+    "0.94": {
+      "copies_found": 0.667,
+      "photos_with_a_false_match": 0.01
+    },
+    "0.95": {
+      "copies_found": 0.583,
+      "photos_with_a_false_match": 0.01
+    }
+  },
+  "closest_different_pair": [
+    "stock-01680.jpg",
+    "stock-03459.jpg"
+  ]
+}
