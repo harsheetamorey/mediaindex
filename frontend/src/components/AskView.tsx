@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, ApiError, type Asset, type AskStatus, type AskTurn, type DetectedBox, type EditInfo } from '../api'
+import { api, ApiError, type Asset, type AskStatus, type AskTurn, type DetectedBox, type EditInfo, type VideoMoment } from '../api'
+import { fmtSpan, fmtTime } from '../lib/time'
 import { FOCUS_HINT } from '../lib/shortcut'
 
 type Message = {
   role: 'user' | 'assistant'
   text: string
   results?: Asset[]
+  videos?: VideoMoment[]
   boxes?: Record<string, DetectedBox[]>
   maybe?: string[]
   action?: string
@@ -17,6 +19,40 @@ type Message = {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Video moments for a search answer: thumbnails with their time span; click one to play that moment here. */
+function VideoMoments({ moments }: { moments: VideoMoment[] }) {
+  const [playing, setPlaying] = useState<number | null>(null)
+  const m = playing != null ? moments[playing] : null
+  return (
+    <div className="msg-videos">
+      <div className="muted small">Video moments (closest by similarity; may be off)</div>
+      <div className="msg-photos">
+        {moments.map((v, n) => (
+          <button
+            key={`${v.asset_id}-${v.start_s}`}
+            className={playing === n ? 'msg-photo on' : 'msg-photo'}
+            title={`${v.asset.rel_path}${v.start_s != null ? ` at ${fmtSpan(v.start_s, v.end_s)}` : ''} (click to play)`}
+            onClick={() => setPlaying(playing === n ? null : n)}
+          >
+            <img src={v.thumbnail_url} alt={v.asset.rel_path} loading="lazy" />
+            <span className="msg-num">▶ {v.start_s != null ? fmtTime(v.start_s) : ''}</span>
+          </button>
+        ))}
+      </div>
+      {m && (
+        <video
+          key={`${m.asset_id}-${m.start_s}`}
+          className="msg-video-player"
+          src={`${m.asset.file_url}#t=${m.start_s ?? 0}${m.end_s != null ? `,${m.end_s}` : ''}`}
+          controls
+          autoPlay
+          playsInline
+        />
+      )}
+    </div>
+  )
+}
 
 /** The edited copy, with the original one click away, and a way to keep it. */
 function EditView({ edit, source }: { edit: EditInfo; source?: Asset }) {
@@ -131,6 +167,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
           role: 'assistant',
           text: r.answer,
           results: r.results,
+          videos: r.video_moments,
           boxes: r.boxes,
           maybe: r.maybe_ids,
           action: r.action,
@@ -245,6 +282,7 @@ export default function AskView({ libraryIds }: { libraryIds: string[] | null })
                 {m.job && <div className="muted small">{m.progress ?? 'Starting…'}</div>}
               </div>
               {m.edit && <EditView edit={m.edit} source={all[0]} />}
+              {m.videos && m.videos.length > 0 && <VideoMoments moments={m.videos} />}
               {all.length > 0 && (!m.edit || m.edit.op === 'video') && (
                 <div className={all.length === 1 && m.role === 'assistant' ? 'msg-photos single' : 'msg-photos'}>
                   {shown.map((a, n) => (

@@ -228,6 +228,9 @@ button { font: inherit; }
 .msg.assistant .bubble { background: var(--panel); border: 1px solid var(--border); }
 .msg.error .bubble { background: var(--err-bg); color: var(--danger); border-color: transparent; }
 .msg-photos { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.msg-videos { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.msg-photo.on { outline: 2px solid var(--accent); }
+.msg-video-player { width: min(480px, 100%); border-radius: 6px; background: #000; }
 .msg-photo { position: relative; padding: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--thumb-bg); cursor: pointer; height: 72px; aspect-ratio: 4 / 3; max-width: 160px; }
 .msg-photos.single .msg-photo { height: auto; width: min(420px, 100%); max-width: none; }
 .msg-photo.maybe { border-style: dashed; border-color: var(--muted); opacity: 0.85; }

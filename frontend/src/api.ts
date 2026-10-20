@@ -190,9 +190,12 @@ export type AskResponse = {
   asset_ids: string[]
   maybe_ids?: string[]
   results: Asset[]
+  video_moments?: VideoMoment[] // searches: the closest video moments, kept apart from the numbered photos
   boxes: Record<string, DetectedBox[]>
   chat_model: { available: boolean; model?: string; reason?: string }
 }
+
+export type VideoMoment = { asset_id: string; start_s: number | null; end_s: number | null; asset: Asset; thumbnail_url: string }
 
 /** Where the detector found an object; box = [x0, y0, x1, y1] as fractions of the photo's width and height. */
 export type DetectedBox = { label: string; score: number; box: [number, number, number, number] }
