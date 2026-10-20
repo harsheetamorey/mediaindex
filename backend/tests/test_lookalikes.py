@@ -45,5 +45,21 @@ def test_api_groups_identical_copies_and_never_touches_files(tmp_path):
         members = [x["asset"]["rel_path"] for x in r["results"] if x["group"] == first["group"]]
         assert sorted(members) == ["IMG_1.jpg", "copy/IMG_1.jpg"] and first["identical"] is True
         assert all(x["similarity"] is None for x in r["results"])
+        group = [x for x in r["results"] if x["group"] == first["group"]]
+        assert sum(x["best"] for x in group) == 1 and group[0]["best"] and first["best"] == group[0]["asset"]["id"]
         assert c.get("/api/lookalikes?level=bogus").status_code == 422
     assert tree_digest(root) == before
+
+
+def test_best_shot_prefers_sharp_then_big():
+    from PIL import Image, ImageFilter
+
+    from mediaindex.lookalikes import best_shot, sharpness
+
+    rng = np.random.default_rng(0)
+    sharp = Image.fromarray(rng.integers(0, 255, (96, 128, 3), dtype=np.uint8))
+    blurred = sharp.filter(ImageFilter.GaussianBlur(2))
+    assert sharpness(sharp) > sharpness(blurred) > 0
+    assert best_shot([("blurred", sharpness(blurred), 12288), ("sharp", sharpness(sharp), 12288)]) == "sharp"
+    assert best_shot([("small", 100.0, 1000), ("big", 95.0, 4000)]) == "big"  # about as sharp: keep the bigger one
+    assert best_shot([("small", 100.0, 1000), ("big", 50.0, 4000)]) == "small"

@@ -99,6 +99,7 @@ export default function ResultsGrid(props: Props) {
           )}
           {r.asset.media_type === 'video' && <span className="cell-video" aria-hidden="true">▶ video</span>}
           {r.asset.live_video_url && <span className="cell-video" title="Live Photo: open it to play">LIVE</span>}
+          {r.best && <span className="cell-best" title="The sharpest of these look-alikes (then the biggest)">★ keep</span>}
           {r.start_s != null && (
             <span className="cell-span">
               {fmtSpan(r.start_s, r.end_s)}

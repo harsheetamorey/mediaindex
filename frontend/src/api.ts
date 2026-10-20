@@ -64,6 +64,7 @@ export type Result = {
   overlapping_windows_merged?: number
   object_check?: 'found' | 'not found' | 'not checked'
   group?: number // look-alikes: which group this photo is in
+  best?: boolean // look-alikes: the suggested one to keep (sharpest; then biggest)
 }
 
 export type LookalikeLevel = 'strict' | 'normal' | 'loose'
@@ -107,7 +108,7 @@ export type SearchResponse = {
   index_state: IndexState | Record<string, IndexState>
   note: string
   object_check?: { label: string; name: string; found: number; detector: string }
-  lookalike_groups?: { group: number; size: number; identical: boolean }[]
+  lookalike_groups?: { group: number; size: number; identical: boolean; best: string }[]
 }
 
 export type Job = {
