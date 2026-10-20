@@ -297,3 +297,21 @@ def test_missing_detector_fails_clearly(tmp_path):
         assert job["status"] == "failed" and "python -m mediaindex setup" in job["error"]
         assert "mediaindex setup" in c.get("/api/ask/status").json()["detector"]["error"]
 
+
+
+def test_save_these_as_a_selection(client):
+    c, root, lib = client
+    before = tree_digest(root)
+    r = ask(c, "show me some photos")
+    hist = [{"role": "user", "text": "show me some photos"}, turn(r)]
+    s = ask(c, "save these as Pets 2024", hist)
+    assert s["action"] == "save" and s["answer"].startswith("Saved 4 photos to “Pets 2024”.")
+    sels = {x["name"]: x for x in c.get("/api/selections").json()}
+    items = c.get(f"/api/selections/{sels['Pets 2024']['id']}").json()["items"]
+    assert [i["asset_id"] for i in items] == r["asset_ids"]
+    again = ask(c, "add them to my pets 2024 album", hist)  # same selection, any case; nothing twice
+    assert "0 new photos (4 were already in it)" in again["answer"] and len(c.get("/api/selections").json()) == 1
+    default = ask(c, "save these", hist)
+    assert "“Show me some photos”" in default["answer"]
+    assert ask(c, "save these")["action"] != "save"  # nothing to save yet: not routed as a save
+    assert tree_digest(root) == before

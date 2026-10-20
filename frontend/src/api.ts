@@ -188,7 +188,7 @@ export type EditInfo = {
 
 export type AskResponse = {
   answer: string
-  action: 'count' | 'search' | 'refine' | 'describe' | 'explain' | 'summary' | 'chat' | 'edit'
+  action: 'count' | 'search' | 'refine' | 'describe' | 'explain' | 'summary' | 'chat' | 'edit' | 'save'
   routed_by: string
   job?: Job
   described_by?: string

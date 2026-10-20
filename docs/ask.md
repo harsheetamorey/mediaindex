@@ -47,6 +47,14 @@ Searching still uses EmbeddingGemma only. RT-DETR and Gemma 4 are helpers for As
 
 Ask can also **edit photos, make images and make videos** ("remove the car from photo 2"): see [`edit.md`](edit.md).
 
+## Save an answer as a selection (2026-10-20)
+
+"**Save these as Goa trip**" (also "put those in my Goa album", "add them to a selection called Beach days", or just
+"save these") puts the photos of the last answer into that selection, making it if needed. The match is case-insensitive,
+and nothing is added twice. Without a name, the selection is named after your question. Selections are on the left,
+ready to reorder and export. Nothing is copied or moved until you export. Like edits, saving needs these words; the
+chat model never decides to save.
+
 ## Video moments in answers (2026-10-20)
 
 Searches in Ask ("show me a campfire") also show the closest **video moments**, up to 4, in their own row under the
