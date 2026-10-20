@@ -249,3 +249,24 @@ def test_browse_by_month(trip):
     assert c.get("/api/timeline/2025-01").json()["results"] == []
     assert c.get("/api/timeline/2024-13").status_code == 422
     assert c.get("/api/timeline/../etc").status_code in (404, 422)
+
+
+@pytest.mark.skipif(__import__("shutil").which("ffmpeg") is None, reason="ffmpeg not installed")
+def test_ask_search_shows_video_moments_in_their_own_row(tmp_path):
+    from test_video import color_video
+
+    root = tmp_path / "Mixed"
+    photo(root / "red.jpg", (200, 0, 0), "2024:07:14 18:00:00")
+    color_video(root / "clip.mp4", colors=["green", "blue"], seg_s=4)
+    app = create_app(Settings(data_dir=tmp_path / "data", precision="float32", watch_interval=0),
+                     backend_factory=FakeBackend, detector_factory=FakeDetector, chat=None)
+    with TestClient(app) as c:
+        lib = c.post("/api/libraries", json={"path": str(root)}).json()
+        wait_job(c, c.post(f"/api/libraries/{lib['id']}/import").json()["id"])
+        r = ask(c, "show me something blue")
+        assert names(r["results"]) == ["red.jpg"]  # numbered results stay photos
+        assert [m["asset"]["rel_path"] for m in r["video_moments"]] == ["clip.mp4"]
+        m = r["video_moments"][0]
+        assert m["start_s"] is not None and "window-thumbnail" in m["thumbnail_url"]
+        assert c.get(m["thumbnail_url"]).status_code == 200 and "closest video moment" in r["answer"]
+        assert ask(c, "how many dogs?")["video_moments"] == []  # only searches show them

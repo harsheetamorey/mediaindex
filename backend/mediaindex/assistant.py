@@ -5,6 +5,8 @@
 - "...from 2024", "last December", "from Goa" -> only photos taken then or there (EXIF date and GPS, photofilter.py),
   filtered before ranking or counting; photos without a date or place never match, and the answer says how many
 - "Photos from last summer"  -> just those photos, oldest first
+- searches also show the closest video moments (EmbeddingGemma, as in Search), in their own row: photo numbers stay
+  photos only, so "describe the second one" and edits keep meaning a photo
 - "Which of those have people?" / "...are at night?" -> narrows or re-ranks the previous answer's photos
 - "Describe the second one"  -> the local chat model looks at that one photo (needs Ollama + Gemma 4)
 - "Remove the car from photo 2" / "replace the dog with a cat" -> a new, edited copy of that photo (edit.py);
@@ -354,13 +356,17 @@ USER = "user"  # corrections typed by the user ("photo 3 isn't a dog") always wi
 
 # text, library_ids, limit, only (rank just these photos) -> asset ids by similarity
 SearchFn = Callable[[str, list[str] | None, int, set[str] | None], list[str]]
+# text, library_ids, limit, only -> [{"asset_id", "start_s", "end_s"}], closest video moments first
+VideoSearchFn = Callable[[str, list[str] | None, int, set[str] | None], list[dict]]
+VIDEO_MOMENTS = 4
 RankFn = Callable[[str, list[str]], list[str]]  # text, candidate asset ids -> the same ids, most similar first
 
 
 class Assistant:
     def __init__(self, store: Store, detector_key: str, search: SearchFn, rank_within: RankFn,
                  image_b64: Callable[[str], str], chat: OllamaChat | None = None, result_limit: int = 12,
-                 load_photo: Callable[[str], object] | None = None, today: Callable[[], date] = date.today):
+                 load_photo: Callable[[str], object] | None = None, today: Callable[[], date] = date.today,
+                 search_videos: VideoSearchFn | None = None):
         self.store = store
         self.key = detector_key
         self.search = search
@@ -370,6 +376,7 @@ class Assistant:
         self.limit = result_limit
         self.load_photo = load_photo  # asset id -> PIL image (colour follow-ups)
         self.today = today
+        self.search_videos = search_videos
 
     # ---- routing --------------------------------------------------------------------
     def plan(self, message: str, history: list[Turn], use_chat: bool) -> Plan:
@@ -535,6 +542,22 @@ class Assistant:
         return {"answer": text, "asset_ids": ids + maybe, "maybe_ids": maybe, "facts": facts, "box_labels": labels[:4]}
 
     def _search(self, plan, message, history, library_ids, use_chat, asset_id):
+        out = self._search_photos(plan, message, history, library_ids, use_chat, asset_id)
+        q = out.get("facts", {}).get("query")
+        if q and self.search_videos is not None:  # the closest video moments too, in their own row
+            when = plan.when
+            only = set(self.store.filtered_photos(library_ids, when, ("video",))) if when is not None else None
+            moments = self.search_videos(q, library_ids, VIDEO_MOMENTS, only) if only is None or only else []
+            if moments:
+                n = len(moments)
+                if not out.get("asset_ids"):
+                    out["answer"] = f"No photos match, but here {'is the closest video moment' if n == 1 else f'are the {n} closest video moments'} for “{q}”."
+                else:
+                    out["answer"] += f" Below, the {'closest video moment' if n == 1 else f'{n} closest video moments'} too."
+                out["video_moments"] = moments
+        return out
+
+    def _search_photos(self, plan, message, history, library_ids, use_chat, asset_id):
         when = plan.when
         if when is None:
             return self._search_all(plan.subject or message, library_ids, None)
@@ -550,8 +573,9 @@ class Assistant:
             more = f" (the first {SHOWN} are shown)" if len(items) > SHOWN else ""
             return {"answer": f"{what} {scope}, oldest first{more}." + self._gaps(when, library_ids),
                     "asset_ids": items[:SHOWN], "facts": {"when": scope, "photos": len(only), "videos": videos}}
-        if not only:
-            return {"answer": f"I found no photos {scope}." + self._gaps(when, library_ids), "facts": {"when": scope}}
+        if not only:  # no photos then or there; the videos may still match
+            return {"answer": f"I found no photos {scope}." + self._gaps(when, library_ids), "asset_ids": [],
+                    "facts": {"query": plan.subject, "when": scope}}
         out = self._search_all(plan.subject, library_ids, when, set(only))
         out["answer"] += (f" I only looked at the {len(only)} {'photo' if len(only) == 1 else 'photos'} {scope}."
                           + self._gaps(when, library_ids))

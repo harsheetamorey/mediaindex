@@ -47,6 +47,14 @@ Searching still uses EmbeddingGemma only. RT-DETR and Gemma 4 are helpers for As
 
 Ask can also **edit photos, make images and make videos** ("remove the car from photo 2"): see [`edit.md`](edit.md).
 
+## Video moments in answers (2026-10-20)
+
+Searches in Ask ("show me a campfire") also show the closest **video moments**, up to 4, in their own row under the
+answer. They are ranked by EmbeddingGemma like the Search tab's video moments: similarity, not a check. Click one to
+play that moment in place. Photo numbers stay photos only, so "describe the second one", "remove the car from photo 2"
+and follow-ups keep meaning a photo. With a time or place ("…from 2024", "…in Goa"), only videos made then or there
+are searched. Counting, describing and editing stay photos only.
+
 ## Confidence and follow-ups (2026-10-15)
 
 - **"Show me cars"** (and the Search tab, approved 2026-10-15): when the words name one of the detector's 80 objects,

@@ -82,6 +82,15 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
                        media_types=["image"], limit=limit, only_assets=only)
         return [x["asset"]["id"] for x in r["results"]]
 
+    def search_videos(text: str, library_ids, limit: int, only: set[str] | None = None) -> list[dict]:
+        """The closest video moments (one per video, best window first), as in the Search tab."""
+        if not store.db.one("SELECT 1 FROM assets WHERE media_type='video' AND status='indexed' LIMIT 1"):
+            return []  # no videos: don't embed the question a second time
+        vec, ms = embed_query(app, lambda b: b.embed_query_texts([text])[0])
+        r = run_search(app, mode="text", query_info={"text": text}, vec=vec, embed_ms=ms, library_ids=library_ids,
+                       media_types=["video"], limit=limit, only_assets=only)
+        return [{"asset_id": x["asset"]["id"], "start_s": x["start_s"], "end_s": x["end_s"]} for x in r["results"]]
+
     def rank_within(text: str, asset_ids: list[str]) -> list[str]:
         vec, _ = embed_query(app, lambda b: b.embed_query_texts([text])[0])
         scored = []
@@ -100,7 +109,8 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
     def load_photo(asset_id: str):
         return load_image(app.state.asset_path(asset_id)[1])
 
-    assistant = Assistant(store, DETECTOR_KEY, search, rank_within, image_b64, chat, load_photo=load_photo)
+    assistant = Assistant(store, DETECTOR_KEY, search, rank_within, image_b64, chat, load_photo=load_photo,
+                          search_videos=search_videos)
     app.state.assistant = assistant
 
     def _check_libs(library_ids):
@@ -143,6 +153,13 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
         assets = [store.get_asset(a) for a in out["asset_ids"]]
         out["results"] = [app.state.public_asset(a) for a in assets if a is not None]
         out["asset_ids"] = [a["id"] for a in out["results"]]
+        moments = []
+        for m in out.pop("video_moments", []):
+            if (a := store.get_asset(m["asset_id"])) is not None:
+                thumb = (f"/api/assets/{a['id']}/window-thumbnail?start={m['start_s']:.3f}" if m["start_s"] is not None
+                         else f"/api/assets/{a['id']}/thumbnail")
+                moments.append({**m, "asset": app.state.public_asset(a), "thumbnail_url": thumb})
+        out["video_moments"] = moments
         if (req := out.pop("create_request", None)) is not None:
             if req["op"] == "generate" and painter_factory is None:
                 out["answer"] = "Making images is turned off on this computer."
