@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Job, Library } from '../api'
+import { COPY_PATH_HINT, examplePath } from '../lib/platform'
 
 type Props = {
   libraries: Library[]
@@ -79,11 +80,11 @@ export default function Sidebar(props: Props) {
             id="lib-path"
             value={path}
             onChange={(e) => setPath(e.target.value)}
-            placeholder="/Users/you/Pictures/project"
+            placeholder={examplePath('Pictures/project')}
             spellCheck={false}
           />
           <p className="hint">
-            Choose a folder, or paste its full path (in Finder: select it and press ⌥⌘C). MediaIndex only reads that folder.
+            Choose a folder, or paste its full path ({COPY_PATH_HINT}). MediaIndex only reads that folder.
             Your files are never moved, changed or uploaded.
           </p>
           {error && <p className="error" role="alert">{error}</p>}

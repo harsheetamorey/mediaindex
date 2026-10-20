@@ -41,7 +41,8 @@ class AudioInfo:
 def ffmpeg_bin(name: str) -> str:
     p = shutil.which(name)
     if p is None:
-        raise AudioRejected(f"{name} not found; install FFmpeg (e.g. `brew install ffmpeg`) to index audio/video")
+        raise AudioRejected(f"{name} not found; install FFmpeg (macOS: `brew install ffmpeg`; Windows: "
+                            f"`winget install Gyan.FFmpeg`) to index audio/video")
     return p
 
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, ApiError, type ClipPlan, type Job, type Result } from '../api'
+import { examplePath } from '../lib/platform'
 import { fmtSpan, fmtTime } from '../lib/time'
 
 type Props = {
@@ -154,7 +155,7 @@ function ClipExport({
         </label>
       </fieldset>
       <div className="query-row">
-        <input type="search" aria-label="Clip destination folder" placeholder="/Users/you/Desktop/clips" value={dest} onChange={(e) => (setDest(e.target.value), setPlan(null))} spellCheck={false} />
+        <input type="search" aria-label="Clip destination folder" placeholder={examplePath('Desktop/clips')} value={dest} onChange={(e) => (setDest(e.target.value), setPlan(null))} spellCheck={false} />
         <button
           className="btn"
           disabled={!dest.trim()}

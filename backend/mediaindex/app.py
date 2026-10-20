@@ -52,6 +52,10 @@ class AppSettingsPatch(BaseModel):
 
 PICK_FOLDER_SCRIPT = ['tell me to activate',
                       'POSIX path of (choose folder with prompt "Choose a media folder for MediaIndex")']
+PICK_FOLDER_PS = ("Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                  "$d.Description = 'Choose a media folder for MediaIndex'; $d.ShowNewFolderButton = $false; "
+                  "$top = New-Object System.Windows.Forms.Form -Property @{TopMost = $true}; "
+                  "if ($d.ShowDialog($top) -eq 'OK') { [Console]::OutputEncoding = [Text.Encoding]::UTF8; $d.SelectedPath }")
 
 
 def create_app(settings: Settings | None = None, backend_factory=None, detector_factory=None, chat=...,
@@ -165,18 +169,24 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
 
     @app.post("/api/pick-folder")
     def pick_folder() -> dict:
-        """Show the native macOS folder chooser on this computer and return the chosen absolute path."""
-        if sys.platform != "darwin":
-            raise HTTPException(501, "the folder chooser is only available on macOS; paste the folder path instead")
-        cmd = ["osascript"] + [a for line in PICK_FOLDER_SCRIPT for a in ("-e", line)]
+        """Show the native folder chooser on this computer (macOS or Windows) and return the chosen absolute path."""
+        if sys.platform == "darwin":
+            cmd = ["osascript"] + [a for line in PICK_FOLDER_SCRIPT for a in ("-e", line)]
+        elif sys.platform == "win32":
+            cmd = ["powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-Command", PICK_FOLDER_PS]
+        else:
+            raise HTTPException(501, "the folder chooser is only available on macOS and Windows; paste the folder path "
+                                     "instead")
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=600)
         except subprocess.TimeoutExpired:
             return {"cancelled": True}
-        if r.returncode != 0:  # -128 = user cancelled
-            return {"cancelled": True}
+        except OSError as e:
+            raise HTTPException(501, f"the folder chooser could not be opened ({e}); paste the folder path instead")
         path = r.stdout.strip()
-        return {"cancelled": False, "path": path.rstrip("/") or path}
+        if r.returncode != 0 or not path:  # osascript: -128 = user cancelled; PowerShell prints nothing
+            return {"cancelled": True}
+        return {"cancelled": False, "path": path.rstrip("/\\") or path}
 
     @app.get("/api/settings")
     def get_settings() -> dict:

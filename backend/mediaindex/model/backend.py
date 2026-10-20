@@ -14,6 +14,7 @@ from typing import Protocol, Sequence
 import numpy as np
 from PIL import Image
 
+from ..config import auto_device, free_device_memory
 from .profiles import IndexProfile
 
 
@@ -58,7 +59,7 @@ class GemmaBackend:
         from sentence_transformers import SentenceTransformer
 
         if device == "auto":
-            device = "mps" if torch.backends.mps.is_available() else "cpu"
+            device = auto_device(torch)
         self.device = device
         self.profile = profile
         config_kwargs = {}
@@ -103,8 +104,7 @@ class GemmaBackend:
         return l2_normalize(out)
 
     def _empty_cache(self) -> None:
-        if self.device == "mps":
-            self._torch.mps.empty_cache()
+        free_device_memory(self._torch, self.device)
 
     def embed_query_texts(self, texts: Sequence[str]) -> np.ndarray:
         return self._encode([self.profile.query_prompt + t for t in texts])

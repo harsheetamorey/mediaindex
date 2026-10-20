@@ -62,6 +62,11 @@ def _free_port(preferred: int) -> int:
 
 
 def _alert(message: str) -> None:
+    if sys.platform == "win32":
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(None, message, "MediaIndex", 0x10)  # MB_ICONERROR
+        return
     subprocess.run(["osascript", "-e", f'display alert "MediaIndex" message {json_str(message)} as critical'],
                    capture_output=True)
 

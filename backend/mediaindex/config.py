@@ -15,6 +15,20 @@ def setup_step(command: str) -> str:
     return f"Run this once in the MediaIndex folder: {command}"
 
 
+def auto_device(torch) -> str:
+    """Apple GPU (MPS) on a Mac, an NVIDIA GPU (CUDA) on Windows or Linux when torch was installed with CUDA, else CPU."""
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cuda" if torch.cuda.is_available() else "cpu"
+
+
+def free_device_memory(torch, device: str) -> None:
+    if device == "mps":
+        torch.mps.empty_cache()
+    elif device == "cuda":
+        torch.cuda.empty_cache()
+
+
 def _default_data_dir() -> Path:
     env = os.environ.get("MEDIAINDEX_DATA_DIR")
     if env:
@@ -27,7 +41,7 @@ class Settings:
     data_dir: Path = field(default_factory=_default_data_dir)
     host: str = "127.0.0.1"
     port: int = int(os.environ.get("MEDIAINDEX_PORT", "8765"))
-    device: str = os.environ.get("MEDIAINDEX_DEVICE", "auto")  # auto | mps | cpu
+    device: str = os.environ.get("MEDIAINDEX_DEVICE", "auto")  # auto | mps | cuda | cpu
     precision: str = os.environ.get("MEDIAINDEX_PRECISION", "auto")  # auto | bfloat16 | float32
     job_queue_size: int = 8
     query_wait_seconds: float = float(os.environ.get("MEDIAINDEX_QUERY_WAIT", "30"))
@@ -67,7 +81,7 @@ class Settings:
         try:
             import torch
 
-            return "mps" if torch.backends.mps.is_available() else "cpu"
+            return auto_device(torch)
         except ImportError:
             return "cpu"
 

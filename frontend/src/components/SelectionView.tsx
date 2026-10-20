@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError, type ExportPlan, type Job, type Selection, type SelectionItem } from '../api'
+import { examplePath } from '../lib/platform'
 
 type Props = {
   selectionId: string
@@ -170,7 +171,7 @@ function ExportPanel({ selectionId, onClose }: { selectionId: string; onClose: (
         <input
           type="search"
           aria-label="Destination folder"
-          placeholder="/Users/you/Desktop/selects"
+          placeholder={examplePath('Desktop/selects')}
           value={dest}
           onChange={(e) => {
             setDest(e.target.value)
