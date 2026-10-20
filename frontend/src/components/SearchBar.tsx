@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MediaType, QueryMode, Target } from '../api'
 
+import { FOCUS_HINT } from '../lib/shortcut'
 import { fmtSpan } from '../lib/time'
 
 export type Reference =
@@ -155,7 +156,7 @@ export default function SearchBar(p: Props) {
             type="search"
             value={p.text}
             onChange={(e) => p.onText(e.target.value)}
-            placeholder={
+            placeholder={`${
               p.reference?.media === 'audio'
                 ? 'Optional: refine, e.g. "in a large hall" (experimental)'
                 : p.reference
@@ -165,7 +166,7 @@ export default function SearchBar(p: Props) {
                     : p.target === 'video'
                       ? 'Describe a moment, e.g. "a dog in a field"…'
                       : 'Describe what you’re looking for…'
-            }
+            } (${FOCUS_HINT})`}
             maxLength={2000}
             autoComplete="off"
           />

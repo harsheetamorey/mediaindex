@@ -16,6 +16,7 @@ import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
 import ResultsGrid, { resultKey } from './components/ResultsGrid'
 import SearchBar, { type Reference } from './components/SearchBar'
+import { isFocusShortcut } from './lib/shortcut'
 import AskView from './components/AskView'
 import SelectionView from './components/SelectionView'
 import Sidebar from './components/Sidebar'
@@ -96,6 +97,31 @@ export default function App() {
       .then((d) => setAddedKeys(new Set(d.items.map((i) => `${i.asset_id}|${i.start_s ?? ''}|${i.end_s ?? ''}`))))
       .catch(() => setAddedKeys(new Set()))
   }, [activeSel])
+
+  // ⌘K (Ctrl+K) or / jumps to the search box, or to the message box on the Ask tab; Esc leaves it.
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const box = () => document.getElementById(view === 'ask' ? 'ask-q' : 'q') as HTMLInputElement | null
+      if (e.key === 'Escape') {
+        const el = document.activeElement
+        if (el instanceof HTMLElement && (el.id === 'q' || el.id === 'ask-q')) {
+          e.preventDefault() // keep the typed text (Esc would clear a search field)
+          el.blur()
+        }
+        return
+      }
+      if (e.defaultPrevented || !isFocusShortcut(e) || document.querySelector('[aria-modal="true"]')) return
+      e.preventDefault()
+      if (view === 'selection') setView('search')
+      requestAnimationFrame(() => {
+        const el = box()
+        el?.focus()
+        el?.select()
+      })
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [view])
 
   useEffect(() => {
     if (!toast) return
