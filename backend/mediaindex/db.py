@@ -140,6 +140,16 @@ MIGRATIONS: list[str] = [
         PRIMARY KEY (content_hash, label, verifier)
     );
     """,
+    # v7: when and where a photo was taken (EXIF), for "beach photos from 2024" and "everything from Goa".
+    # photo_meta_read = 1 once the file's EXIF has been read, so photos imported earlier are read once on re-import.
+    """
+    ALTER TABLE assets ADD COLUMN taken_at TEXT;
+    ALTER TABLE assets ADD COLUMN gps_lat REAL;
+    ALTER TABLE assets ADD COLUMN gps_lon REAL;
+    ALTER TABLE assets ADD COLUMN place TEXT;
+    ALTER TABLE assets ADD COLUMN photo_meta_read INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX assets_taken ON assets(taken_at);
+    """,
 ]
 
 

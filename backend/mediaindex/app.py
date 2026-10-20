@@ -19,7 +19,7 @@ from .config import Settings
 from .db import Database
 from . import api_ask, api_search, api_selections
 from .indexer import make_audio_embedder, make_image_embedder, make_video_embedder
-from .ingest import run_image_import, thumb_path, window_thumb_path
+from .ingest import read_missing_photo_meta, run_image_import, thumb_path, window_thumb_path
 from .media.images import BROWSER_EXTENSIONS, ImageRejected, jpeg_bytes, load_image
 from .search import MatrixCache
 from .uploads import cleanup_stale_uploads
@@ -78,6 +78,8 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
     async def lifespan(app: FastAPI):
         if settings.watch_interval > 0:
             watcher.start()
+        if store.photos_without_meta():  # photos imported before dates and places were stored
+            runner.submit("read-photo-dates", lambda ctx: read_missing_photo_meta(ctx, store))
         yield
         watcher.stop()
         runner.shutdown()
@@ -227,7 +229,7 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
     # ---- asset serving (by immutable ID only) ----------------------------------
     def _public_asset(a: dict) -> dict:
         out = {k: a[k] for k in ("id", "library_id", "rel_path", "media_type", "size", "content_hash", "width",
-                                 "height", "duration", "status", "error")}
+                                 "height", "duration", "status", "error", "taken_at", "place")}
         import json as _json
 
         meta = _json.loads(a["meta_json"]) if a.get("meta_json") else {}

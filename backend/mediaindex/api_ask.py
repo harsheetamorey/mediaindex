@@ -76,10 +76,10 @@ def register(app: FastAPI, detector_host: DetectorHost, chat, editor: Editor | N
     store = app.state.store
     edits = EditStore(app.state.settings.data_dir / "edits")
 
-    def search(text: str, library_ids, limit: int) -> list[str]:
+    def search(text: str, library_ids, limit: int, only: set[str] | None = None) -> list[str]:
         vec, ms = embed_query(app, lambda b: b.embed_query_texts([text])[0])
         r = run_search(app, mode="text", query_info={"text": text}, vec=vec, embed_ms=ms, library_ids=library_ids,
-                       media_types=["image"], limit=limit)
+                       media_types=["image"], limit=limit, only_assets=only)
         return [x["asset"]["id"] for x in r["results"]]
 
     def rank_within(text: str, asset_ids: list[str]) -> list[str]:

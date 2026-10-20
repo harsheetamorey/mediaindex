@@ -2,6 +2,9 @@
 
 - "How many dogs?"           -> object counts from the detector (detect.py), with the photos they come from
 - "Show me beach sunsets"    -> EmbeddingGemma search (ranked by similarity, as in Search)
+- "...from 2024", "last December", "from Goa" -> only photos taken then or there (EXIF date and GPS, photofilter.py),
+  filtered before ranking or counting; photos without a date or place never match, and the answer says how many
+- "Photos from last summer"  -> just those photos, oldest first
 - "Which of those have people?" / "...are at night?" -> narrows or re-ranks the previous answer's photos
 - "Describe the second one"  -> the local chat model looks at that one photo (needs Ollama + Gemma 4)
 - "Remove the car from photo 2" / "replace the dog with a cat" -> a new, edited copy of that photo (edit.py);
@@ -19,12 +22,14 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Callable
 
 import numpy as np
 
 from .detect import LABELS, SURE
 from .llm import ChatUnavailable, OllamaChat
+from .photofilter import PhotoFilter, parse_filter
 from .store import Store
 
 ACTIONS = ("count", "search", "refine", "describe", "explain", "summary", "chat")
@@ -77,6 +82,9 @@ def _build_index() -> dict[str, str]:
 
 
 WORD_TO_LABEL = _build_index()
+FILTERED = ("search", "count", "summary", "refine", "video")  # answers that a time or place can narrow
+GENERIC = set("what what's whats everything anything stuff shoot shot took take taken photographed get got".split())
+SHOWN = 48  # photos shown for "photos from last summer"
 FILLER = set("""a an the any all my our your of in on at with do does did i we you have has had are is there was were
 photo photos picture pictures image images pic pics shot shots library folder collection total altogether
 contain contains containing show see find can could please how many number count counted some me which those
@@ -202,6 +210,7 @@ class Plan:
     new: str = ""  # edit: what to put in place of `subject` ("" = remove it)
     big: bool = False  # edit: the user said to go ahead although it changes most of the photo
     seed: int = 0  # edit: > 0 when the user asked to try a removal again
+    when: PhotoFilter | None = None  # only photos taken then / there ("from 2024", "in Goa")
 
 
 def _parts(message: str) -> list[str]:
@@ -343,14 +352,15 @@ class Turn:
 
 USER = "user"  # corrections typed by the user ("photo 3 isn't a dog") always win
 
-SearchFn = Callable[[str, list[str] | None, int], list[str]]  # text, library_ids, limit -> asset ids by similarity
+# text, library_ids, limit, only (rank just these photos) -> asset ids by similarity
+SearchFn = Callable[[str, list[str] | None, int, set[str] | None], list[str]]
 RankFn = Callable[[str, list[str]], list[str]]  # text, candidate asset ids -> the same ids, most similar first
 
 
 class Assistant:
     def __init__(self, store: Store, detector_key: str, search: SearchFn, rank_within: RankFn,
                  image_b64: Callable[[str], str], chat: OllamaChat | None = None, result_limit: int = 12,
-                 load_photo: Callable[[str], object] | None = None):
+                 load_photo: Callable[[str], object] | None = None, today: Callable[[], date] = date.today):
         self.store = store
         self.key = detector_key
         self.search = search
@@ -359,6 +369,7 @@ class Assistant:
         self.chat = chat
         self.limit = result_limit
         self.load_photo = load_photo  # asset id -> PIL image (colour follow-ups)
+        self.today = today
 
     # ---- routing --------------------------------------------------------------------
     def plan(self, message: str, history: list[Turn], use_chat: bool) -> Plan:
@@ -383,6 +394,36 @@ class Assistant:
                         routed_by="chat model")
         except (ChatUnavailable, ValueError, TypeError, json.JSONDecodeError):
             return Plan("search", _strip(message) or message)
+
+    def _plan_filtered(self, message: str, history: list[Turn], library_ids, use_chat: bool) -> Plan:
+        """Take a time or place out of the question ("beach photos from 2024") and plan the rest; the filter is
+        applied by the answer. Questions it can't narrow (describe, edit, …) are planned as asked."""
+        when, rest = parse_filter(message, self.today(), self.store.known_places(library_ids))
+        if when is None:
+            return self.plan(message, history, use_chat)
+        generic = not [w for w in _strip(rest).lower().split() if w not in GENERIC]
+        plan = self.plan(rest, history, use_chat) if rest.strip(" ?.!") else Plan("search")
+        if plan.action == "chat" or (plan.action == "search" and generic):
+            plan = Plan("search", routed_by=plan.routed_by)  # "what did I shoot in 2024?", "photos from Goa"
+        elif plan.action not in FILTERED:
+            return self.plan(message, history, use_chat)
+        if generic:
+            plan.subject = ""
+        plan.when = when
+        return plan
+
+    def _filtered(self, when: PhotoFilter | None, library_ids) -> list[str] | None:
+        return None if when is None else self.store.filtered_photos(library_ids, when)
+
+    def _gaps(self, when: PhotoFilter | None, library_ids) -> str:
+        """ "12 photos have no date, so they're not included." """
+        if when is None:
+            return ""
+        gaps, out = self.store.photo_meta_gaps(library_ids), ""
+        for n, what in ((gaps["undated"] if when.dated else 0, "date"), (gaps["unplaced"] if when.places else 0, "location")):
+            if n:
+                out += f" {n} {'photo has' if n == 1 else 'photos have'} no {what}, so {'it isn’t' if n == 1 else 'they aren’t'} included."
+        return out
 
     @staticmethod
     def _previous(history: list[Turn]) -> list[str]:
@@ -427,7 +468,7 @@ class Assistant:
             if asset_id:  # the user clicked a photo and asked about it: describe it, or edit it
                 plan = edit_plan(message) or Plan("describe", item=None)
             else:
-                plan = self.plan(message, history, use_chat)
+                plan = self._plan_filtered(message, history, library_ids, use_chat)
             handler = getattr(self, "_" + plan.action)
             out = handler(plan, message, history, library_ids, use_chat, asset_id)
         out.update(action=plan.action, routed_by=plan.routed_by, chat_model=status)
@@ -441,24 +482,35 @@ class Assistant:
                     out["boxes"][aid] = b
         return out
 
-    def _coverage(self, library_ids):
-        return self.store.detection_coverage(self.key, library_ids)
+    def _coverage(self, library_ids, when: PhotoFilter | None = None):
+        return self.store.detection_coverage(self.key, library_ids, when)
 
     def _count(self, plan, message, history, library_ids, use_chat, asset_id):
-        cov = self._coverage(library_ids)
-        labels = resolve_labels(plan.subject) or resolve_labels(message)
+        when = plan.when
+        scope = f" {when.describe()}" if when else ""
+        cov = self._coverage(library_ids, when)
+        labels = resolve_labels(plan.subject) or (resolve_labels(message) if when is None else [])
         facts = {"subject": plan.subject, "labels": labels, "coverage": cov}
+        if when is not None:
+            facts["when"] = when.describe()
+            if not labels and not plan.subject:  # "how many photos from 2024?"
+                ids = self._filtered(when, library_ids)
+                return {"answer": f"You have {len(ids)} {'photo' if len(ids) == 1 else 'photos'}{scope}."
+                                  + self._gaps(when, library_ids), "asset_ids": ids[:SHOWN], "facts": facts}
         if not labels:
-            ids = self.search(plan.subject or message, library_ids, self.limit)
+            only = self._filtered(when, library_ids)
+            ids = self.search(plan.subject or message, library_ids, self.limit, set(only) if only is not None else None)
             return {"answer": (f"I can count common things like people, dogs, cats, cars and birds, but not "
                                f"“{plan.subject or message}”. Here are the closest photos instead."),
                     "asset_ids": ids, "facts": facts}
         if cov["checked"] == 0:
+            if when is not None and cov["photos"] == 0:
+                return {"answer": f"I found no photos{scope}." + self._gaps(when, library_ids), "facts": facts}
             return {"answer": ("Your photos haven't been checked for objects yet. Press “Count objects” above, "
                                "then ask again."), "facts": facts}
         parts, ids, maybe = [], [], []
         for label in labels[:4]:
-            c = self.store.count_objects(self.key, label, library_ids, sure=SURE)
+            c = self.store.count_objects(self.key, label, library_ids, sure=SURE, when=when)
             kept = self._without_corrections(label, c["asset_ids"])
             unsure = [a for a in self._without_corrections(label, c["maybe_ids"]) if a not in ids and a not in kept]
             objects = sum(c["counts"][a] for a in kept)
@@ -466,9 +518,9 @@ class Assistant:
             ids += [a for a in kept if a not in ids]
             maybe += [a for a in unsure if a not in maybe]
             if not kept:
-                parts.append(f"I didn't find any {display(label)} in the {cov['checked']} photos I checked.")
+                parts.append(f"I didn't find any {display(label)} in the {cov['checked']} photos{scope} I checked.")
             else:
-                parts.append(f"{display(label).capitalize()} appear in {len(kept)} of {cov['checked']} photos "
+                parts.append(f"{display(label).capitalize()} appear in {len(kept)} of {cov['checked']} photos{scope} "
                              f"({objects} {display(label, objects)} counted).")
             if unsure:
                 parts.append(f"{len(unsure)} more {'photo' if len(unsure) == 1 else 'photos'} might have {display(label)}, "
@@ -477,15 +529,33 @@ class Assistant:
         unchecked = cov["photos"] - cov["checked"]
         if unchecked:
             text += f" {unchecked} newer photos haven't been checked yet."
+        text += self._gaps(when, library_ids)
         text += " Counts come from automatic detection and can be wrong; tell me if one is (“photo 3 isn't a dog”)."
         ids, maybe = ids[:48], maybe[:24]
         return {"answer": text, "asset_ids": ids + maybe, "maybe_ids": maybe, "facts": facts, "box_labels": labels[:4]}
 
     def _search(self, plan, message, history, library_ids, use_chat, asset_id):
-        q = plan.subject or message
+        when = plan.when
+        if when is None:
+            return self._search_all(plan.subject or message, library_ids, None)
+        scope, only = when.describe(), self._filtered(when, library_ids)
+        if not only:
+            return {"answer": f"I found no photos {scope}." + self._gaps(when, library_ids), "facts": {"when": scope}}
+        if not plan.subject:  # "photos from last December"
+            more = f" (the first {SHOWN} are shown)" if len(only) > SHOWN else ""
+            return {"answer": f"{len(only)} {'photo' if len(only) == 1 else 'photos'} {scope}, oldest first{more}."
+                              + self._gaps(when, library_ids), "asset_ids": only[:SHOWN],
+                    "facts": {"when": scope, "photos": len(only)}}
+        out = self._search_all(plan.subject, library_ids, when, set(only))
+        out["answer"] += (f" I only looked at the {len(only)} {'photo' if len(only) == 1 else 'photos'} {scope}."
+                          + self._gaps(when, library_ids))
+        out["facts"]["when"] = scope
+        return out
+
+    def _search_all(self, q: str, library_ids, when: PhotoFilter | None, only: set[str] | None = None) -> dict:
         labels = resolve_labels(q)
-        checked = len(labels) == 1 and self._coverage(library_ids)["checked"] > 0
-        ids = self.search(q, library_ids, self.limit * 4 if checked else self.limit)
+        checked = len(labels) == 1 and self._coverage(library_ids, when)["checked"] > 0
+        ids = self.search(q, library_ids, self.limit * 4 if checked else self.limit, only)
         if not ids:
             return {"answer": "Nothing is indexed yet. Add a folder on the left first.", "facts": {"query": q}}
         if checked:  # like the Search tab: photos where the detector found it first, the rest marked "maybe"
@@ -505,6 +575,15 @@ class Assistant:
 
     def _refine(self, plan, message, history, library_ids, use_chat, asset_id):
         prev = self._previous(history)
+        if plan.when is not None:  # "which of those are from 2024?"
+            allowed = set(self._filtered(plan.when, library_ids))
+            kept = [a for a in prev if a in allowed]
+            if not plan.subject:
+                scope = plan.when.describe()
+                return {"answer": f"{len(kept)} of those {len(prev)} photos {'is' if len(kept) == 1 else 'are'} {scope}."
+                                  + self._gaps(plan.when, library_ids), "asset_ids": kept,
+                        "facts": {"when": scope, "of": len(prev), "kept": len(kept)}}
+            prev = kept
         q = plan.subject or message
         colour = next((COLOUR_WORDS[w] for w in re.findall(r"[a-z]+", message.lower()) if w in COLOUR_WORDS), None)
         topic = resolve_label(q) or self._topic_label(message, history)
@@ -721,9 +800,17 @@ class Assistant:
 
     def _video(self, plan, message, history, library_ids, use_chat, asset_id):
         """A slideshow of exactly the photos asked for: the last answer's, or the closest matches for a subject."""
+        only = self._filtered(plan.when, library_ids)
+        scope = f" {plan.when.describe()}" if plan.when else ""
+        if plan.when is not None and not only:
+            return {"answer": f"I found no photos{scope}." + self._gaps(plan.when, library_ids), "facts": {}}
         if plan.subject:
-            ids = self.search(plan.subject, library_ids, self.limit)
-            source = f"the {len(ids)} closest matches for “{plan.subject}”"
+            ids = self.search(plan.subject, library_ids, self.limit, set(only) if only is not None else None)
+            source = f"the {len(ids)} closest matches for “{plan.subject}”{scope}"
+        elif only is not None:  # "make a video of last summer"
+            ids = only[:self.limit]
+            source = (f"the {len(only)} photos{scope}" if len(only) <= self.limit else
+                      f"the first {len(ids)} of the {len(only)} photos{scope}") + ", oldest first"
         else:
             ids = self._previous(history) or self._focus(history)
             source = f"{'this photo' if len(ids) == 1 else f'these {len(ids)} photos'}"
@@ -789,14 +876,20 @@ class Assistant:
 
     def _summary(self, plan, message, history, library_ids, use_chat, asset_id):
         """What's in the library: every number comes from the database, never from the chat model."""
-        cov = self._coverage(library_ids)
+        when = plan.when
+        scope = f" {when.describe()}" if when else ""
+        cov = self._coverage(library_ids, when)
         if cov["photos"] == 0:
+            if when is not None:
+                return {"answer": f"I found no photos{scope}." + self._gaps(when, library_ids), "facts": {"coverage": cov}}
             return {"answer": "There are no indexed photos yet. Add a folder on the left first.", "facts": {"coverage": cov}}
+        shown = self._filtered(when, library_ids)[:SHOWN] if when else []  # "everything from Goa": show them too
         if cov["checked"] == 0:
-            return {"answer": f"You have {cov['photos']} photos. Press “Count objects” above to see what's in them.",
-                    "facts": {"coverage": cov}}
-        top = self.store.object_summary(self.key, library_ids, sure=SURE)[:8]
-        text = f"You have {cov['photos']} photos."
+            return {"answer": f"You have {cov['photos']} {'photo' if cov['photos'] == 1 else 'photos'}{scope}. Press "
+                              f"“Count objects” above to see what's in them." + self._gaps(when, library_ids),
+                    "asset_ids": shown, "facts": {"coverage": cov}}
+        top = self.store.object_summary(self.key, library_ids, sure=SURE, when=when)[:8]
+        text = f"You have {cov['photos']} {'photo' if cov['photos'] == 1 else 'photos'}{scope}."
         if top:
             text += " Most common in them: " + ", ".join(
                 f"{display(t['label'])} ({t['photos']} {'photo' if t['photos'] == 1 else 'photos'})" for t in top) + "."
@@ -804,13 +897,14 @@ class Assistant:
             text += " I didn't find any of the common objects I can count."
         if cov["checked"] < cov["photos"]:
             text += f" {cov['photos'] - cov['checked']} newer photos haven't been checked yet."
+        text += self._gaps(when, library_ids)
         examples = []  # one example photo for each of the most common things
         for t in top[:6]:
-            ids = self._without_corrections(t["label"],
-                                             self.store.count_objects(self.key, t["label"], library_ids, sure=SURE)["asset_ids"])
+            ids = self._without_corrections(t["label"], self.store.count_objects(self.key, t["label"], library_ids,
+                                                                                 sure=SURE, when=when)["asset_ids"])
             if (pick := next((a for a in ids if a not in examples), None)) is not None:
                 examples.append(pick)
-        return {"answer": text, "asset_ids": examples, "facts": {"coverage": cov, "top": top},
+        return {"answer": text, "asset_ids": shown or examples, "facts": {"coverage": cov, "top": top},
                 "box_labels": [t["label"] for t in top[:6]]}
 
     def _chat(self, plan, message, history, library_ids, use_chat, asset_id):

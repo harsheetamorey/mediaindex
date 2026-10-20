@@ -11,6 +11,7 @@ import numpy as np
 
 from .db import Database, now
 from .model.profiles import IndexProfile
+from .photofilter import PhotoFilter
 
 INDEXED = "indexed"
 PENDING = "pending"
@@ -311,14 +312,20 @@ class Store:
                       (content_hash, detector, now()))
 
     @staticmethod
-    def _scope(library_ids: list[str] | None) -> tuple[str, list]:
-        sql = "a.media_type='image' AND a.status='indexed'"
+    def _scope(library_ids: list[str] | None, when: PhotoFilter | None = None) -> tuple[str, list]:
+        sql, params = "a.media_type='image' AND a.status='indexed'", []
         if library_ids:
-            return sql + f" AND a.library_id IN ({','.join('?' * len(library_ids))})", list(library_ids)
-        return sql, []
+            sql += f" AND a.library_id IN ({','.join('?' * len(library_ids))})"
+            params += list(library_ids)
+        if when is not None:
+            w, p = when.sql()
+            sql += f" AND {w}"
+            params += p
+        return sql, params
 
-    def detection_coverage(self, detector: str, library_ids: list[str] | None = None) -> dict:
-        where, params = self._scope(library_ids)
+    def detection_coverage(self, detector: str, library_ids: list[str] | None = None,
+                           when: PhotoFilter | None = None) -> dict:
+        where, params = self._scope(library_ids, when)
         r = self.db.one(f"""SELECT COUNT(*) AS photos, COUNT(dr.content_hash) AS checked FROM assets a
                             LEFT JOIN detection_runs dr ON dr.content_hash=a.content_hash AND dr.detector=?
                             WHERE {where}""", [detector, *params])
@@ -335,10 +342,10 @@ class Store:
         return out
 
     def count_objects(self, detector: str, label: str, library_ids: list[str] | None = None,
-                      sure: float = 0.0) -> dict:
+                      sure: float = 0.0, when: PhotoFilter | None = None) -> dict:
         """Photos (files) where the detector found `label`. A photo counts if it has a box scoring >= `sure`;
         photos with only lower-scoring boxes are returned separately as `maybe_ids`."""
-        where, params = self._scope(library_ids)
+        where, params = self._scope(library_ids, when)
         rows = self.db.query(f"""SELECT a.id, a.rel_path, d.boxes_json FROM assets a
                                  JOIN detections d ON d.content_hash=a.content_hash AND d.detector=? AND d.label=?
                                  WHERE {where}""", [detector, label, *params])
@@ -389,9 +396,10 @@ class Store:
             c.execute("INSERT OR REPLACE INTO verifications(content_hash, label, verifier, present, created_at) "
                       "VALUES (?,?,?,?,?)", (content_hash, label, verifier, int(present), now()))
 
-    def object_summary(self, detector: str, library_ids: list[str] | None = None, sure: float = 0.0) -> list[dict]:
+    def object_summary(self, detector: str, library_ids: list[str] | None = None, sure: float = 0.0,
+                       when: PhotoFilter | None = None) -> list[dict]:
         """Per label: photos with a box scoring >= `sure`, and how many such boxes in total."""
-        where, params = self._scope(library_ids)
+        where, params = self._scope(library_ids, when)
         rows = self.db.query(f"""SELECT d.label, d.boxes_json FROM assets a
                                  JOIN detections d ON d.content_hash=a.content_hash AND d.detector=?
                                  WHERE {where}""", [detector, *params])
@@ -404,6 +412,39 @@ class Store:
                 a[1] += n
         return [{"label": k, "photos": v[0], "objects": v[1]}
                 for k, v in sorted(agg.items(), key=lambda kv: (-kv[1][0], kv[0]))]
+
+    # ---- when and where photos were taken (EXIF) ------------------------------------
+    def set_photo_meta(self, asset_id: str, taken_at: str | None, gps: tuple[float, float] | None,
+                       place: str | None) -> None:
+        lat, lon = gps or (None, None)
+        with self.db.tx() as c:
+            c.execute("UPDATE assets SET taken_at=?, gps_lat=?, gps_lon=?, place=?, photo_meta_read=1 WHERE id=?",
+                      (taken_at, lat, lon, place, asset_id))
+
+    def photos_without_meta(self) -> list[dict]:
+        """Photos whose EXIF date and place haven't been read yet (imported before they were stored)."""
+        return [dict(r) for r in self.db.query("""SELECT a.id, a.rel_path, l.root_path FROM assets a
+                                                   JOIN libraries l ON l.id = a.library_id
+                                                   WHERE a.media_type='image' AND a.photo_meta_read=0
+                                                   AND a.status != 'missing'""")]
+
+    def filtered_photos(self, library_ids: list[str] | None, when: PhotoFilter) -> list[str]:
+        """Indexed photos matching `when`, oldest first (undated ones last)."""
+        where, params = self._scope(library_ids, when)
+        return [r["id"] for r in self.db.query(f"""SELECT a.id FROM assets a WHERE {where}
+                                                   ORDER BY a.taken_at IS NULL, a.taken_at, a.rel_path""", params)]
+
+    def photo_meta_gaps(self, library_ids: list[str] | None = None) -> dict:
+        """How many indexed photos have no date, and no place."""
+        where, params = self._scope(library_ids)
+        r = self.db.one(f"""SELECT COUNT(*) AS photos, SUM(a.taken_at IS NULL) AS undated,
+                            SUM(a.place IS NULL) AS unplaced FROM assets a WHERE {where}""", params)
+        return {"photos": r["photos"], "undated": r["undated"] or 0, "unplaced": r["unplaced"] or 0}
+
+    def known_places(self, library_ids: list[str] | None = None) -> list[str]:
+        where, params = self._scope(library_ids)
+        return [r["place"] for r in self.db.query(f"SELECT DISTINCT a.place FROM assets a WHERE {where} "
+                                                  "AND a.place IS NOT NULL", params)]
 
     # ---- jobs ------------------------------------------------------------------
     def save_job(self, job: dict, library_id: str | None = None) -> None:

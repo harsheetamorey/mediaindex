@@ -1,7 +1,14 @@
 # Third-party data
 
-MediaIndex does not bundle any third-party media in this repository. Optional demo data is downloaded on request
+MediaIndex does not bundle any third-party media in this repository. The only bundled third-party data is the place list below. Optional demo data is downloaded on request
 to `data/demo/`, which is git-ignored.
+
+## Bundled place names: GeoNames cities15000
+- `backend/mediaindex/resources/places.tsv.gz` (and the Mac app) contains a reduced copy of **GeoNames** `cities15000`,
+  `admin1CodesASCII` and `countryInfo` (https://www.geonames.org, downloaded 2026-10-20), licensed under
+  **CC BY 4.0** (https://creativecommons.org/licenses/by/4.0/). Changes: only name, region, country, position and
+  population are kept, sections of cities and historical places are removed, and positions are rounded to 4 decimals
+  (`scripts/build_places.py`). It is used only to name photo GPS positions on this computer.
 
 ## Optional demo image pack: KoalaAI/StockImages-CC0
 - Source: https://huggingface.co/datasets/KoalaAI/StockImages-CC0, pinned revision `206f3575579f1187548c6f47042ae9174c0a51fc`.

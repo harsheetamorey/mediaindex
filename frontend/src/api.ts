@@ -34,7 +34,12 @@ export type Asset = {
   source: SourceRecord
   thumbnail_url: string
   file_url: string
+  taken_at?: string | null // EXIF date taken, camera-local time
+  place?: string | null // named offline from EXIF GPS
 }
+
+/** Photos taken between these days (YYYY-MM-DD, both included); '' = open-ended. */
+export type DateRange = { from: string; to: string }
 
 export type Segment = { start_s: number | null; end_s: number | null; similarity: number; window_thumbnail_url?: string }
 
@@ -265,10 +270,10 @@ export const api = {
   assetPath: (id: string) => request<{ path: string }>(`/api/assets/${id}/path`),
   reveal: (id: string) => request<{ revealed: boolean }>(`/api/assets/${id}/reveal`, { method: 'POST' }),
 
-  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48, globalRank = false) =>
+  searchText: (text: string, libraryIds: string[] | null, mediaTypes: MediaType[] = ['image'], limit = 48, globalRank = false, dates?: DateRange) =>
     request<SearchResponse>(
       '/api/search/text',
-      json({ text, library_ids: libraryIds, media_types: mediaTypes, limit, global_rank: globalRank }),
+      json({ text, library_ids: libraryIds, media_types: mediaTypes, limit, global_rank: globalRank, date_from: dates?.from || null, date_to: dates?.to || null }),
     ),
   videoWindow: (assetId: string, startS: number, target: MediaType, libraryIds: string[] | null, includeSameVideo = false) =>
     request<SearchResponse>(
@@ -310,10 +315,13 @@ export const api = {
     includeIdentical: boolean,
     target: MediaType = 'image',
     limit = 48,
+    dates?: DateRange,
   ) => {
     const form = new FormData()
     if (ref.file) form.append('file', ref.file)
     if (ref.assetId) form.append('asset_id', ref.assetId)
+    if (dates?.from) form.append('date_from', dates.from)
+    if (dates?.to) form.append('date_to', dates.to)
     form.append('target', target)
     if (libraryIds?.length) form.append('library_ids', libraryIds.join(','))
     form.append('limit', String(limit))

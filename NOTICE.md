@@ -55,6 +55,9 @@ https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz.
 The built UI bundle (`frontend/dist`, not committed) contains React (MIT).
 
 ## Data
+Place names for photo GPS positions come from **GeoNames** (cities15000), © GeoNames, licensed under **CC BY 4.0**; a
+reduced copy is bundled (`backend/mediaindex/resources/places.tsv.gz`, details in `THIRD_PARTY_DATA.md`).
+
 No media is included in this repository. Optional demo downloads, their publisher-declared licences, and their provenance are described in
 `THIRD_PARTY_DATA.md`. **A publisher's declaration is not a rights audit.** The optional benchmark data (Clotho) is licensed for
 non-commercial experimental use only. It is used only for local evaluation and is never bundled.

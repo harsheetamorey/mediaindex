@@ -11,6 +11,7 @@ import {
   type SearchResponse,
   type Selection,
   type Target,
+  type DateRange,
 } from './api'
 import { useSegmentPlayer } from './lib/player'
 import DetailPanel from './components/DetailPanel'
@@ -207,6 +208,7 @@ export default function App() {
   }, [activeIds, refreshLibraries])
 
   const libraryIds = selected.size ? Array.from(selected) : null
+  const [dates, setDates] = useState<DateRange>({ from: '', to: '' })
 
   const runSearch = useCallback(async () => {
     const seq = ++searchSeq.current
@@ -215,6 +217,7 @@ export default function App() {
     try {
       player.stop()
       const single: MediaType = target === 'all' ? (reference?.media ?? 'image') : target
+      const when = target === 'image' || target === 'all' ? dates : undefined // only photos have a date taken
       const r = reference
         ? reference.media === 'audio'
           ? await api.searchAudioReference(
@@ -230,8 +233,10 @@ export default function App() {
               libraryIds,
               includeIdentical,
               single,
+              48,
+              when,
             )
-        : await api.searchText(text.trim(), libraryIds, target === 'all' ? ['image', 'audio', 'video'] : [target], 48, globalRank)
+        : await api.searchText(text.trim(), libraryIds, target === 'all' ? ['image', 'audio', 'video'] : [target], 48, globalRank, when)
       if (seq !== searchSeq.current) return
       setResponse(r)
       setFocused(0)
@@ -242,7 +247,7 @@ export default function App() {
     } finally {
       if (seq === searchSeq.current) setSearching(false)
     }
-  }, [reference, text, libraryIds, includeIdentical, target, player, globalRank])
+  }, [reference, text, libraryIds, includeIdentical, target, player, globalRank, dates])
 
   const results = useMemo(() => {
     const rs = response?.results ?? []
@@ -259,6 +264,12 @@ export default function App() {
           Object.values(rawState as Record<string, IndexState>)[0])
         : undefined
   const grouped = response?.grouping === 'by_modality'
+  const dq = response?.query.dates as { from: string | null; to: string | null; photos: number; undated_photos: number } | undefined
+  const dateNote = dq
+    ? `Only photos taken ${dq.from && dq.to ? `from ${dq.from} to ${dq.to}` : dq.from ? `on or after ${dq.from}` : `on or before ${dq.to}`} ` +
+      `(${dq.photos} ${dq.photos === 1 ? 'photo' : 'photos'}).` +
+      (dq.undated_photos ? ` ${dq.undated_photos} ${dq.undated_photos === 1 ? 'photo has' : 'photos have'} no date and ${dq.undated_photos === 1 ? 'is' : 'are'} left out.` : '')
+    : null
   const objectCheck = response?.object_check
   const sections: { label: string; offset: number; items: Result[] }[] = grouped
     ? (['image', 'audio', 'video'] as MediaType[])
@@ -457,6 +468,8 @@ export default function App() {
             modes={modes}
             onSearch={runSearch}
             searching={searching}
+            dates={dates}
+            onDates={setDates}
           />
 
           <section className="results" aria-busy={searching}>
@@ -486,6 +499,7 @@ export default function App() {
                     </span>
                   )}
                 </div>
+                {dateNote && <p className="muted small">{dateNote}</p>}
                 {st && st.state === 'partial' && (
                   <div className="banner warn">
                     Only {st.searchable} of {st.total} items are indexed so far. Results cover indexed items only.
