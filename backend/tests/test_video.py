@@ -131,3 +131,22 @@ def test_broken_video_marked_failed(tmp_path):
     st, prof, host, lib, ev = _env(tmp_path, root)
     r = run_image_import(JobContext(Job(id="j", kind="import"), None), st, tmp_path / "t", lib["id"], None, embed_video=ev)
     assert r["failed"][0][0] == "broken.mp4" and st.list_assets(lib["id"])[0]["status"] == "failed"
+
+
+def test_iphone_style_mov_with_rotation(tmp_path):
+    """iPhones save .mov files, and portrait video is stored sideways with a rotation flag."""
+    src = color_video(tmp_path / "src.mp4", colors=["red", "blue"], seg_s=2)
+    mov = tmp_path / "lib" / "IMG_0042.MOV"
+    mov.parent.mkdir()
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-display_rotation", "90", "-i", str(src), "-c", "copy", str(mov)],
+                   check=True)
+    info = probe_video(mov)
+    assert (info.width, info.height) == (90, 160)  # as displayed, not as stored (160x90)
+    frames, _ = sample_frames(mov, info, 0, 2, fps=1.0)
+    assert frames.shape[1:] == (160, 90, 3) and np.allclose(frames[0].reshape(-1, 3).mean(0), RGB["red"], atol=40)
+    st = Store(Database(tmp_path / "db.sqlite3"))
+    lib = st.create_library("phone", mov.parent)
+    r = run_image_import(JobContext(Job(id="j", kind="import"), None), st, tmp_path / "thumbs", lib["id"])
+    assert r["video_files"] == 1 and r["failed"] == []
+    a = st.list_assets(lib["id"])[0]
+    assert a["media_type"] == "video" and (a["width"], a["height"]) == (90, 160)

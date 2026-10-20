@@ -17,7 +17,7 @@ from PIL import Image
 
 from .audio import SAFE_INPUT, ffmpeg_bin
 
-VIDEO_EXTENSIONS = {".mp4"}
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v"}  # .mov: iPhone and most cameras (the same ISO media container)
 SUPPORTED_VIDEO_CODECS = {"h264", "hevc", "mpeg4", "av1", "vp9"}
 MAX_FILE_BYTES = 8 * 1024 * 1024 * 1024
 MAX_DURATION_S = 6 * 3600
@@ -31,7 +31,7 @@ class VideoRejected(ValueError):
 @dataclass
 class VideoInfo:
     codec: str
-    width: int
+    width: int  # as displayed: phones store portrait video sideways with a rotation flag, which FFmpeg applies
     height: int
     fps: float
     duration: float
@@ -46,7 +46,8 @@ def probe_video(path: Path) -> VideoInfo:
     if size > MAX_FILE_BYTES:
         raise VideoRejected(f"file too large ({size} bytes)")
     cmd = [ffmpeg_bin("ffprobe"), *SAFE_INPUT, "-v", "error", "-show_entries",
-           "stream=codec_type,codec_name,width,height,avg_frame_rate:format=duration,format_name",
+           "stream=codec_type,codec_name,width,height,avg_frame_rate:stream_side_data=rotation:stream_tags=rotate:"
+           "format=duration,format_name",
            "-of", "json", "--", str(path)]
     try:
         out = subprocess.run(cmd, capture_output=True, timeout=60, check=False)
@@ -56,8 +57,8 @@ def probe_video(path: Path) -> VideoInfo:
         raise VideoRejected(f"cannot read video: {out.stderr.decode(errors='replace').strip()[:200]}")
     data = json.loads(out.stdout or b"{}")
     fmt = data.get("format") or {}
-    if "mp4" not in (fmt.get("format_name") or ""):
-        raise VideoRejected(f"unsupported container {fmt.get('format_name')!r}; MP4 is supported")
+    if "mp4" not in (fmt.get("format_name") or "").split(","):  # "mov,mp4,m4a,3gp,3g2,mj2" for .mp4 and .mov
+        raise VideoRejected(f"unsupported container {fmt.get('format_name')!r}; MP4 and MOV are supported")
     streams = data.get("streams") or []
     v = next((s for s in streams if s.get("codec_type") == "video"), None)
     a = next((s for s in streams if s.get("codec_type") == "audio"), None)
@@ -76,8 +77,24 @@ def probe_video(path: Path) -> VideoInfo:
         raise VideoRejected("unknown or zero duration")
     if duration > MAX_DURATION_S:
         raise VideoRejected(f"video too long ({duration:.0f}s)")
-    return VideoInfo(v["codec_name"], int(v.get("width") or 0), int(v.get("height") or 0), fps, duration,
-                     a is not None, a.get("codec_name") if a else None)
+    w, h = int(v.get("width") or 0), int(v.get("height") or 0)
+    if _rotation(v) % 180 == 90:
+        w, h = h, w
+    return VideoInfo(v["codec_name"], w, h, fps, duration, a is not None, a.get("codec_name") if a else None)
+
+
+def _rotation(stream: dict) -> int:
+    """Display rotation in degrees (0, 90, 180, 270) from the display matrix, or the older "rotate" tag."""
+    for sd in stream.get("side_data_list") or []:
+        if "rotation" in sd:
+            try:
+                return int(round(float(sd["rotation"]))) % 360
+            except (TypeError, ValueError):
+                pass
+    try:
+        return int((stream.get("tags") or {}).get("rotate") or 0) % 360
+    except ValueError:
+        return 0
 
 
 def _scaled(info: VideoInfo, max_side: int) -> tuple[int, int]:

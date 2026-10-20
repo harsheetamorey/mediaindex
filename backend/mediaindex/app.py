@@ -297,7 +297,8 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
             except ImageRejected:
                 raise HTTPException(422, "cannot decode image")
         media = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp",
-                 ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg", ".mp4": "video/mp4"}
+                 ".wav": "audio/wav", ".flac": "audio/flac", ".mp3": "audio/mpeg", ".mp4": "video/mp4",
+                 ".mov": "video/mp4", ".m4v": "video/mp4"}  # same container; browsers refuse "video/quicktime" more often
         return FileResponse(p, media_type=media.get(p.suffix.lower(), "application/octet-stream"))
 
     app.state.public_asset = _public_asset
