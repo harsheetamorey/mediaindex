@@ -101,8 +101,7 @@ videos are left out while it is set. API: `date_from` / `date_to` (`YYYY-MM-DD`,
 ## Setup
 
 1. **Object counts:** download the detector once, then open **Ask** and press **Count objects**.
-   - `MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.detect --download` fetches RT-DETR (~170 MB, pinned
-     revision) and checks that it runs. The server itself never downloads; if the detector is missing, **Count objects**
+   - `uv run python -m mediaindex setup` fetches RT-DETR (~170 MB, pinned revision) together with the search model. The server itself never downloads; if the detector is missing, **Count objects**
      fails with this command in the message.
    - The Mac app downloads it together with EmbeddingGemma on first launch.
    - Counting is about 0.3 s per photo; 512 photos took **145–151 s** on an M1.

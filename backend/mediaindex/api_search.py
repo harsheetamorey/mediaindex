@@ -111,7 +111,8 @@ def embed_query(app: FastAPI, fn):
         raise HTTPException(507, str(e))
     except (OSError, RuntimeError) as e:
         if not host.loaded:
-            raise HTTPException(503, f"model could not be loaded: {e}. Run the Phase 1 setup to cache weights.")
+            raise HTTPException(503, f"model could not be loaded: {e}. Run this once in the MediaIndex folder: "
+                                     f"uv run python -m mediaindex setup")
         raise
 
 

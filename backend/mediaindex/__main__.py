@@ -1,4 +1,6 @@
-"""Entry point: `uv run python -m mediaindex` (loopback only, single worker, one instance per data dir)."""
+"""Entry point: `uv run python -m mediaindex` (loopback only, single worker, one instance per data dir).
+
+`uv run python -m mediaindex setup` downloads the models once (setup.py)."""
 
 from __future__ import annotations
 
@@ -6,8 +8,9 @@ import os
 import sys
 
 # Normal use is offline: model files come from the local cache only, and library telemetry is off.
-# (First-time setup downloads the weights explicitly: see README / scripts/model_smoke.py.)
-if os.environ.get("MEDIAINDEX_ALLOW_DOWNLOAD") != "1":
+# (First-time setup downloads the weights explicitly: `python -m mediaindex setup`.)
+SETUP = sys.argv[1:2] == ["setup"]
+if os.environ.get("MEDIAINDEX_ALLOW_DOWNLOAD") != "1" and not SETUP:
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
@@ -22,6 +25,10 @@ from .instance import AlreadyRunning, acquire_instance_lock  # noqa: E402
 
 
 def main() -> None:
+    if SETUP:
+        from .setup import main as setup_main
+
+        raise SystemExit(setup_main(sys.argv[2:]))
     settings = Settings()
     settings.ensure_dirs()
     try:

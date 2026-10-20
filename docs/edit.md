@@ -44,10 +44,12 @@ In the **Ask** tab you can change a photo or make something new by asking in pla
 ## Setup
 
 ```bash
-MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.edit --download        # remove: SAM + LaMa (~580 MB)
-uv sync --extra create                                                          # replace / make images: diffusers, peft
-MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.creative --download    # Stable Diffusion inpainting + LCM (~2.1 GB)
+uv sync --extra create                          # replace / make images: diffusers, peft (skip for removing only)
+uv run python -m mediaindex setup --editing     # SAM + LaMa (~580 MB), and Stable Diffusion inpainting + LCM (~2.1 GB)
 ```
+
+(The older per-model commands, `MEDIAINDEX_ALLOW_DOWNLOAD=1 uv run python -m mediaindex.edit --download` and
+`… mediaindex.creative --download`, still work.)
 
 The server never downloads. If a model is missing, the answer gives the command to run. Making videos needs only FFmpeg.
 

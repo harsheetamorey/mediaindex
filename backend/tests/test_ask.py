@@ -294,6 +294,6 @@ def test_missing_detector_fails_clearly(tmp_path):
         lib = c.post("/api/libraries", json={"path": str(root)}).json()
         wait_job(c, c.post(f"/api/libraries/{lib['id']}/import").json()["id"])
         job = wait_job(c, c.post("/api/ask/prepare", json={}).json()["id"])
-        assert job["status"] == "failed" and "python -m mediaindex.detect --download" in job["error"]
-        assert "mediaindex.detect --download" in c.get("/api/ask/status").json()["detector"]["error"]
+        assert job["status"] == "failed" and "python -m mediaindex setup" in job["error"]
+        assert "mediaindex setup" in c.get("/api/ask/status").json()["detector"]["error"]
 
