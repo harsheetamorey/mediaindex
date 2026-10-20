@@ -132,7 +132,7 @@ Results are nearest neighbours by cosine similarity, so the closest items are **
 Scores are hidden by default and are never shown as percentages. Searching several media types at once groups results by type, because similarity
 scales are not comparable across types.
 
-**Supported formats:** JPEG, PNG, WebP and HEIC/HEIF (iPhone) images; WAV, FLAC and MP3 audio; MP4 video (H.264 tested). Audio is indexed in 10 s windows (5 s stride).
+**Supported formats:** JPEG, PNG, WebP and HEIC/HEIF (iPhone) images; WAV, FLAC and MP3 audio; MP4 and MOV (iPhone) video (H.264 tested; portrait phone video is turned upright). Audio is indexed in 10 s windows (5 s stride).
 Video is indexed in 8 s windows (4 s stride) of frames sampled at 1 frame/s plus the window's soundtrack. Timestamps are only as precise as these windows.
 
 **Creator outputs:** persistent ordered selections, a JSON manifest (source paths, hashes, source and licence records, how each item was found),
@@ -165,7 +165,7 @@ text→audio benchmark, EmbeddingGemma 2 scores well below the specialist LAION-
 | "model could not be loaded" | Run the model-download step once with `MEDIAINDEX_ALLOW_DOWNLOAD=1` (it needs network). |
 | "another MediaIndex process is already using …" | Only one server per data directory. Stop the other one. |
 | 503 "model is busy" | A long indexing step holds the model. Retry, or raise `MEDIAINDEX_QUERY_WAIT` (seconds, default 30). |
-| Sounds or videos fail to import | Install FFmpeg 6+ and make sure `ffmpeg` and `ffprobe` are on PATH. Only MP4 video is accepted. |
+| Sounds or videos fail to import | Install FFmpeg 6+ and make sure `ffmpeg` and `ffprobe` are on PATH. Only MP4, MOV and M4V video is accepted. |
 | Search says "different model profile" (409) | The library was indexed with other model settings. Click **Re-scan** to reindex. |
 | Port 8765 in use | `MEDIAINDEX_PORT=8800 uv run python -m mediaindex`. The UI is served from the same port. |
 | Out-of-memory on 8 GB | Close other heavy apps, or run on CPU with `MEDIAINDEX_DEVICE=cpu` (slower). |

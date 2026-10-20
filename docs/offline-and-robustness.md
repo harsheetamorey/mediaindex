@@ -42,7 +42,7 @@ A control `curl https://huggingface.co` inside the profile failed (exit 7), and 
 | Single instance | New: a `flock` on `<data>/.mediaindex.lock` refuses a second server on the same data dir. Found when a stray process ran recovery concurrently. |
 | Paths | Libraries are explicit absolute folders, not `/` or `$HOME`. Media is served by asset ID only, re-resolved inside the root, with symlink escapes rejected. Exports cannot target library folders. |
 | Uploads | New: request bodies over 60 MB are rejected **before parsing** (ASGI middleware, also for chunked bodies). Per-type limits are 25 MB images and 50 MB audio. Server-generated names. Deleted after use and swept at startup. Multipart spooling is redirected to `<data>/tmp_spool` (emptied at start) instead of the system temp dir. |
-| Decoding limits | Images ≤ 80 MP and ≤ 200 MB. Audio ≤ 4 h. Video ≤ 6 h, MP4 only, allow-listed codecs. FFprobe and FFmpeg have timeouts. |
+| Decoding limits | Images ≤ 80 MP and ≤ 200 MB. Audio ≤ 4 h. Video ≤ 6 h, MP4/MOV/M4V only, allow-listed codecs. FFprobe and FFmpeg have timeouts. |
 | FFmpeg | Argument lists only (no shell), `--` before probe paths, absolute paths. New: `-protocol_whitelist file,pipe` on every invocation, so a crafted playlist inside a `.mp3` cannot reach a URL (test added). |
 | Cleanup | Partial export and clip files are removed on failure, cancel or disk-full. Stale uploads are removed at startup. |
 | Reveal | `open -R <path>` as an argument list, path from the ID resolver. |

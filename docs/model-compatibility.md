@@ -89,4 +89,4 @@ This verifies local-only loading. A test with outbound network blocked is deferr
   longest side ≤ 768 px), and a vision budget of 140 soft tokens per frame (**1,120 tokens per window**, or +200 audio tokens for joint).
   Stored modalities: `video-visual` (native video), `video-audio` (the window's soundtrack via the audio encoder, only when the file has audio), and optionally
   `video-joint` (`video_modalities` profile setting, off by default because it costs a third forward pass and mostly duplicates the visual vector).
-- MP4 container only. Video codecs h264/hevc/mpeg4/av1/vp9 pass the probe, but only H.264 was exercised. Other containers or codecs are rejected with a message.
+- MP4 container (`.mp4`, `.mov`, `.m4v`; added MOV for iPhone video on 2026-10-20, with the display rotation applied). Video codecs h264/hevc/mpeg4/av1/vp9 pass the probe, but only H.264 was exercised. Other containers or codecs are rejected with a message.
