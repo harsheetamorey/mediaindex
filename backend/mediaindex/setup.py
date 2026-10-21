@@ -96,12 +96,11 @@ def check_search_model() -> bool:
     """Load the search model from the local cache and embed one sentence (the same path the app uses)."""
     from .config import Settings
     from .model.backend import make_backend
-    from .model.profiles import IndexProfile
 
     settings = Settings()
     _say("check", f"loading the search model on {settings.resolved_device()}…")
     os.environ["HF_HUB_OFFLINE"] = "1"
-    backend = make_backend(IndexProfile(precision=settings.resolved_precision()), device=settings.resolved_device())
+    backend = make_backend(settings.index_profile(), device=settings.resolved_device())
     try:
         v = backend.embed_query_texts(["a dog on a beach"])[0]
     finally:

@@ -14,7 +14,7 @@ from typing import Protocol, Sequence
 import numpy as np
 from PIL import Image
 
-from ..config import auto_device, free_device_memory
+from ..config import auto_device, free_device_memory, use_all_cores
 from .profiles import IndexProfile
 
 
@@ -61,6 +61,8 @@ class GemmaBackend:
         if device == "auto":
             device = auto_device(torch)
         self.device = device
+        if device == "cpu":
+            use_all_cores(torch)
         self.profile = profile
         config_kwargs = {}
         if "image" not in profile.encoders:
@@ -112,13 +114,15 @@ class GemmaBackend:
     def embed_images(self, images: Sequence[Image.Image]) -> np.ndarray:
         if not self.capabilities()["image"]:
             raise CapabilityUnavailable("image encoder not loaded in this profile")
-        return self._encode([{"image": im.convert("RGB")} for im in images], batch_size=2)
+        return self._encode([{"image": im.convert("RGB")} for im in images], batch_size=2,
+                            processing_kwargs=self._image_kwargs())
 
     def embed_image_text(self, image: Image.Image, text: str) -> np.ndarray:
         """Native single-pass image+text embedding (verified interface, not an average)."""
         if not self.capabilities()["image+text"]:
             raise CapabilityUnavailable("image+text requires the image encoder")
-        return self._encode([{"text": self.profile.query_prompt + text, "image": image.convert("RGB")}], batch_size=1)
+        return self._encode([{"text": self.profile.query_prompt + text, "image": image.convert("RGB")}], batch_size=1,
+                            processing_kwargs=self._image_kwargs())
 
     def embed_audio(self, arrays: Sequence[np.ndarray], sampling_rate: int = 16000) -> np.ndarray:
         """Mono float32 arrays at 16 kHz (model card), no prompt prefix."""
@@ -126,6 +130,9 @@ class GemmaBackend:
             raise CapabilityUnavailable("audio encoder not loaded in this profile")
         return self._encode([{"audio": {"array": np.asarray(a, np.float32), "sampling_rate": sampling_rate}}
                              for a in arrays], batch_size=2)
+
+    def _image_kwargs(self) -> dict:  # 280 is the model's default (passing it gives bit-identical vectors)
+        return {"image": {"max_soft_tokens": self.profile.image_max_soft_tokens}}
 
     def _video_input(self, frames: np.ndarray, fps: float) -> dict:
         meta = {"fps": float(fps), "total_num_frames": int(len(frames)), "duration": float(len(frames) / fps)}

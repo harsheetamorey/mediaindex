@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [windows-speed]
-    paths: [evaluation/bench_cpu.py, .github/workflows/windows-speed.yml]
+    paths: [evaluation/bench_cpu.py, scripts/index_speed_check.py, backend/mediaindex/**, .github/workflows/windows-speed.yml]
 
 permissions:
   contents: read
@@ -36,6 +36,23 @@ jobs:
         with:
           name: bench-${{ matrix.variant }}-${{ matrix.threads }}
           path: bench-out
+
+  app:
+    # The app itself on Windows (real model, CPU): indexing speed, and the upgrade from 1.1.0 re-indexing by itself.
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      MEDIAINDEX_ALLOW_DOWNLOAD: "1"
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: choco install ffmpeg -y --no-progress
+      - run: uv sync --frozen
+      - run: uv run python scripts/index_speed_check.py --photos 24 | tee -a "$GITHUB_STEP_SUMMARY"
 
   summary:
     needs: bench
