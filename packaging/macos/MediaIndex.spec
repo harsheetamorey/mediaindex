@@ -1,10 +1,12 @@
 # PyInstaller spec for MediaIndex.app (macOS, Apple silicon). Build with: scripts/build_mac_app.sh
 # The model weights are NOT bundled: the app downloads them once on first launch, after asking.
+import tomllib
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 ROOT = Path(SPECPATH).resolve().parents[1]
+VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
 datas = [(str(ROOT / "frontend" / "dist"), "frontend_dist")]
 FFMPEG = ROOT / "build-app" / "ffmpeg"  # static FFmpeg 9.0.2 (GPL), fetched and checked by scripts/build_mac_app.sh
 binaries = [(str(FFMPEG / name), "ffmpeg_bin") for name in ("ffmpeg", "ffprobe")]
@@ -33,6 +35,6 @@ exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="MediaIndex", console=
           upx=False)
 coll = COLLECT(exe, a.binaries, a.datas, name="MediaIndex", upx=False)
 app = BUNDLE(coll, name="MediaIndex.app", bundle_identifier="io.github.harsheetamorey.mediaindex",
-             info_plist={"CFBundleShortVersionString": "1.0.0", "CFBundleDisplayName": "MediaIndex",
+             info_plist={"CFBundleShortVersionString": VERSION, "CFBundleDisplayName": "MediaIndex",
                          "NSHighResolutionCapable": True, "LSMinimumSystemVersion": "13.0",
                          "LSApplicationCategoryType": "public.app-category.photography"})
