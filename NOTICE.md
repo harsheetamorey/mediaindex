@@ -38,8 +38,9 @@ Code, models and media each have their own terms, and they are kept separate bel
 | soundfile | 0.14.0 | BSD-3-Clause |
 | psutil | 7.2.2 | BSD-3-Clause |
 | diffusers / peft / accelerate (optional `create` extra) | 0.41.0 / 0.21.2 / 1.15.0 | Apache-2.0 |
-| pywebview (optional `app` extra, included in the Mac app) | 6.2.1 | BSD-3-Clause |
-| pyinstaller (optional `app` extra, builds the Mac app) | 6.22.3 | GPL-2.0 with a bootloader exception |
+| pywebview (optional `app` extra, included in the Mac and Windows apps) | 6.2.1 | BSD-3-Clause |
+| pythonnet / clr-loader (Windows app only, used by pywebview) | 3.2.0 / 0.3.1 | MIT |
+| pyinstaller (optional `app` extra, builds the Mac and Windows apps) | 6.22.3 | GPL-2.0 with a bootloader exception |
 | pyarrow (optional `demo` extra) | 25.0.1 | Apache-2.0 |
 | py7zr (optional `bench` extra) | 1.1.3 | LGPL-2.1-or-later |
 | react / react-dom / scheduler | 19.3.0 / 19.3.0 / 0.28.0 | MIT |
@@ -51,6 +52,9 @@ The Mac app includes static FFmpeg 9.0.2 builds for arm64 by Martin Riedl (https
 **GPL-3.0** (built with `--enable-gpl --enable-version3`). MediaIndex runs them as separate processes and does not link them.
 Their licence notice and source links ship in the app (`Contents/Resources/ffmpeg_bin/LICENSE-ffmpeg.txt`); FFmpeg source:
 https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz.
+The Windows app includes the FFmpeg 9.0.2 "essentials" build by Gyan Doshi (https://www.gyan.dev/ffmpeg/builds/, pinned
+and checksum-checked by `scripts/build_windows_app.ps1`), also **GPL-3.0** and also run as separate processes. Its licence
+and source links ship in `_internal/ffmpeg_bin/`.
 
 The built UI bundle (`frontend/dist`, not committed) contains React (MIT).
 

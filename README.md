@@ -5,7 +5,7 @@
 Ask your photo library questions, find what you describe, and remove or replace things in a photo, all on your Mac.
 Nothing is uploaded: no account, no cloud, no telemetry.
 
-**[⬇ Download for Mac (Apple silicon)](https://github.com/harsheetamorey/mediaindex/releases/latest)** · free and open source
+**[⬇ Download for Mac (Apple silicon) or Windows (x64)](https://github.com/harsheetamorey/mediaindex/releases/latest)** · free and open source
 
 ![MediaIndex counting dogs, finding red cars, then removing four benches and replacing them with a table](docs/assets/demo.gif)
 
@@ -27,6 +27,13 @@ It also searches sounds and videos by description, and opens a video at the matc
 4. Click **+ Add folder** and pick a folder of photos. You can search as soon as the first ones are indexed.
 
 Needs an Apple silicon Mac (M1 or later) with macOS 13+. 8 GB of memory works; editing is faster with 16 GB.
+
+**Windows 10/11 (x64):** download `MediaIndex-…-windows-x64.zip`, unzip it anywhere (for example into your Documents), and
+run **MediaIndex\MediaIndex.exe**. It isn't signed, so the first time Windows may say "Windows protected your PC": click
+**More info → Run anyway**. FFmpeg is included; the models download on first launch as on the Mac. It runs on the CPU, so
+indexing is slower than on an Apple silicon Mac. Your data is in `%LOCALAPPDATA%\MediaIndex` (with a `mediaindex.log`).
+The Windows app is built and start-checked on GitHub's Windows machines but hasn't been tried on many real PCs yet:
+please report problems in [issue #7](https://github.com/harsheetamorey/mediaindex/issues/7).
 For free-form chat and photo descriptions in Ask, also install [Ollama](https://ollama.com) and run `ollama pull gemma4:e2b-it-qat`
 (optional: counting, finding and editing work without it).
 
@@ -79,8 +86,8 @@ uv run python -m mediaindex                     # open http://127.0.0.1:8765
 - `uv sync` installs the CPU build of PyTorch. With an NVIDIA GPU, install a CUDA build of the same torch version
   (see [pytorch.org](https://pytorch.org/get-started/locally/)). MediaIndex then picks `cuda` on its own; `MEDIAINDEX_DEVICE=cpu`
   forces the CPU.
-- Finder tags on exported files are a macOS feature and are skipped. There is no Windows desktop app yet: open the
-  address above in your browser.
+- Finder tags on exported files are a macOS feature and are skipped. To build the Windows app yourself:
+  `powershell -ExecutionPolicy Bypass -File scripts\build_windows_app.ps1`.
 - The unit tests run on Windows in CI. The real models haven't been checked on a Windows PC yet; please report how it goes
   in [issue #7](https://github.com/harsheetamorey/mediaindex/issues/7).
 
