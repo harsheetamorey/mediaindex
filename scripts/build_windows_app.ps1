@@ -36,5 +36,8 @@ Copy-Item "$ff\LICENSE-GPLv3.txt" "dist-app\MediaIndex\_internal\ffmpeg_bin\" -E
 $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
 $out = "dist-app\MediaIndex-$version-windows-x64.zip"
 if (Test-Path $out) { Remove-Item $out }
-Compress-Archive -Path dist-app\MediaIndex -DestinationPath $out
+# tar.exe (bsdtar, in Windows 10+) writes "/" in zip paths as the format requires; Windows PowerShell's
+# Compress-Archive writes "\", which other unzip tools turn into odd file names.
+tar.exe -a -c -f $out -C dist-app MediaIndex
+if ($LASTEXITCODE) { throw "zip failed" }
 Write-Host "built: dist-app\MediaIndex\MediaIndex.exe, $out ($([math]::Round((Get-Item $out).Length / 1MB)) MB)"
