@@ -49,8 +49,9 @@ def load(variant: str):
                             config_kwargs={"audio_config": None})
     m.eval()
     if variant == "int8":
-        if "fbgemm" not in torch.backends.quantized.supported_engines:  # Arm CPUs
-            torch.backends.quantized.engine = "qnnpack"
+        engines = torch.backends.quantized.supported_engines
+        torch.backends.quantized.engine = next(e for e in ("x86", "fbgemm", "onednn", "qnnpack") if e in engines)
+        print("quantized engine:", torch.backends.quantized.engine, engines)
         q = torch.ao.quantization
         names = {n: q.default_dynamic_qconfig for n, mod in m.named_modules()  # the patch embedder reads its weight dtype
                  if isinstance(mod, torch.nn.Linear) and "patch_embedder" not in n}

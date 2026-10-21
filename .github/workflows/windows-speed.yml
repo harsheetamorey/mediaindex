@@ -19,11 +19,7 @@ jobs:
       matrix:
         include:  # threads 0 = torch's default (physical cores); 4 = every logical core of the runner
           - {variant: fp32, threads: 0}
-          - {variant: fp32, threads: 4}
-          - {variant: fp32-b8, threads: 0}
-          - {variant: bf16, threads: 0}
-          - {variant: int8, threads: 0}
-          - {variant: tok140, threads: 0}
+          - {variant: int8, threads: 4}
           - {variant: tok140, threads: 4}
     defaults:
       run:
