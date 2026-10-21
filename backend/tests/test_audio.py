@@ -135,7 +135,7 @@ def test_compatible_profile_rekey_preserves_image_vectors(tmp_path):
     with db.tx() as c:
         c.execute("INSERT INTO index_profiles(key, json, created_at) VALUES (?,?,?)", ("otherkey", json.dumps(incompatible), now()))
     db.close()
-    app = create_app(Settings(data_dir=tmp_path, precision="float32"), backend_factory=FakeBackend)
+    app = create_app(Settings(data_dir=tmp_path, precision="float32", image_tokens=280), backend_factory=FakeBackend)
     with TestClient(app):
         cur = app.state.profile.key
         m = app.state.store.load_matrix(cur)

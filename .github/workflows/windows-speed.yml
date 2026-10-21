@@ -1,0 +1,65 @@
+name: windows-speed
+
+# CPU speed and search quality of each way to run EmbeddingGemma 2 on a Windows PC (evaluation/bench_cpu.py).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:  # threads 0 = torch's default (physical cores); 4 = every logical core of the runner
+          - {variant: fp32, threads: 0}
+          - {variant: int8, threads: 4}
+          - {variant: tok140, threads: 4}
+    defaults:
+      run:
+        shell: bash
+    env:
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - name: Benchmark (speed only, generated phone-size photos; quality is measured on the 500-image pack locally)
+        run: uv run python evaluation/bench_cpu.py --variant ${{ matrix.variant }} --synthetic 40 --threads ${{ matrix.threads }} --tag=${{ matrix.threads != 0 && format('-t{0}', matrix.threads) || '' }} --out bench-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.variant }}-${{ matrix.threads }}
+          path: bench-out
+
+  app:
+    # The app itself on Windows (real model, CPU): indexing speed, and the upgrade from 1.1.0 re-indexing by itself.
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      MEDIAINDEX_ALLOW_DOWNLOAD: "1"
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: choco install ffmpeg -y --no-progress
+      - run: uv sync --frozen
+      - run: uv run python scripts/index_speed_check.py --photos 24 | tee -a "$GITHUB_STEP_SUMMARY"
+
+  summary:
+    needs: bench
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: bench-out
+          merge-multiple: true
+      - run: uv run --no-project --with numpy python evaluation/bench_cpu.py --summarize bench-out | tee -a "$GITHUB_STEP_SUMMARY"

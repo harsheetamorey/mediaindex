@@ -22,6 +22,12 @@ def auto_device(torch) -> str:
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def use_all_cores(torch) -> None:
+    """On the CPU, run on every logical core. torch's default is the physical cores; on a 4-thread Windows runner every
+    thread made indexing 1.6x faster (evaluation/bench_cpu.py). MEDIAINDEX_CPU_THREADS overrides."""
+    torch.set_num_threads(int(os.environ.get("MEDIAINDEX_CPU_THREADS") or os.cpu_count() or 1))
+
+
 def free_device_memory(torch, device: str) -> None:
     if device == "mps":
         torch.mps.empty_cache()
@@ -43,6 +49,7 @@ class Settings:
     port: int = int(os.environ.get("MEDIAINDEX_PORT", "8765"))
     device: str = os.environ.get("MEDIAINDEX_DEVICE", "auto")  # auto | mps | cuda | cpu
     precision: str = os.environ.get("MEDIAINDEX_PRECISION", "auto")  # auto | bfloat16 | float32
+    image_tokens: int = int(os.environ.get("MEDIAINDEX_IMAGE_TOKENS", "0"))  # 0 = auto (resolved_image_tokens)
     job_queue_size: int = 8
     query_wait_seconds: float = float(os.environ.get("MEDIAINDEX_QUERY_WAIT", "30"))
     watch_interval: float = float(os.environ.get("MEDIAINDEX_WATCH_INTERVAL", "20"))  # seconds; 0 disables watching
@@ -89,3 +96,15 @@ class Settings:
         if self.precision != "auto":
             return self.precision
         return "bfloat16" if self.resolved_device() == "mps" else "float32"
+
+    def resolved_image_tokens(self) -> int:
+        """Vision soft tokens per photo: the model's default 280 on a GPU; 140 on a CPU (a PC without an Apple or
+        NVIDIA GPU), where it indexes photos 2.4x faster (evaluation/bench_cpu.py, docs/progress.md)."""
+        if self.image_tokens:
+            return self.image_tokens
+        return 140 if self.resolved_device() == "cpu" else 280
+
+    def index_profile(self):
+        from .model.profiles import IndexProfile
+
+        return IndexProfile(precision=self.resolved_precision(), image_max_soft_tokens=self.resolved_image_tokens())

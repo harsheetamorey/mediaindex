@@ -71,6 +71,13 @@ class Store:
         r = self.db.one("SELECT * FROM libraries WHERE id = ?", (library_id,))
         return dict(r) if r else None
 
+    def libraries_to_reindex(self, profile_key: str) -> list[str]:
+        """Libraries with media searchable only under another index profile (e.g. after the profile changed)."""
+        rows = self.db.query("""SELECT DISTINCT a.library_id FROM embeddings e JOIN assets a ON a.id = e.asset_id
+                                WHERE e.profile_key != ? AND NOT EXISTS (SELECT 1 FROM embeddings c
+                                      WHERE c.asset_id = a.id AND c.profile_key = ?)""", (profile_key, profile_key))
+        return [r["library_id"] for r in rows]
+
     def list_libraries(self) -> list[dict]:
         rows = self.db.query("""
             SELECT l.*,

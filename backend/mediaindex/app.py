@@ -28,7 +28,6 @@ from .paths import PathRejected, resolve_in_root, validate_root
 from .store import Store
 from .model.backend import make_backend
 from .model.host import ModelHost
-from .model.profiles import IndexProfile
 from .security import BodySizeLimitMiddleware, LocalGuardMiddleware
 from .watch import FolderWatcher
 from .detect import DetectorHost, default_factory as default_detector_factory
@@ -62,7 +61,7 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
                editor=..., painter=...) -> FastAPI:
     settings = settings or Settings()
     settings.ensure_dirs()
-    profile = IndexProfile(precision=settings.resolved_precision())
+    profile = settings.index_profile()
     factory = backend_factory or (lambda p: make_backend(p, device=settings.resolved_device()))
     host = ModelHost(profile, factory)
     db = Database(settings.db_path)
@@ -84,6 +83,11 @@ def create_app(settings: Settings | None = None, backend_factory=None, detector_
             watcher.start()
         if store.photos_without_meta():  # photos imported before dates and places were stored
             runner.submit("read-photo-dates", lambda ctx: read_missing_photo_meta(ctx, store))
+        for lid in store.libraries_to_reindex(profile.key):  # e.g. a PC library from 1.1.0 (280 image tokens)
+            try:
+                submit_import(lid)
+            except QueueFull:  # the folder watcher picks the rest up later
+                break
         yield
         watcher.stop()
         runner.shutdown()
