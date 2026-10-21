@@ -3,9 +3,6 @@ name: windows-speed
 # CPU speed and search quality of each way to run EmbeddingGemma 2 on a Windows PC (evaluation/bench_cpu.py).
 on:
   workflow_dispatch:
-  push:
-    branches: [windows-speed]
-    paths: [evaluation/bench_cpu.py, scripts/index_speed_check.py, backend/mediaindex/**, .github/workflows/windows-speed.yml]
 
 permissions:
   contents: read

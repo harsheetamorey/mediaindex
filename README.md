@@ -30,8 +30,8 @@ Needs an Apple silicon Mac (M1 or later) with macOS 13+. 8 GB of memory works; e
 
 **Windows 10/11 (x64):** download `MediaIndex-…-windows-x64.zip`, unzip it anywhere (for example into your Documents), and
 run **MediaIndex\MediaIndex.exe**. It isn't signed, so the first time Windows may say "Windows protected your PC": click
-**More info → Run anyway**. FFmpeg is included; the models download on first launch as on the Mac. It runs on the CPU, so
-indexing is slower than on an Apple silicon Mac. Your data is in `%LOCALAPPDATA%\MediaIndex` (with a `mediaindex.log`).
+**More info → Run anyway**. FFmpeg is included; the models download on first launch as on the Mac. It runs on the CPU
+(every core, 140 vision tokens per photo instead of 280), about 2–4 s per photo; slower than an Apple silicon Mac. Your data is in `%LOCALAPPDATA%\MediaIndex` (with a `mediaindex.log`).
 The Windows app is built and start-checked on GitHub's Windows machines but hasn't been tried on many real PCs yet:
 please report problems in [issue #7](https://github.com/harsheetamorey/mediaindex/issues/7).
 For free-form chat and photo descriptions in Ask, also install [Ollama](https://ollama.com) and run `ollama pull gemma4:e2b-it-qat`
@@ -159,7 +159,9 @@ with a provenance file ([`docs/clip-export.md`](docs/clip-export.md)).
 | Memory | about 3.5 GB peak physical footprint (model in unified memory) |
 
 Precision follows the model card: bfloat16 on MPS, float32 on CPU, **never float16**. Override with `MEDIAINDEX_DEVICE=cpu|mps` and
-`MEDIAINDEX_PRECISION=float32|bfloat16`. Full numbers: [`docs/evaluation-report.md`](docs/evaluation-report.md).
+`MEDIAINDEX_PRECISION=float32|bfloat16`. On a CPU, photos use 140 vision tokens (the model's default is 280) and every
+core: 2.3–4.6× faster on GitHub's Windows machines with the same search results on the evaluation set (`MEDIAINDEX_IMAGE_TOKENS`,
+`MEDIAINDEX_CPU_THREADS` override). A library indexed the other way is re-indexed by itself when the app starts. Full numbers: [`docs/evaluation-report.md`](docs/evaluation-report.md).
 
 ## Evaluation
 A frozen 50-query image evaluation (20 text, 15 image, 15 image+text) with a local human-labelling page lives in `evaluation/`
