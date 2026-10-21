@@ -99,10 +99,11 @@ def test_incompatible_profile_rejected(tmp_path):
         lib = c.post("/api/libraries", json={"path": str(root)}).json()
         wait_job(c, c.post(f"/api/libraries/{lib['id']}/import").json()["id"])
     app2 = create_app(Settings(data_dir=data, precision="bfloat16"), backend_factory=FakeBackend)
+    r = TestClient(app2).post("/api/search/text", json={"text": "x", "library_ids": [lib["id"]]})  # before startup
+    assert r.status_code == 409 and "different model profile" in r.json()["detail"]
     with TestClient(app2) as c:
-        r = c.post("/api/search/text", json={"text": "x", "library_ids": [lib["id"]]})
-        assert r.status_code == 409 and "different model profile" in r.json()["detail"]
-        # re-import reindexes unchanged files under the new profile
-        assert wait_job(c, c.post(f"/api/libraries/{lib['id']}/import").json()["id"])["result"]["embedded"] == 1
+        # startup re-imports the library: unchanged files are reindexed under the new profile
+        job = next(j for j in c.get("/api/jobs").json() if j["kind"] == "import")
+        assert wait_job(c, job["id"])["result"]["embedded"] == 1
         r = c.post("/api/search/text", json={"text": "x", "library_ids": [lib["id"]]})
         assert r.status_code == 200 and len(r.json()["results"]) == 1
