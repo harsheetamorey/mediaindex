@@ -1,4 +1,5 @@
-"""Desktop entry point (the double-click macOS app): run the local server in-process and show it in a native window.
+"""Desktop entry point (the double-click app for macOS and Windows): run the local server in-process and show it in a
+native window (WebKit on macOS, Edge WebView2 on Windows).
 
 Same app, same rules as `python -m mediaindex`: loopback only, one model instance, one process per data
 directory. The model is never downloaded silently: if it is not in the local cache, the first window asks first.
@@ -15,7 +16,8 @@ import time
 import urllib.request
 from pathlib import Path
 
-APP_SUPPORT = Path.home() / "Library" / "Application Support" / "MediaIndex"
+APP_SUPPORT = (Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "MediaIndex"
+               if sys.platform == "win32" else Path.home() / "Library" / "Application Support" / "MediaIndex")
 MODEL_CACHE_MB = 1450 + 170  # observed sizes: EmbeddingGemma and the Ask object detector in the Hugging Face cache
 EXTRAS_MB = 358 + 196 + 2000 + 128  # SAM, LaMa, Stable Diffusion inpainting and LCM-LoRA (photo editing in Ask)
 SKIP_EXTRAS = APP_SUPPORT / "skip-editing-models"  # the user unticked photo editing at first launch
@@ -76,12 +78,12 @@ def json_str(s: str) -> str:
 
 
 def prepare_environment(need_download: bool) -> None:
-    if getattr(sys, "frozen", False):  # inside the .app bundle: user data lives in Application Support
+    if getattr(sys, "frozen", False):  # the packaged app: user data in Application Support / %LOCALAPPDATA%
         os.environ.setdefault("MEDIAINDEX_DATA_DIR", str(APP_SUPPORT))
         os.environ.setdefault("MEDIAINDEX_UI_DIR", str(Path(getattr(sys, "_MEIPASS", ".")) / "frontend_dist"))
     # The app ships its own FFmpeg; apps opened from Finder get a minimal PATH, so Homebrew's folders are added after it.
     bundled = Path(getattr(sys, "_MEIPASS", "")) / "ffmpeg_bin" if getattr(sys, "frozen", False) else None
-    extra = [p for p in ("/opt/homebrew/bin", "/usr/local/bin") if Path(p).is_dir()]
+    extra = [p for p in ("/opt/homebrew/bin", "/usr/local/bin") if sys.platform == "darwin" and Path(p).is_dir()]
     os.environ["PATH"] = os.pathsep.join([*([str(bundled)] if bundled and bundled.is_dir() else []),
                                           os.environ.get("PATH", "/usr/bin:/bin:/usr/sbin:/sbin"), *extra])
     if not need_download:  # normal use: model files from the local cache only
@@ -110,7 +112,7 @@ document.getElementById('s').textContent='Starting download…';pywebview.api.do
 <p id="s"></p></main></body></html>"""
 
 FIRST_RUN_HTML = (SETUP_HTML.replace("__TITLE__", "One-time setup")
-                  .replace("__INTRO__", "MediaIndex runs AI models on this Mac: Google EmbeddingGemma 2 for search, and an object "
+                  .replace("__INTRO__", "MediaIndex runs AI models on this computer: Google EmbeddingGemma 2 for search, and an object "
                            f"detector for counting in Ask. It downloads them once, about {MODEL_CACHE_MB / 1000:.1f} GB, from "
                            "Hugging Face. After that, MediaIndex works fully offline and never uploads your files.")
                   .replace("__CHOICE__", '<label><input type="checkbox" id="x" checked> <b>Also photo editing</b><br><small>'
@@ -312,7 +314,78 @@ def _boot(window, api, need_download: bool, settings, state: dict) -> None:
         _selftest(window, os.environ["MEDIAINDEX_DESKTOP_SELFTEST"], need_download)
 
 
+def serve_check(out: str) -> None:
+    """Support and CI: start the packaged app's server without a window or models, check the API and the UI answer,
+    and write the result as JSON to `out` (a windowed app has no console to print to)."""
+    import json
+    import shutil
+    import traceback
+
+    prepare_environment(need_download=False)  # before importing settings: it picks the port and folders
+
+    import uvicorn
+
+    from .app import create_app
+    from .config import Settings
+
+    settings = Settings()
+    settings.ensure_dirs()
+    server = uvicorn.Server(uvicorn.Config(create_app(settings), host=settings.host, port=settings.port, workers=1,
+                                           log_level="warning"))
+    failed: list[str] = []
+
+    def run() -> None:
+        try:
+            server.run()
+        except BaseException:  # noqa: BLE001
+            failed.append(traceback.format_exc())
+
+    threading.Thread(target=run, daemon=True).start()
+    url = f"http://{settings.host}:{settings.port}/"
+    result: dict = {"ok": False, "url": url, "data_dir": str(settings.data_dir)}
+    for _ in range(600):
+        if failed:
+            result["server_error"] = failed[0]
+            break
+        try:
+            health = json.load(urllib.request.urlopen(url + "api/health", timeout=1))
+            page = urllib.request.urlopen(url, timeout=5).read().decode()
+            ffmpeg = shutil.which("ffmpeg")
+            ui = '<div id="root">' in page
+            result.update(ok=ui and bool(ffmpeg), version=health["version"], platform=health["platform"], ui=ui,
+                          ffmpeg=ffmpeg)
+            break
+        except OSError as e:
+            result["last_error"] = repr(e)
+            time.sleep(0.2)
+    server.should_exit = True
+    Path(out).write_text(json.dumps(result, indent=2))
+
+
+def _console_or_log() -> None:
+    """A windowed Windows app has no console: sys.stdout is None, and the web server's logging fails on it. Send
+    output to <data>/mediaindex.log instead (also handy for support)."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    folder = Path(os.environ.get("MEDIAINDEX_DATA_DIR") or APP_SUPPORT)
+    folder.mkdir(parents=True, exist_ok=True)
+    log = open(folder / "mediaindex.log", "a", encoding="utf-8", buffering=1)
+    sys.stdout = sys.stdout or log
+    sys.stderr = sys.stderr or log
+
+
 def main() -> None:
+    _console_or_log()
+    if "--serve-check" in sys.argv:
+        out = sys.argv[sys.argv.index("--serve-check") + 1]
+        try:
+            serve_check(out)
+        except BaseException:  # noqa: BLE001 (a windowed app would show a blocking error dialog instead)
+            import json
+            import traceback
+
+            Path(out).write_text(json.dumps({"ok": False, "error": traceback.format_exc()}, indent=2))
+        os._exit(0)
     if "--check-models" in sys.argv:  # support: which model groups this app sees as downloaded
         from . import creative, edit
 
