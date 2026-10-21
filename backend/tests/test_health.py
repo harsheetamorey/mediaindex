@@ -84,3 +84,13 @@ def test_device_choice_and_pasted_windows_paths(tmp_path):
     (tmp_path / "pics").mkdir()
     assert validate_root(f'"{tmp_path / "pics"}"') == (tmp_path / "pics").resolve()  # "Copy as path" adds quotes
 
+
+
+def test_version_matches_pyproject():
+    import tomllib
+    from pathlib import Path
+
+    import mediaindex
+
+    pyproject = tomllib.loads((Path(__file__).resolve().parents[2] / "pyproject.toml").read_text())
+    assert mediaindex.__version__ == pyproject["project"]["version"]
