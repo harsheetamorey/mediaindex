@@ -38,6 +38,10 @@ jobs:
           if (-not $p.WaitForExit(300000)) { $p.Kill(); throw "the packaged app did not exit within 5 minutes" }
           Get-Content "$env:RUNNER_TEMP\check.json"
           if (-not (Get-Content "$env:RUNNER_TEMP\check.json" | ConvertFrom-Json).ok) { throw "the packaged app did not start" }
+      - name: Check the zip uses "/" in its paths
+        shell: bash
+        run: |
+          python -c "import zipfile,glob,sys; n=zipfile.ZipFile(glob.glob('dist-app/MediaIndex-*-windows-x64.zip')[0]).namelist(); bad=[x for x in n if chr(92) in x]; print(len(n), 'entries,', len(bad), 'with backslashes'); sys.exit(1 if bad or 'MediaIndex/MediaIndex.exe' not in n else 0)"
       - uses: actions/upload-artifact@v4
         with:
           name: MediaIndex-windows-x64
