@@ -67,9 +67,12 @@ def synthetic(n: int) -> list:
             for w, h in (sizes[i % len(sizes)] for i in range(n))]
 
 
-def run(variant: str, images: Path, limit: int, out: Path, n_synthetic: int = 0) -> None:
+def run(variant: str, images: Path, limit: int, out: Path, n_synthetic: int = 0, threads: int = 0, tag: str = "") -> None:
     import torch
     from PIL import Image
+
+    if threads:
+        torch.set_num_threads(threads)
 
     spec = json.loads((HERE / "queries.json").read_text())
     items = json.loads((REPO / spec["library"]["manifest"]).read_text())["items"][:limit]
@@ -109,9 +112,9 @@ def run(variant: str, images: Path, limit: int, out: Path, n_synthetic: int = 0)
 
     out.mkdir(parents=True, exist_ok=True)
     if names:
-        np.savez(out / f"{variant}.npz", images=np.vstack(vecs).astype(np.float32),
+        np.savez(out / f"{variant}{tag}.npz", images=np.vstack(vecs).astype(np.float32),
                  texts=np.vstack(T).astype(np.float32), names=np.array(names))
-    res = {"variant": variant, "batch": batch, "images": len(ims), "synthetic": bool(n_synthetic),
+    res = {"variant": variant + tag, "batch": batch, "images": len(ims), "synthetic": bool(n_synthetic),
            "platform": platform.platform(),
            "cpu": platform.processor(), "cores": os.cpu_count(), "torch_threads": torch.get_num_threads(),
            "cpu_capability": torch.backends.cpu.get_cpu_capability(), "load_s": round(load_s, 1),
@@ -122,7 +125,7 @@ def run(variant: str, images: Path, limit: int, out: Path, n_synthetic: int = 0)
         res["rss_mb"] = round(psutil.Process().memory_info().rss / 2**20)
     except ImportError:
         pass
-    (out / f"{variant}.json").write_text(json.dumps(res, indent=1))
+    (out / f"{variant}{tag}.json").write_text(json.dumps(res, indent=1))
     print(json.dumps(res, indent=1))
 
 
@@ -152,9 +155,7 @@ def summarize(d: Path) -> None:
     lines = ["| Variant | s/image | vs fp32 | query s | Text Hit@1 | Text Hit@5 | Image Hit@5 | cos to fp32 (min) "
              "| top-10 overlap with fp32 |", "|---|---|---|---|---|---|---|---|---|"]
     base_s = json.loads((d / "fp32.json").read_text())["s_per_image"] if (d / "fp32.json").exists() else None
-    for v in VARIANTS:
-        if not (d / f"{v}.json").exists():
-            continue
+    for v in sorted((p.stem for p in d.glob("*.json")), key=lambda v: (VARIANTS.index(v.split("-t")[0]), v)):
         res = json.loads((d / f"{v}.json").read_text())
         speed = f"{base_s / res['s_per_image']:.2f}×" if base_s else "–"
         if not (d / f"{v}.npz").exists():  # speed only (generated photos)
@@ -182,10 +183,12 @@ if __name__ == "__main__":
     ap.add_argument("--images", type=Path, default=REPO / "data" / "demo" / "stockimages-cc0")
     ap.add_argument("--limit", type=int, default=500)
     ap.add_argument("--synthetic", type=int, default=0)
+    ap.add_argument("--threads", type=int, default=0, help="torch CPU threads (default: torch's own choice)")
+    ap.add_argument("--tag", default="", help="suffix for the result files")
     ap.add_argument("--out", type=Path, default=HERE / "bench" / "cpu")
     ap.add_argument("--summarize", type=Path)
     a = ap.parse_args()
     if a.summarize:
         summarize(a.summarize)
     else:
-        run(a.variant, a.images, a.limit, a.out, a.synthetic)
+        run(a.variant, a.images, a.limit, a.out, a.synthetic, a.threads, a.tag)
