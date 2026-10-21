@@ -1,0 +1,50 @@
+name: windows-speed
+
+# CPU speed and search quality of each way to run EmbeddingGemma 2 on a Windows PC (evaluation/bench_cpu.py).
+on:
+  workflow_dispatch:
+  push:
+    branches: [windows-speed]
+    paths: [evaluation/bench_cpu.py, .github/workflows/windows-speed.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [fp32, fp32-b8, bf16, int8, tok140]
+    defaults:
+      run:
+        shell: bash
+    env:
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --extra demo
+      - name: 500-image CC0 pack (pinned manifest)
+        run: uv run --extra demo python scripts/download_demo.py
+      - name: Benchmark
+        run: uv run python evaluation/bench_cpu.py --variant ${{ matrix.variant }} --out bench-out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-${{ matrix.variant }}
+          path: bench-out
+
+  summary:
+    needs: bench
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: bench-out
+          merge-multiple: true
+      - run: uv run --no-project --with numpy python evaluation/bench_cpu.py --summarize bench-out | tee -a "$GITHUB_STEP_SUMMARY"
