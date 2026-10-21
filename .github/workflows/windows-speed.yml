@@ -26,11 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen --extra demo
-      - name: 500-image CC0 pack (pinned manifest)
-        run: uv run --extra demo python scripts/download_demo.py
-      - name: Benchmark
-        run: uv run python evaluation/bench_cpu.py --variant ${{ matrix.variant }} --out bench-out
+      - run: uv sync --frozen
+      - name: Benchmark (speed only, generated phone-size photos; quality is measured on the 500-image pack locally)
+        run: uv run python evaluation/bench_cpu.py --variant ${{ matrix.variant }} --synthetic 40 --out bench-out
       - uses: actions/upload-artifact@v4
         with:
           name: bench-${{ matrix.variant }}

@@ -10,7 +10,10 @@ Same model and weights in every variant; only how it runs on the CPU changes:
 Quality: the frozen image evaluation (evaluation/queries.json, human labels only) on the 500-image CC0 pack, plus how far
 each variant's vectors and top 10s move from fp32. Unlabelled results count as unknown, never as irrelevant.
 
-Usage: uv run python evaluation/bench_cpu.py --variant fp32 [--images DIR] [--limit N] [--out DIR]
+Speed alone can be measured on generated photos (--synthetic N: phone-camera sizes, same amount of model work per photo),
+for machines without the pack, such as GitHub's Windows runners.
+
+Usage: uv run python evaluation/bench_cpu.py --variant fp32 [--images DIR] [--limit N] [--synthetic N] [--out DIR]
        uv run python evaluation/bench_cpu.py --summarize DIR
 """
 
@@ -55,7 +58,16 @@ def load(variant: str):
     return m
 
 
-def run(variant: str, images: Path, limit: int, out: Path) -> None:
+def synthetic(n: int) -> list:
+    from PIL import Image
+
+    rng = np.random.default_rng(0)
+    sizes = [(4032, 3024), (3024, 4032), (1920, 1080), (2048, 1536)]
+    return [Image.fromarray(rng.integers(0, 256, (h // 8, w // 8, 3), np.uint8)).resize((w, h))
+            for w, h in (sizes[i % len(sizes)] for i in range(n))]
+
+
+def run(variant: str, images: Path, limit: int, out: Path, n_synthetic: int = 0) -> None:
     import torch
     from PIL import Image
 
@@ -74,7 +86,10 @@ def run(variant: str, images: Path, limit: int, out: Path) -> None:
         with torch.inference_mode():
             return m.encode(inputs, batch_size=bs, convert_to_numpy=True, normalize_embeddings=True, **kw)
 
-    ims = [Image.open(images / n).convert("RGB") for n in names]
+    if n_synthetic:
+        ims, names = synthetic(n_synthetic), []
+    else:
+        ims = [Image.open(images / n).convert("RGB") for n in names]
     enc([{"image": ims[0]}], 1)  # warm-up
     vecs, per_batch = [], []
     t0 = time.perf_counter()
@@ -93,12 +108,14 @@ def run(variant: str, images: Path, limit: int, out: Path) -> None:
         tq.append(time.perf_counter() - tb)
 
     out.mkdir(parents=True, exist_ok=True)
-    np.savez(out / f"{variant}.npz", images=np.vstack(vecs).astype(np.float32), texts=np.vstack(T).astype(np.float32),
-             names=np.array(names))
-    res = {"variant": variant, "batch": batch, "images": len(names), "platform": platform.platform(),
+    if names:
+        np.savez(out / f"{variant}.npz", images=np.vstack(vecs).astype(np.float32),
+                 texts=np.vstack(T).astype(np.float32), names=np.array(names))
+    res = {"variant": variant, "batch": batch, "images": len(ims), "synthetic": bool(n_synthetic),
+           "platform": platform.platform(),
            "cpu": platform.processor(), "cores": os.cpu_count(), "torch_threads": torch.get_num_threads(),
            "cpu_capability": torch.backends.cpu.get_cpu_capability(), "load_s": round(load_s, 1),
-           "s_per_image": round(img_s / len(names), 3), "s_per_image_median": round(statistics.median(per_batch), 3),
+           "s_per_image": round(img_s / len(ims), 3), "s_per_image_median": round(statistics.median(per_batch), 3),
            "query_s_median": round(statistics.median(tq), 3)}
     try:
         import psutil
@@ -138,7 +155,12 @@ def summarize(d: Path) -> None:
     for v in VARIANTS:
         if not (d / f"{v}.json").exists():
             continue
-        res, z = json.loads((d / f"{v}.json").read_text()), np.load(d / f"{v}.npz")
+        res = json.loads((d / f"{v}.json").read_text())
+        speed = f"{base_s / res['s_per_image']:.2f}×" if base_s else "–"
+        if not (d / f"{v}.npz").exists():  # speed only (generated photos)
+            lines.append(f"| {v} | {res['s_per_image']} | {speed} | {res['query_s_median']} | – | – | – | – | – |")
+            continue
+        z = np.load(d / f"{v}.npz")
         r = ranked(z)
         h = lambda qs, k: aggregate([hit_at_k(r[q["id"]], labels.get(q["id"], {}), k) for q in qs if q["id"] in r])  # noqa: E731
         cos = overlap = "–"
@@ -146,7 +168,6 @@ def summarize(d: Path) -> None:
             c = np.sum(z["images"] * base["images"], axis=1)
             cos = f"{c.mean():.4f} ({c.min():.4f})"
             overlap = f"{np.mean([len(set(r[k]) & set(base_r[k])) / 10 for k in r]):.2f}"
-        speed = f"{base_s / res['s_per_image']:.2f}×" if base_s else "–"
         lines.append(f"| {v} | {res['s_per_image']} | {speed} | {res['query_s_median']} | {fmt(h(text_qs, 1))} | "
                      f"{fmt(h(text_qs, 5))} | {fmt(h(image_qs, 5))} | {cos} | {overlap} |")
     first = json.loads(next(d.glob("*.json")).read_text())
@@ -160,10 +181,11 @@ if __name__ == "__main__":
     ap.add_argument("--variant", choices=VARIANTS)
     ap.add_argument("--images", type=Path, default=REPO / "data" / "demo" / "stockimages-cc0")
     ap.add_argument("--limit", type=int, default=500)
+    ap.add_argument("--synthetic", type=int, default=0)
     ap.add_argument("--out", type=Path, default=HERE / "bench" / "cpu")
     ap.add_argument("--summarize", type=Path)
     a = ap.parse_args()
     if a.summarize:
         summarize(a.summarize)
     else:
-        run(a.variant, a.images, a.limit, a.out)
+        run(a.variant, a.images, a.limit, a.out, a.synthetic)
